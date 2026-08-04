@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #1E293B;
+    background-color: #FDFBF7;
+  }
+
+  h1, h2, h3, .font-serif-heading {
+    font-family: 'Cinzel', 'Playfair Display', serif;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #FBF5E8;
+}
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B45309;
+}
+
+/* Custom Utilities */
+.bg-cream-gradient {
+  background: linear-gradient(180deg, #FAF7F0 0%, #FDFBF7 40%, #FFFBEB 100%);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #D4AF37 0%, #F59E0B 50%, #B45309 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-kerala-gradient {
+  background: linear-gradient(135deg, #0D472B 0%, #052E16 50%, #166534 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.glass-nav {
+  background: rgba(253, 251, 247, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.kerala-border {
+  border-image: linear-gradient(to right, #D4AF37, #F59E0B, #0D472B) 1;
+}
+
+/* Custom Kerala Kasavu Gold Frame */
+.kasavu-card {
+  position: relative;
+  border: 2px solid #D4AF37;
+  background: white;
+}
+.kasavu-card::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  border: 1px dashed rgba(212, 175, 55, 0.6);
+  pointer-events: none;
+}
