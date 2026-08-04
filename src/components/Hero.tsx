@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Ticket, Calendar, MapPin, Sparkles, Volume2, VolumeX, ArrowRight } from 'lucide-react';
+import { getAssetUrl } from '../utils/assetPath';
 
 export const Hero = () => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -134,7 +135,7 @@ export const Hero = () => {
               
               <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-cream-soft to-amber-50">
                 <img
-                  src="/images/hero_illustration.png"
+                  src={getAssetUrl('images/hero_illustration.png')}
                   alt="Kruponam Onam Festival King Mahabali & Vallam Kali"
                   className="w-full h-auto object-cover max-h-[520px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
                 />

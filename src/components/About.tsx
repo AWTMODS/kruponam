@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Sparkles, Crown, Heart, Landmark, ChevronRight } from 'lucide-react';
+import { getAssetUrl } from '../utils/assetPath';
 
 export const About: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'what' | 'history' | 'why' | 'college'>('what');
@@ -18,7 +19,7 @@ export const About: React.FC = () => {
         'Inter-Departmental Pookalam & Cultural Contests',
         'Traditional Chenda Melam & Pulikali Performances',
       ],
-      image: '/images/pookalam.png',
+      image: getAssetUrl('images/pookalam.png'),
     },
     {
       id: 'history',
@@ -33,7 +34,7 @@ export const About: React.FC = () => {
         'Celebrated in the Malayalam Harvest Month Chingam',
         'Symbol of Unity, Joy, and Generosity',
       ],
-      image: '/images/hero_illustration.png',
+      image: getAssetUrl('images/hero_illustration.png'),
     },
     {
       id: 'why',
@@ -48,7 +49,7 @@ export const About: React.FC = () => {
         'Preserving Kerala’s Traditional Performing Arts',
         'Fostering Lifelong Campus Memories',
       ],
-      image: '/images/thiruvathira.png',
+      image: getAssetUrl('images/thiruvathira.png'),
     },
     {
       id: 'college',
@@ -63,7 +64,7 @@ export const About: React.FC = () => {
         'State-of-the-Art Campus & Facilities',
         'Vibrant Student Clubs & Cultural Leadership',
       ],
-      image: '/images/onasadya.png',
+      image: getAssetUrl('images/onasadya.png'),
     },
   ];
 

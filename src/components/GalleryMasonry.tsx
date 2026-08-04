@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Image as ImageIcon, Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getAssetUrl } from '../utils/assetPath';
 
 interface GalleryItem {
   id: string;
@@ -19,7 +20,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g1',
       title: 'Grand Pookalam Competition 2025',
       category: 'pookalam',
-      image: '/images/pookalam.png',
+      image: getAssetUrl('images/pookalam.png'),
       caption: 'Circular floral carpet made of marigold and fresh rose petals designed by BCA department.',
       aspect: 'h-80',
     },
@@ -27,7 +28,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g2',
       title: 'Authentic 24-Item Onasadya Feast',
       category: 'feast',
-      image: '/images/onasadya.png',
+      image: getAssetUrl('images/onasadya.png'),
       caption: 'Students & faculty enjoying traditional Onasadya feast served on fresh banana leaves.',
       aspect: 'h-96',
     },
@@ -35,7 +36,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g3',
       title: 'Thiruvathirakali Dance Performance',
       category: 'culturals',
-      image: '/images/thiruvathira.png',
+      image: getAssetUrl('images/thiruvathira.png'),
       caption: 'Graceful Thiruvathira dance by students wearing Kasavu dhotis and sarees around Nilavilakku.',
       aspect: 'h-72',
     },
@@ -43,7 +44,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g4',
       title: 'Chenda Melam Percussion Ensemble',
       category: 'culturals',
-      image: '/images/chenda_melam.png',
+      image: getAssetUrl('images/chenda_melam.png'),
       caption: 'Traditional Chenda Melam drum rhythm performance at Krupanidhi campus entrance.',
       aspect: 'h-88',
     },
@@ -51,7 +52,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g5',
       title: 'King Mahabali Maveli Welcome',
       category: 'culturals',
-      image: '/images/hero_illustration.png',
+      image: getAssetUrl('images/hero_illustration.png'),
       caption: 'Student dressed as King Mahabali blessing students and spreading festival joy.',
       aspect: 'h-80',
     },
@@ -59,7 +60,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g6',
       title: 'Traditional Kasavu Dress Showcase',
       category: 'culturals',
-      image: '/images/thiruvathira.png',
+      image: getAssetUrl('images/thiruvathira.png'),
       caption: 'College students celebrating in elegant Kerala Kasavu ethnic wear.',
       aspect: 'h-72',
     },

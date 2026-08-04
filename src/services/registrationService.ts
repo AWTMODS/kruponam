@@ -1,3 +1,5 @@
+import { getAssetUrl } from '../utils/assetPath';
+
 export interface Registration {
   id: string;
   fullName: string;
@@ -31,7 +33,7 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     year: '2nd Year',
     gender: 'Male',
     ticketType: 'Student Pass',
-    idCardUrl: '/images/hero_illustration.png',
+    idCardUrl: getAssetUrl('images/hero_illustration.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '320918239012',
@@ -50,7 +52,7 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     year: '3rd Year',
     gender: 'Female',
     ticketType: 'VIP Cultural Pass',
-    idCardUrl: '/images/pookalam.png',
+    idCardUrl: getAssetUrl('images/pookalam.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '482019384912',
@@ -68,7 +70,7 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     year: '1st Year',
     gender: 'Male',
     ticketType: 'Student Pass',
-    idCardUrl: '/images/onasadya.png',
+    idCardUrl: getAssetUrl('images/onasadya.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '981204918234',
@@ -85,7 +87,7 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     year: '2nd Year',
     gender: 'Female',
     ticketType: 'Group Pass',
-    idCardUrl: '/images/thiruvathira.png',
+    idCardUrl: getAssetUrl('images/thiruvathira.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '109283019283',
