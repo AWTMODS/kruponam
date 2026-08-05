@@ -6,10 +6,12 @@ export interface Registration {
   email: string;
   phone: string;
   department: string;
+  section: string;
   year: string;
   gender: string;
   ticketType: string;
   idCardUrl: string;
+  paymentScreenshotUrl?: string;
   paymentAmount: number;
   paymentStatus: 'Verified' | 'Pending' | 'Failed';
   paymentUtr: string;
@@ -30,10 +32,12 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     email: 'anand.nair@example.com',
     phone: '9876543210',
     department: 'BCA',
+    section: 'Section A',
     year: '2nd Year',
     gender: 'Male',
     ticketType: 'Student Pass',
     idCardUrl: getAssetUrl('images/hero_illustration.png'),
+    paymentScreenshotUrl: getAssetUrl('images/pookalam.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '320918239012',
@@ -49,10 +53,12 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     email: 'priya.r@example.com',
     phone: '9845123789',
     department: 'B.Com',
+    section: 'Section B',
     year: '3rd Year',
     gender: 'Female',
     ticketType: 'VIP Cultural Pass',
     idCardUrl: getAssetUrl('images/pookalam.png'),
+    paymentScreenshotUrl: getAssetUrl('images/hero_illustration.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '482019384912',
@@ -67,10 +73,12 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     email: 'rohan.s@example.com',
     phone: '9123456780',
     department: 'BBA',
+    section: 'Section A',
     year: '1st Year',
     gender: 'Male',
     ticketType: 'Student Pass',
     idCardUrl: getAssetUrl('images/onasadya.png'),
+    paymentScreenshotUrl: getAssetUrl('images/pookalam.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '981204918234',
@@ -84,10 +92,12 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     email: 'sneha.m@example.com',
     phone: '9765432109',
     department: 'B.Sc',
+    section: 'Section C',
     year: '2nd Year',
     gender: 'Female',
     ticketType: 'Group Pass',
     idCardUrl: getAssetUrl('images/thiruvathira.png'),
+    paymentScreenshotUrl: getAssetUrl('images/onasadya.png'),
     paymentAmount: 700,
     paymentStatus: 'Verified',
     paymentUtr: '109283019283',
@@ -105,16 +115,36 @@ export const getRegistrations = (): Registration[] => {
     return INITIAL_REGISTRATIONS;
   }
   try {
-    return JSON.parse(data);
+    const list = JSON.parse(data);
+    // Ensure section exists on legacy items
+    return list.map((item: any) => ({
+      ...item,
+      section: item.section || 'Section A',
+    }));
   } catch (e) {
     return INITIAL_REGISTRATIONS;
   }
 };
 
-export const saveRegistration = (registration: Registration): void => {
-  const registrations = getRegistrations();
-  const updated = [registration, ...registrations];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+export const saveRegistration = (registration: Registration): boolean => {
+  try {
+    const registrations = getRegistrations();
+    const updated = [registration, ...registrations];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return true;
+  } catch (e) {
+    console.error('LocalStorage quota exceeded or save error:', e);
+    // Fallback: compress images or save without large previews if storage full
+    try {
+      const registrations = getRegistrations();
+      const lightweightReg = { ...registration };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([lightweightReg, ...registrations]));
+      return true;
+    } catch (err) {
+      alert('⚠️ Local storage full on device. Please notify admin to backup data.');
+      return false;
+    }
+  }
 };
 
 export const approveRegistration = (id: string): Registration | null => {
@@ -222,4 +252,46 @@ export const findRegistration = (query: string): Registration | undefined => {
       r.phone === q ||
       r.paymentUtr === q
   );
+};
+
+// ── Backup & Safety Helper Exports ──────────────────────────────────
+export const exportBackupDataJson = (): string => {
+  const registrations = getRegistrations();
+  return JSON.stringify({
+    version: '2.0',
+    exportDate: new Date().toISOString(),
+    totalRecords: registrations.length,
+    registrations,
+  }, null, 2);
+};
+
+export const importBackupDataJson = (jsonContent: string): { success: boolean; count: number; message: string } => {
+  try {
+    const parsed = JSON.parse(jsonContent);
+    const records: Registration[] = Array.isArray(parsed) ? parsed : parsed.registrations;
+    if (!Array.isArray(records)) {
+      return { success: false, count: 0, message: 'Invalid JSON structure: Expected array of registrations.' };
+    }
+    
+    // Merge or replace
+    const current = getRegistrations();
+    const existingIds = new Set(current.map(r => r.id));
+    let addedCount = 0;
+    
+    const merged = [...current];
+    records.forEach(r => {
+      if (r.id && !existingIds.has(r.id)) {
+        merged.push({
+          ...r,
+          section: r.section || 'Section A',
+        });
+        addedCount++;
+      }
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return { success: true, count: addedCount, message: `Successfully restored ${addedCount} new registration records!` };
+  } catch (e) {
+    return { success: false, count: 0, message: 'Failed to parse JSON backup file.' };
+  }
 };

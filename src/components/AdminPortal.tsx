@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers
 } from 'lucide-react';
-import { getRegistrations, approveRegistration, rejectRegistration, markAsReported, type Registration } from '../services/registrationService';
+import { 
+  getRegistrations, approveRegistration, rejectRegistration, markAsReported, 
+  exportBackupDataJson, importBackupDataJson, type Registration 
+} from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { AdminQrScanner } from './AdminQrScanner';
@@ -40,6 +43,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings'>('registrations');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Multi-UPI Settings state
   const [multiUpi, setMultiUpi] = useState<MultiUpiSettings>(getMultiUpiSettings());
@@ -78,7 +83,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Strictly require admin@kruponam / adminpass
     if (
       adminEmail.trim().toLowerCase() === 'admin@kruponam' &&
       adminPassword === 'adminpass'
@@ -193,18 +197,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }, 500);
   };
 
+  // CSV Export
   const exportToCsv = () => {
     if (registrations.length === 0) {
       addToast('⚠️ No registration records to export.', 'error');
       return;
     }
-    const headers = ["ID", "Full Name", "Email", "Phone", "Department", "Year", "UTR", "Approval Status", "Gate Checked-In", "Check-In Time"];
+    const headers = ["ID", "Full Name", "Email", "Phone", "Department", "Section", "Year", "UTR", "Approval Status", "Gate Checked-In", "Check-In Time"];
     const rows = registrations.map(r => [
       r.id,
       `"${r.fullName.replace(/"/g, '""')}"`,
       r.email,
       r.phone,
       `"${r.department.replace(/"/g, '""')}"`,
+      `"${(r.section || 'Section A').replace(/"/g, '""')}"`,
       r.year,
       r.paymentUtr,
       r.approvalStatus,
@@ -220,6 +226,40 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     link.click();
     document.body.removeChild(link);
     addToast('📥 Exported registration records as CSV', 'success');
+  };
+
+  // JSON Safety Backup Export
+  const handleExportJsonBackup = () => {
+    const jsonStr = exportBackupDataJson();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kruponam_database_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    addToast('💾 Full database backup downloaded safely as JSON!', 'success');
+  };
+
+  // JSON Backup Import
+  const handleImportJsonBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result as string;
+      const res = importBackupDataJson(content);
+      if (res.success) {
+        loadData();
+        addToast(`✅ ${res.message}`, 'success');
+      } else {
+        addToast(`❌ ${res.message}`, 'error');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const totalApps = registrations.length;
@@ -246,13 +286,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       item.id.toLowerCase().includes(q) ||
       item.phone.toLowerCase().includes(q) ||
       item.paymentUtr.toLowerCase().includes(q) ||
-      item.department.toLowerCase().includes(q);
+      item.department.toLowerCase().includes(q) ||
+      (item.section && item.section.toLowerCase().includes(q));
     return matchesFilter && matchesQuery;
   });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-3 sm:p-6 lg:p-8 font-sans relative overflow-x-hidden">
       
+      {/* Hidden File Input for JSON Backup Import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".json"
+        onChange={handleImportJsonBackup}
+        className="hidden"
+      />
+
       {/* Background Decorative Ambient Glows */}
       <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[140px] pointer-events-none -z-10" />
       <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[160px] pointer-events-none -z-10" />
@@ -305,10 +355,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Action Controls & Clock */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
+        {/* Action Controls, Data Safety Backup & Clock */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
           {currentTime && (
-            <div className="hidden lg:flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300 text-xs font-mono font-bold">
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300 text-xs font-mono font-bold">
               <Clock className="w-3.5 h-3.5 text-gold-royal" />
               <span>{currentTime}</span>
             </div>
@@ -318,27 +368,45 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
             <>
               <button
                 onClick={() => setShowScannerModal(true)}
-                className="px-4 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-950/40 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                className="px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-950/40 flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
               >
-                <QrCode className="w-4 h-4 text-gold-light" />
+                <QrCode className="w-3.5 h-3.5 text-gold-light" />
                 <span>Gate Scanner</span>
+              </button>
+
+              <button
+                onClick={handleExportJsonBackup}
+                title="Download JSON Database Backup for Safety"
+                className="px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-gold-royal/40 text-gold-light font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <FileJson className="w-3.5 h-3.5 text-gold-royal" />
+                <span className="hidden sm:inline">Backup JSON</span>
+              </button>
+
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                title="Restore Database from JSON File"
+                className="px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs transition-all flex items-center gap-1.5"
+              >
+                <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Restore</span>
               </button>
 
               <button
                 onClick={exportToCsv}
                 title="Export Registrations as CSV"
-                className="px-3.5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center gap-1.5"
+                className="px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Export CSV</span>
+                <span className="hidden sm:inline">CSV</span>
               </button>
 
               <button
                 onClick={loadData}
                 title="Refresh All Registrations"
-                className={`p-2.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all ${isRefreshing ? 'animate-spin text-amber-400' : ''}`}
+                className={`p-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all ${isRefreshing ? 'animate-spin text-amber-400' : ''}`}
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </>
           )}
@@ -346,7 +414,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {onClose && (
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-slate-300 transition-all border border-slate-800 flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-slate-300 transition-all border border-slate-800 flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Website</span>
@@ -356,7 +424,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-              className="px-4 py-2.5 rounded-full bg-rose-950/80 text-rose-300 hover:bg-rose-900/90 text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-800/80 shadow-md"
+              className="px-3.5 py-2 rounded-full bg-rose-950/80 text-rose-300 hover:bg-rose-900/90 text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-800/80 shadow-md"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Logout</span>
@@ -370,7 +438,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         <div className="max-w-md mx-auto my-12 animate-fadeIn">
           <div className="bg-slate-900/90 backdrop-blur-2xl rounded-3xl p-8 border border-gold-royal/30 shadow-2xl relative overflow-hidden space-y-6">
             
-            {/* Top Glowing Edge */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-gold-royal to-transparent" />
 
             <div className="text-center space-y-3">
@@ -462,7 +529,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         /* ── Main Dashboard ───────────────────────────────────────────── */
         <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn">
 
-          {/* Top Dashboard Tab Switcher */}
+          {/* Dashboard Tab Switcher */}
           <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 p-2 rounded-2xl border border-slate-800">
             <div className="flex flex-wrap gap-2">
               <button
@@ -495,7 +562,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
             <div className="px-3 py-1.5 text-xs text-slate-400 font-mono font-medium flex items-center gap-2">
               <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>Live Synced</span>
+              <span>Data Preserved & Synced</span>
             </div>
           </div>
 
@@ -504,7 +571,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
             {/* Metrics Overview Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               
-              {/* Card 1: Total Apps */}
               <div className="bg-slate-900/80 rounded-3xl p-5 border border-slate-800 shadow-xl hover:border-slate-700 transition-all group">
                 <div className="flex justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-wider">
                   <span>Total Applied</span>
@@ -518,7 +584,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              {/* Card 2: Pending Action */}
               <div className="bg-slate-900/80 rounded-3xl p-5 border border-amber-500/30 shadow-xl hover:border-amber-500/60 transition-all group">
                 <div className="flex justify-between items-center text-amber-400 text-xs font-bold uppercase tracking-wider">
                   <span>Pending Action</span>
@@ -533,7 +598,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              {/* Card 3: Approved */}
               <div className="bg-slate-900/80 rounded-3xl p-5 border border-emerald-500/30 shadow-xl hover:border-emerald-500/60 transition-all group">
                 <div className="flex justify-between items-center text-emerald-400 text-xs font-bold uppercase tracking-wider">
                   <span>Approved Passes</span>
@@ -547,7 +611,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              {/* Card 4: Gate Checked-In */}
               <div className="bg-gradient-to-br from-emerald-950/80 to-slate-900 rounded-3xl p-5 border border-emerald-500/60 shadow-xl hover:border-emerald-400 transition-all group">
                 <div className="flex justify-between items-center text-emerald-300 text-xs font-bold uppercase tracking-wider">
                   <span>Gate Checked-In</span>
@@ -561,7 +624,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              {/* Card 5: Total Revenue */}
               <div className="bg-gradient-to-br from-amber-500/10 via-slate-900 to-gold-royal/10 rounded-3xl p-5 border border-gold-royal/40 shadow-xl hover:border-gold-royal transition-all group">
                 <div className="flex justify-between items-center text-gold-light text-xs font-bold uppercase tracking-wider">
                   <span>Total Revenue</span>
@@ -642,7 +704,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search student, UTR, ID, phone..."
+                    placeholder="Search student, section, UTR, ID..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-11 pr-9 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-gold-royal focus:ring-1 focus:ring-gold-royal transition-all placeholder-slate-500"
@@ -665,8 +727,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <tr className="bg-slate-950 text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-800 text-[11px]">
                       <th className="p-4">Reg ID</th>
                       <th className="p-4">Student Info</th>
-                      <th className="p-4">Department</th>
-                      <th className="p-4">ID Card</th>
+                      <th className="p-4">Dept & Section</th>
+                      <th className="p-4">Files / Verification</th>
                       <th className="p-4">Payment UTR</th>
                       <th className="p-4">Status</th>
                       <th className="p-4">Gate Check-In</th>
@@ -712,21 +774,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                             </div>
                           </td>
 
-                          {/* Department & Year */}
+                          {/* Department & Section */}
                           <td className="p-4">
-                            <span className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 font-semibold text-[11px] inline-block">
-                              {item.department} ({item.year})
-                            </span>
+                            <div className="space-y-1">
+                              <span className="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 font-bold text-[11px] inline-flex items-center gap-1">
+                                <Layers className="w-3 h-3 text-gold-royal" />
+                                {item.department} — {item.section || 'Section A'}
+                              </span>
+                              <span className="text-[10px] text-slate-500 block">
+                                {item.year}
+                              </span>
+                            </div>
                           </td>
 
-                          {/* Student ID Preview button */}
+                          {/* Student ID & Payment Screenshot Preview */}
                           <td className="p-4">
                             <button
                               onClick={() => setInspectItem(item)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-gold-light border border-gold-royal/30 font-semibold transition-all hover:border-gold-royal"
                             >
                               <Eye className="w-3.5 h-3.5 text-gold-royal" />
-                              <span>View ID Card</span>
+                              <span>Inspect ID & Payment</span>
                             </button>
                           </td>
 
@@ -1123,10 +1191,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         </div>
       )}
 
-      {/* ── Inspect Student Modal ─────────────────────────────────── */}
+      {/* ── Inspect Student Modal (With ID Card & Payment Screenshot) ── */}
       {inspectItem && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl max-w-2xl w-full p-6 border-2 border-gold-royal/50 shadow-2xl relative animate-fadeIn max-h-[90vh] overflow-y-auto space-y-6">
+          <div className="bg-slate-900 rounded-3xl max-w-3xl w-full p-6 border-2 border-gold-royal/50 shadow-2xl relative animate-fadeIn max-h-[90vh] overflow-y-auto space-y-6">
             
             <button
               onClick={() => setInspectItem(null)}
@@ -1140,33 +1208,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 🪪
               </div>
               <div>
-                <h3 className="font-serif text-xl font-bold text-white">Student ID & Application File</h3>
+                <h3 className="font-serif text-xl font-bold text-white">Student ID & Payment Verification File</h3>
                 <p className="text-xs text-slate-400">
                   Ref ID: <span className="font-mono text-gold-light font-bold">{inspectItem.id}</span>
                 </p>
               </div>
             </div>
 
-            {/* ID Card Display Card */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center">
-              <p className="text-[11px] text-slate-400 font-extrabold uppercase tracking-wider mb-3">
-                Uploaded Institution Student ID Card
-              </p>
-              <img
-                src={inspectItem.idCardUrl}
-                alt="Student ID Card"
-                className="max-h-72 mx-auto object-contain rounded-xl border border-gold-royal/40 shadow-xl"
-              />
+            {/* Side-by-side ID Card and Payment Screenshot Preview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Student ID Card */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
+                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
+                  🪪 Student ID Card Photo
+                </p>
+                <div className="h-60 flex items-center justify-center bg-slate-900/50 rounded-xl overflow-hidden p-2">
+                  <img
+                    src={inspectItem.idCardUrl}
+                    alt="Student ID Card"
+                    className="max-h-full max-w-full object-contain rounded-lg border border-gold-royal/30 shadow-md"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Screenshot showing UTR */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
+                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
+                  💳 Payment Screenshot (Showing UTR)
+                </p>
+                <div className="h-60 flex items-center justify-center bg-slate-900/50 rounded-xl overflow-hidden p-2">
+                  {inspectItem.paymentScreenshotUrl ? (
+                    <img
+                      src={inspectItem.paymentScreenshotUrl}
+                      alt="Payment Receipt Screenshot"
+                      className="max-h-full max-w-full object-contain rounded-lg border border-emerald-500/40 shadow-md"
+                    />
+                  ) : (
+                    <div className="text-slate-500 text-xs font-mono">
+                      No Payment Screenshot Uploaded
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-emerald-400 font-mono font-bold">
+                  Verified UTR: {inspectItem.paymentUtr}
+                </p>
+              </div>
+
             </div>
 
             {/* Application Data Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
               {[
                 ['Student Full Name', inspectItem.fullName],
-                ['Department & Year', `${inspectItem.department} (${inspectItem.year})`],
+                ['Department', inspectItem.department],
+                ['Section', inspectItem.section || 'Section A'],
+                ['Academic Year', inspectItem.year],
                 ['Email Address', inspectItem.email],
                 ['Contact Phone', inspectItem.phone],
                 ['₹700 Payment UTR', inspectItem.paymentUtr],
+                ['Pass Tier', inspectItem.ticketType],
                 ['Gate Gate Check-In', inspectItem.isReported ? `✓ Reported (${inspectItem.reportedAt || 'Yes'})` : 'Not Reported Yet'],
               ].map(([label, value]) => (
                 <div key={label} className="space-y-0.5">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, QrCode, Sparkles, RefreshCw, ShieldCheck, CreditCard, Image as ImageIcon } from 'lucide-react';
+import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, QrCode, Sparkles, RefreshCw, ShieldCheck, CreditCard, Image as ImageIcon, Layers, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { saveRegistration, type Registration } from '../services/registrationService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
@@ -15,6 +15,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     email: '',
     phone: '',
     department: 'BCA',
+    section: 'Section A',
     year: '2nd Year',
     gender: 'Male',
     ticketType: selectedPassFromParent || 'Student Pass',
@@ -22,6 +23,10 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
   const [idCardPreview, setIdCardPreview] = useState<string | null>(null);
+
+  const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
+  const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
+
   const [paymentUtr, setPaymentUtr] = useState('');
   const [isPaymentVerified, setIsPaymentVerified] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
@@ -49,8 +54,20 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     }
   };
 
+  const handlePaymentScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentScreenshotFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPaymentScreenshotPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAutoVerifyPayment = () => {
-    if (!paymentUtr || paymentUtr.length < 6) {
+    if (!paymentUtr || paymentUtr.trim().length < 6) {
       alert('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
       return;
     }
@@ -80,6 +97,11 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       return;
     }
 
+    if (!paymentScreenshotPreview) {
+      alert('Please upload your Payment Screenshot showing the UTR / Ref ID clearly.');
+      return;
+    }
+
     if (!isPaymentVerified) {
       alert('Please verify your ₹700 payment transaction using UTR / Transaction ID before submitting.');
       return;
@@ -95,6 +117,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         id: randomId,
         ...formData,
         idCardUrl: idCardPreview,
+        paymentScreenshotUrl: paymentScreenshotPreview,
         paymentAmount: 700,
         paymentStatus: 'Verified',
         paymentUtr: paymentUtr,
@@ -133,7 +156,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
             Registration <span className="text-gold-gradient font-normal italic">&</span> Payment Portal
           </h2>
           <p className="text-slate-600 text-base sm:text-lg">
-            Complete your details, upload your Student ID Card, and pay the ₹700 event fee to request your pass.
+            Complete your details, select your department & section, upload your Student ID Card & Payment Screenshot, and pay ₹700 to request your pass.
           </p>
         </div>
 
@@ -153,7 +176,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
               </h3>
 
               <p className="text-slate-700 text-sm max-w-md mx-auto leading-relaxed">
-                Thank you <span className="font-bold text-amber-950">{submittedRegistration.fullName}</span>! Your ID Card and ₹700 Payment (UTR: <span className="font-mono font-bold">{submittedRegistration.paymentUtr}</span>) have been recorded.
+                Thank you <span className="font-bold text-amber-950">{submittedRegistration.fullName}</span> ({submittedRegistration.department} — {submittedRegistration.section})! Your ID Card & Payment Screenshot (UTR: <span className="font-mono font-bold">{submittedRegistration.paymentUtr}</span>) have been recorded safely.
               </p>
 
               <div className="p-4 bg-white rounded-2xl border border-amber-200 inline-block text-center shadow-sm">
@@ -188,15 +211,16 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
           <div className="max-w-4xl mx-auto glass-card rounded-3xl p-6 sm:p-10 border border-gold-royal/40 shadow-card-hover">
             <form onSubmit={handleSubmit} className="space-y-8">
               
+              {/* Step 1: Student Details */}
               <div className="space-y-4">
                 <h3 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2 pb-2 border-b border-gold-royal/20">
                   <span className="w-7 h-7 rounded-full bg-gold-light/40 text-gold-dark text-xs flex items-center justify-center font-bold font-sans">
                     1
                   </span>
-                  <span>Student Information</span>
+                  <span>Student Information & Department</span>
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-gold-royal" />
@@ -267,6 +291,26 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-gold-royal" />
+                      Section *
+                    </label>
+                    <select
+                      name="section"
+                      value={formData.section}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 outline-none text-sm font-bold text-kerala-deep transition-all bg-white"
+                    >
+                      <option value="Section A">Section A</option>
+                      <option value="Section B">Section B</option>
+                      <option value="Section C">Section C</option>
+                      <option value="Section D">Section D</option>
+                      <option value="Section E">Section E</option>
+                      <option value="Section F">Section F</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-gold-royal" />
                       Academic Year *
                     </label>
@@ -283,26 +327,27 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       <option value="PG / Alumni">PG / Alumni</option>
                     </select>
                   </div>
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Ticket className="w-3.5 h-3.5 text-gold-royal" />
-                      Pass Tier *
-                    </label>
-                    <select
-                      name="ticketType"
-                      value={formData.ticketType}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 rounded-xl border border-gold-royal/50 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 outline-none text-sm font-bold text-kerala-deep transition-all bg-gold-light/20"
-                    >
-                      <option value="Student Pass">Student Pass (General Access)</option>
-                      <option value="VIP Cultural Pass">VIP Cultural Pass (Front Seating)</option>
-                      <option value="Group Pass">Group Pass (5+ Squad)</option>
-                    </select>
-                  </div>
+                <div className="pt-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Ticket className="w-3.5 h-3.5 text-gold-royal" />
+                    Pass Tier Selection *
+                  </label>
+                  <select
+                    name="ticketType"
+                    value={formData.ticketType}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-xl border border-gold-royal/50 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 outline-none text-sm font-bold text-kerala-deep transition-all bg-gold-light/20"
+                  >
+                    <option value="Student Pass">Student Pass (General Access)</option>
+                    <option value="VIP Cultural Pass">VIP Cultural Pass (Front Seating)</option>
+                    <option value="Group Pass">Group Pass (5+ Squad)</option>
+                  </select>
                 </div>
               </div>
 
+              {/* Step 2: Student ID Card Upload */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2 pb-2 border-b border-gold-royal/20">
                   <span className="w-7 h-7 rounded-full bg-gold-light/40 text-gold-dark text-xs flex items-center justify-center font-bold font-sans">
@@ -328,7 +373,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       />
                       <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>ID Card Uploaded: {idCardFile?.name || 'student_id.jpg'}</span>
+                        <span>Student ID Uploaded: {idCardFile?.name || 'student_id.jpg'}</span>
                       </p>
                       <span className="text-[11px] text-slate-400 underline">Click or drop image to replace</span>
                     </div>
@@ -342,7 +387,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                           Click to upload or drag & drop Student ID Card Photo
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          PNG, JPG or JPEG (Max 5MB) • Scanned copy or clear phone photo
+                          PNG, JPG or JPEG • Scanned copy or clear phone photo
                         </p>
                       </div>
                     </div>
@@ -350,15 +395,18 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                 </div>
               </div>
 
+              {/* Step 3: Payment (₹700) + Payment Screenshot + UTR */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2 pb-2 border-b border-gold-royal/20">
                   <span className="w-7 h-7 rounded-full bg-gold-light/40 text-gold-dark text-xs flex items-center justify-center font-bold font-sans">
                     3
                   </span>
-                  <span>Pay Pass Fee (₹700) & Verify UTR</span>
+                  <span>Pay Pass Fee (₹700) & Upload Payment Screenshot</span>
                 </h3>
 
                 <div className="bg-gradient-to-br from-amber-50 via-white to-amber-50 rounded-2xl p-6 border-2 border-gold-royal/40 shadow-sm space-y-6">
+                  
+                  {/* QR & UTR row */}
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
                     <div className="sm:col-span-5 text-center space-y-2 border-r sm:border-r border-gold-royal/20 pr-0 sm:pr-4">
                       <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-[11px] font-black uppercase tracking-wider">
@@ -402,7 +450,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       {isPaymentVerified ? (
                         <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                          <span>₹700 Payment Verified Automatically! UTR recorded.</span>
+                          <span>₹700 Payment Verified! UTR recorded.</span>
                         </div>
                       ) : (
                         <button
@@ -414,21 +462,65 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                           {isVerifyingPayment ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Verifying ₹700 Payment with Bank API...</span>
+                              <span>Verifying ₹700 Payment...</span>
                             </>
                           ) : (
                             <>
                               <ShieldCheck className="w-4 h-4 text-kerala-dark" />
-                              <span>Auto-Verify ₹700 Payment</span>
+                              <span>Auto-Verify ₹700 Payment UTR</span>
                             </>
                           )}
                         </button>
                       )}
                     </div>
                   </div>
+
+                  {/* Payment Screenshot Upload (Crucial Requirement) */}
+                  <div className="pt-4 border-t border-gold-royal/20 space-y-3">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-gold-royal" />
+                      Upload Payment Screenshot (Showing UTR Number clearly) *
+                    </label>
+
+                    <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-5 bg-white text-center hover:bg-amber-50/50 transition-all relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePaymentScreenshotUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+
+                      {paymentScreenshotPreview ? (
+                        <div className="space-y-2">
+                          <img
+                            src={paymentScreenshotPreview}
+                            alt="Payment Receipt Preview"
+                            className="max-h-44 mx-auto rounded-xl shadow-md border border-gold-royal/40 object-contain"
+                          />
+                          <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>Payment Receipt Uploaded: {paymentScreenshotFile?.name || 'payment_receipt.png'}</span>
+                          </p>
+                          <span className="text-[11px] text-slate-400 underline">Click to replace payment screenshot</span>
+                        </div>
+                      ) : (
+                        <div className="py-3 space-y-2">
+                          <Upload className="w-7 h-7 mx-auto text-gold-dark" />
+                          <p className="text-xs font-bold text-slate-800">
+                            Upload GPay / PhonePe / Paytm Payment Screenshot
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Must clearly display the ₹700 paid amount and 12-digit UTR/UPI Ref ID.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
+              {/* Submit Button */}
               <div className="pt-4">
                 <button
                   type="submit"
@@ -438,19 +530,19 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                   {isSubmitting ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
-                      <span>Submitting Registration to Admin Panel...</span>
+                      <span>Saving Data & Submitting to Admin Panel...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-gold-royal" />
-                      <span>Submit for Admin Approval (₹700 Paid)</span>
+                      <span>Submit Pass Request (₹700 Paid)</span>
                     </>
                   )}
                 </button>
               </div>
 
               <p className="text-[11px] text-center text-slate-400">
-                🔒 All details & uploaded ID cards are saved securely. Passes are issued upon Admin verification.
+                🔒 All student information, section details, and payment screenshots are safely encrypted and preserved.
               </p>
             </form>
           </div>

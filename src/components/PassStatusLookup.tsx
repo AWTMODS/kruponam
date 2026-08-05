@@ -140,8 +140,8 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Department</p>
-                        <p className="font-semibold">{searchResult.department}</p>
+                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Department & Section</p>
+                        <p className="font-semibold">{searchResult.department} — {searchResult.section || 'Section A'}</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Academic Year</p>

@@ -98,7 +98,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Student Name', registration.fullName],
                   ['Email Address', registration.email],
                   ['Phone Number', registration.phone],
-                  ['Department & Year', `${registration.department} — ${registration.year}`],
+                  ['Department & Section', `${registration.department} — ${registration.section || 'Section A'} (${registration.year})`],
                   ['Pass Type', registration.ticketType],
                   ['Amount Paid', '₹700.00'],
                   ['Payment UTR / Ref', registration.paymentUtr],
