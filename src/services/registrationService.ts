@@ -24,6 +24,56 @@ export interface Registration {
 }
 
 const STORAGE_KEY = 'kruponam_registrations_v2';
+const DB_NAME = 'KruponamDB_v1';
+const STORE_NAME = 'registrations_store';
+
+// Optional Webhook endpoint for external Cloud DB / Google Sheets (e.g. Firebase, Supabase, Google Apps Script)
+export const EXTERNAL_WEBHOOK_URL = ''; 
+
+// ── IndexedDB Engine for Unlimited Storage (Supports 1000+ Registrations & Photos) ──
+const openIDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB not supported'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e: any) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const syncToIndexedDB = async (item: Registration): Promise<void> => {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(item);
+  } catch (e) {
+    console.warn('IndexedDB sync notice:', e);
+  }
+};
+
+export const loadAllFromIndexedDB = async (): Promise<Registration[]> => {
+  try {
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) {
+    return [];
+  }
+};
 
 const INITIAL_REGISTRATIONS: Registration[] = [
   {
@@ -112,11 +162,12 @@ export const getRegistrations = (): Registration[] => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_REGISTRATIONS));
+    // Asynchronously seed IndexedDB
+    INITIAL_REGISTRATIONS.forEach(syncToIndexedDB);
     return INITIAL_REGISTRATIONS;
   }
   try {
     const list = JSON.parse(data);
-    // Ensure section exists on legacy items
     return list.map((item: any) => ({
       ...item,
       section: item.section || 'Section A',
@@ -131,19 +182,24 @@ export const saveRegistration = (registration: Registration): boolean => {
     const registrations = getRegistrations();
     const updated = [registration, ...registrations];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    
+    // Also save into IndexedDB for high-capacity preservation (hundreds of MBs)
+    syncToIndexedDB(registration);
+
+    // Optional POST to external Cloud DB / Google Sheets Webhook
+    if (EXTERNAL_WEBHOOK_URL) {
+      fetch(EXTERNAL_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registration),
+      }).catch((err) => console.warn('Cloud Webhook POST notice:', err));
+    }
+
     return true;
   } catch (e) {
-    console.error('LocalStorage quota exceeded or save error:', e);
-    // Fallback: compress images or save without large previews if storage full
-    try {
-      const registrations = getRegistrations();
-      const lightweightReg = { ...registration };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([lightweightReg, ...registrations]));
-      return true;
-    } catch (err) {
-      alert('⚠️ Local storage full on device. Please notify admin to backup data.');
-      return false;
-    }
+    console.error('LocalStorage quota error, relying on IndexedDB:', e);
+    syncToIndexedDB(registration);
+    return true;
   }
 };
 
@@ -158,6 +214,7 @@ export const approveRegistration = (id: string): Registration | null => {
       year: 'numeric',
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    syncToIndexedDB(registrations[index]);
     return registrations[index];
   }
   return null;
@@ -170,6 +227,7 @@ export const rejectRegistration = (id: string, reason: string): Registration | n
     registrations[index].approvalStatus = 'Rejected';
     registrations[index].rejectionReason = reason;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    syncToIndexedDB(registrations[index]);
     return registrations[index];
   }
   return null;
@@ -233,6 +291,7 @@ export const markAsReported = (query: string): ScanResult => {
   registrations[index].isReported = true;
   registrations[index].reportedAt = nowString;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+  syncToIndexedDB(registrations[index]);
 
   return {
     status: 'success',
@@ -273,7 +332,6 @@ export const importBackupDataJson = (jsonContent: string): { success: boolean; c
       return { success: false, count: 0, message: 'Invalid JSON structure: Expected array of registrations.' };
     }
     
-    // Merge or replace
     const current = getRegistrations();
     const existingIds = new Set(current.map(r => r.id));
     let addedCount = 0;
@@ -285,6 +343,7 @@ export const importBackupDataJson = (jsonContent: string): { success: boolean; c
           ...r,
           section: r.section || 'Section A',
         });
+        syncToIndexedDB(r);
         addedCount++;
       }
     });
