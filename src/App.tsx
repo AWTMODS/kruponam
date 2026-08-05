@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FloatingPetals } from './components/FloatingPetals';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -21,6 +21,42 @@ export function App() {
   const [selectedPass, setSelectedPass] = useState<string>('Student Pass');
   const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin'>('main');
 
+  useEffect(() => {
+    // 1. Check URL Hash (e.g., #admin or ?admin=true)
+    const checkAdminTrigger = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash === '#admin' || search.includes('admin=true')) {
+        setActiveView('admin');
+      }
+    };
+
+    checkAdminTrigger();
+    window.addEventListener('hashchange', checkAdminTrigger);
+
+    // 2. Secret Keyboard Shortcut: Ctrl + Shift + A (or Cmd + Shift + A)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setActiveView((prev) => (prev === 'admin' ? 'main' : 'admin'));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('hashchange', checkAdminTrigger);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  const handleCloseAdmin = () => {
+    setActiveView('main');
+    if (window.location.hash === '#admin') {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
   const handleSelectTicketFromPasses = (passName: string) => {
     setSelectedPass(passName);
   };
@@ -30,9 +66,9 @@ export function App() {
       {/* Floating Canvas Flower Petals */}
       <FloatingPetals />
 
-      {/* Main App Navigation */}
+      {/* Main App View Navigation */}
       {activeView === 'admin' ? (
-        <AdminPortal onClose={() => setActiveView('main')} />
+        <AdminPortal onClose={handleCloseAdmin} />
       ) : activeView === 'lookup' ? (
         <div className="pt-24 min-h-screen">
           <Navbar onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />

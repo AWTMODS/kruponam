@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Ticket, ShieldCheck, Lock } from 'lucide-react';
+import { Menu, X, Ticket, ShieldCheck } from 'lucide-react';
 
 interface NavbarProps {
   onOpenLookup?: () => void;
@@ -9,6 +9,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoClickCount, setLogoClickCount] = useState(0);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +22,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Secret 5-tap on logo triggers Admin Portal
+  const handleLogoClick = (e: React.MouseEvent) => {
+    const newCount = logoClickCount + 1;
+    setLogoClickCount(newCount);
+    if (newCount >= 5) {
+      e.preventDefault();
+      setLogoClickCount(0);
+      if (onOpenAdmin) onOpenAdmin();
+    }
+    // Reset click count after 3 seconds of inactivity
+    setTimeout(() => setLogoClickCount(0), 3000);
+  };
 
   const navLinks = [
     { name: 'Home', href: '#home' },
@@ -44,8 +58,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           
-          {/* Logo & College Emblem */}
-          <a href="#home" className="flex items-center gap-3 group">
+          {/* Logo & College Emblem (Secret 5x click triggers Admin) */}
+          <a href="#home" onClick={handleLogoClick} className="flex items-center gap-3 group select-none">
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-kerala-deep via-gold-royal to-floral-yellow p-0.5 shadow-gold-glow transition-transform duration-300 group-hover:scale-105">
               <div className="w-full h-full bg-cream-warm rounded-full flex items-center justify-center">
                 <span className="text-xl">🌼</span>
@@ -77,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
             ))}
           </nav>
 
-          {/* Right Action Buttons */}
+          {/* Right Action Buttons (Public only - Admin button removed) */}
           <div className="hidden sm:flex items-center gap-2.5">
             {onOpenLookup && (
               <button
@@ -97,16 +111,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
               <Ticket className="w-3.5 h-3.5 text-gold-royal group-hover:rotate-12 transition-transform" />
               <span>Register Pass</span>
             </a>
-
-            {onOpenAdmin && (
-              <button
-                onClick={onOpenAdmin}
-                className="p-2.5 rounded-full bg-slate-900 text-gold-royal hover:bg-slate-800 transition-all border border-gold-royal/40"
-                title="Admin Approval Portal"
-              >
-                <Lock className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
 
           {/* Mobile Hamburger Toggle */}
@@ -159,19 +163,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
                 <Ticket className="w-4 h-4 text-gold-royal" />
                 Register Pass (₹700)
               </a>
-
-              {onOpenAdmin && (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAdmin();
-                  }}
-                  className="w-full py-2 text-center text-xs font-bold text-gold-light bg-slate-900 rounded-xl flex items-center justify-center gap-2"
-                >
-                  <Lock className="w-3.5 h-3.5 text-gold-royal" />
-                  Admin Approval Portal
-                </button>
-              )}
             </div>
           </div>
         </div>

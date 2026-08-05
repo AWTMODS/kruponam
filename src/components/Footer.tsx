@@ -1,12 +1,12 @@
 import React from 'react';
-import { Heart, ArrowUp, Lock, ShieldCheck } from 'lucide-react';
+import { Heart, ArrowUp, ShieldCheck } from 'lucide-react';
 
 interface FooterProps {
   onOpenAdmin?: () => void;
   onOpenLookup?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenLookup }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -51,7 +51,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenLookup }) => 
 
           <div className="space-y-3">
             <h4 className="font-serif text-sm font-bold text-gold-royal uppercase tracking-wider">
-              Student & Admin Portal
+              Student Pass & Services
             </h4>
             <ul className="space-y-2 text-xs text-slate-300">
               <li><a href="#registration" className="hover:text-gold-royal transition-colors">Pass Registration (₹700)</a></li>
@@ -60,14 +60,6 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenLookup }) => 
                   <button onClick={onOpenLookup} className="hover:text-gold-royal transition-colors text-left flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 text-gold-royal" />
                     <span>Check Pass Status</span>
-                  </button>
-                </li>
-              )}
-              {onOpenAdmin && (
-                <li>
-                  <button onClick={onOpenAdmin} className="hover:text-gold-royal transition-colors text-left flex items-center gap-1 font-bold text-gold-light">
-                    <Lock className="w-3 h-3 text-gold-royal" />
-                    <span>Admin Approval Portal</span>
                   </button>
                 </li>
               )}
