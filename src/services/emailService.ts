@@ -91,7 +91,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Amount Paid', '₹700.00'],
                   ['Payment UTR / Ref', registration.paymentUtr],
                   ['Payment Status', '✅ Verified & Confirmed'],
-                  ['Event Date', '26 August 2026, 8:00 AM onwards'],
+                  ['Event Date', '6 September 2026, 8:00 AM onwards'],
                   ['Venue', 'Krupanidhi Degree College, Bengaluru'],
                   ['Approved On', registration.approvedAt || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })],
                 ].map(([label, value], i) => `
@@ -136,7 +136,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                       ${registration.department} • ${registration.year}
                     </p>
                     <p style="margin:10px 0 0;font-size:11px;color:#D4AF37;font-weight:700;">
-                      📅 26 August 2026 &nbsp;|&nbsp; 8:00 AM
+                      📅 6 September 2026 &nbsp;|&nbsp; 8:00 AM
                     </p>
                     <p style="margin:4px 0 0;font-size:11px;color:#a8d5b5;">
                       📍 Krupanidhi Campus, Bengaluru

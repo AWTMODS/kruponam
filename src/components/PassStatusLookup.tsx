@@ -192,7 +192,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </div>
 
                 <div className="pt-4 border-t border-dashed border-gold-royal/40 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
-                  <span>📍 Krupanidhi Campus • Aug 26, 2026</span>
+                  <span>📍 Krupanidhi Campus • Sep 6, 2026</span>
                   <span>Approved: {searchResult.approvedAt || searchResult.submittedAt}</span>
                 </div>
               </div>

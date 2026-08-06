@@ -24,7 +24,7 @@ export const FAQ: React.FC = () => {
     },
     {
       q: 'How do departments register for the Pookalam & Tug-of-War contests?',
-      a: 'Department class representatives can register their team (up to 8 members) with the Cultural Secretary or via the Student Council lead before Aug 24th.',
+      a: 'Department class representatives can register their team (up to 8 members) with the Cultural Secretary or via the Student Council lead before Sep 4th.',
     },
     {
       q: 'Is parking available on campus during the event?',

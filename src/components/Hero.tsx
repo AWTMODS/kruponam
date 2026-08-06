@@ -59,7 +59,7 @@ export const Hero = () => {
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2 text-xs sm:text-sm text-slate-700 font-semibold">
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm">
                 <Calendar className="w-4 h-4 text-gold-royal" />
-                <span>26 August 2026</span>
+                <span>6 September 2026</span>
               </div>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm">
                 <MapPin className="w-4 h-4 text-kerala-deep" />
@@ -158,7 +158,7 @@ export const Hero = () => {
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg bg-kerala-mint text-kerala-deep text-[11px] font-bold">
-                    Aug 26
+                    Sep 6
                   </span>
                 </div>
 
