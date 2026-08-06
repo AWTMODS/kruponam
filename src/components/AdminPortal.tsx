@@ -3,13 +3,14 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy
 } from 'lucide-react';
 import { 
-  getRegistrations, approveRegistration, rejectRegistration, markAsReported, 
+  syncCloudRegistrations, approveRegistration, rejectRegistration, markAsReported, 
   exportBackupDataJson, importBackupDataJson, type Registration 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
+import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { AdminQrScanner } from './AdminQrScanner';
 
@@ -40,9 +41,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings' | 'database'>('registrations');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  // Supabase Database state
+  const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseCredentials().url);
+  const [supabaseAnonKey, setSupabaseAnonKey] = useState(getSupabaseCredentials().key);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,9 +75,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     return () => clearInterval(timer);
   }, []);
 
-  const loadData = () => {
+  const loadData = async () => {
     setIsRefreshing(true);
-    setRegistrations(getRegistrations());
+    const regs = await syncCloudRegistrations();
+    setRegistrations(regs);
     setTimeout(() => setIsRefreshing(false), 300);
   };
 
@@ -557,6 +564,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               >
                 <Settings className="w-4 h-4" />
                 <span>Payment & UPI Gateway Slots</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('database')}
+                className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                  activeTab === 'database'
+                    ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 shadow-gold-glow font-black'
+                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Database className="w-4 h-4" />
+                <span>Cloud DB & Storage</span>
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] ${
+                  isSupabaseConfigured() ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                }`}>
+                  {isSupabaseConfigured() ? '✓ Connected' : 'Local Backup'}
+                </span>
               </button>
             </div>
 
@@ -1141,6 +1165,157 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <><Save className="w-4 h-4" /><span>Save All Slot Configurations</span></>
                   )}
                 </button>
+              </div>
+
+            </div>
+          )}
+
+          {activeTab === 'database' && (
+            <div className="space-y-6 animate-fadeIn">
+              
+              {/* Status Header */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-2 border-emerald-500/50 text-emerald-400 flex items-center justify-center font-bold text-xl shadow-md">
+                      <Database className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <div>
+                      <h2 className="font-serif text-xl font-bold text-white flex items-center gap-2">
+                        <span>Free Cloud Database & Storage (Supabase)</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          isSupabaseConfigured() ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                        }`}>
+                          {isSupabaseConfigured() ? '✓ Cloud Live' : 'Local Backup Mode'}
+                        </span>
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Store student details in PostgreSQL DB and uploaded Student ID / Payment images in Free Cloud Storage.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      setIsRefreshing(true);
+                      const regs = await syncCloudRegistrations();
+                      setRegistrations(regs);
+                      setIsRefreshing(false);
+                      addToast('🔄 Synced live data from Cloud Database!', 'success');
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all border border-slate-700 flex items-center gap-2"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
+                    <span>Sync Live Cloud DB</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Database Type</p>
+                    <p className="text-white font-mono font-bold text-sm mt-1">Free Cloud PostgreSQL</p>
+                    <p className="text-[11px] text-emerald-400 mt-1">500 MB Free Capacity (Thousands of registrations)</p>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">File & Image Storage</p>
+                    <p className="text-white font-mono font-bold text-sm mt-1">Supabase Public Bucket</p>
+                    <p className="text-[11px] text-emerald-400 mt-1">1 GB Free Image Storage (ID Cards & Receipts)</p>
+                  </div>
+
+                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                    <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Email Pass Dispatch</p>
+                    <p className="text-white font-mono font-bold text-sm mt-1">EmailJS / Direct QR Pass</p>
+                    <p className="text-[11px] text-blue-400 mt-1">Auto-sends HTML Invoice & Gate Pass QR</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Supabase Setup Credentials Form */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-5">
+                <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-gold-royal" />
+                  <span>Configure Free Supabase Cloud Database Credentials</span>
+                </h3>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Sign up for free at <a href="https://supabase.com" target="_blank" rel="noreferrer" className="text-amber-400 font-bold underline">supabase.com</a>. Create a free project, go to <strong>Project Settings → API</strong>, and paste your Project URL and Anon Key below:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Supabase Project URL
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. https://xyzcompany.supabase.co"
+                      value={supabaseUrl}
+                      onChange={(e) => setSupabaseUrl(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Supabase Anon / Public Key
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="e.g. eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                      value={supabaseAnonKey}
+                      onChange={(e) => setSupabaseAnonKey(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      saveSupabaseCredentials(supabaseUrl, supabaseAnonKey);
+                      addToast('✅ Supabase cloud credentials saved successfully!', 'success');
+                      loadData();
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:opacity-90 shadow-md flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Cloud Connection Settings</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 1-Click SQL Setup Script Box */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                      <span>1-Click Supabase SQL Setup Query</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Run this query in your Supabase Dashboard → <strong>SQL Editor</strong> to create the Database Table & Image Storage bucket:
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(SUPABASE_SQL_SETUP_SCRIPT);
+                      setCopiedSql(true);
+                      addToast('📋 SQL script copied to clipboard!', 'info');
+                      setTimeout(() => setCopiedSql(false), 3000);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-gold-light text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all"
+                  >
+                    {copiedSql ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedSql ? 'Copied SQL!' : 'Copy SQL Script'}</span>
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 overflow-x-auto max-h-60">
+                  <pre className="text-[11px] font-mono text-emerald-300 leading-relaxed">
+                    {SUPABASE_SQL_SETUP_SCRIPT}
+                  </pre>
+                </div>
               </div>
 
             </div>

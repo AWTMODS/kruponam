@@ -1,4 +1,10 @@
 import { getAssetUrl } from '../utils/assetPath';
+import { 
+  fetchRegistrationsFromSupabase, 
+  saveRegistrationToSupabase, 
+  uploadImageToSupabase, 
+  isSupabaseConfigured 
+} from './supabaseService';
 
 export interface Registration {
   id: string;
@@ -177,14 +183,58 @@ export const getRegistrations = (): Registration[] => {
   }
 };
 
+export const syncCloudRegistrations = async (): Promise<Registration[]> => {
+  if (isSupabaseConfigured()) {
+    const cloudRecords = await fetchRegistrationsFromSupabase();
+    if (cloudRecords && cloudRecords.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudRecords));
+      cloudRecords.forEach(syncToIndexedDB);
+      return cloudRecords;
+    }
+  }
+  return getRegistrations();
+};
+
+export const saveRegistrationAsync = async (registration: Registration): Promise<Registration> => {
+  let finalReg = { ...registration };
+
+  // 1. Upload ID Card & Payment Screenshot to Free Supabase Storage if configured
+  if (isSupabaseConfigured()) {
+    try {
+      if (finalReg.idCardUrl && finalReg.idCardUrl.startsWith('data:image')) {
+        const uploadedIdUrl = await uploadImageToSupabase(finalReg.idCardUrl, `idcard_${finalReg.id}`);
+        if (uploadedIdUrl) finalReg.idCardUrl = uploadedIdUrl;
+      }
+      if (finalReg.paymentScreenshotUrl && finalReg.paymentScreenshotUrl.startsWith('data:image')) {
+        const uploadedPayUrl = await uploadImageToSupabase(finalReg.paymentScreenshotUrl, `pay_${finalReg.id}`);
+        if (uploadedPayUrl) finalReg.paymentScreenshotUrl = uploadedPayUrl;
+      }
+      await saveRegistrationToSupabase(finalReg);
+    } catch (e) {
+      console.warn('Supabase cloud upload notice:', e);
+    }
+  }
+
+  // 2. Save locally in LocalStorage & IndexedDB
+  saveRegistration(finalReg);
+  return finalReg;
+};
+
 export const saveRegistration = (registration: Registration): boolean => {
   try {
     const registrations = getRegistrations();
-    const updated = [registration, ...registrations];
+    // Prevent duplicate entries
+    const filtered = registrations.filter((r) => r.id !== registration.id);
+    const updated = [registration, ...filtered];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     
     // Also save into IndexedDB for high-capacity preservation (hundreds of MBs)
     syncToIndexedDB(registration);
+
+    // Sync to Supabase in background if available
+    if (isSupabaseConfigured()) {
+      saveRegistrationToSupabase(registration);
+    }
 
     // Optional POST to external Cloud DB / Google Sheets Webhook
     if (EXTERNAL_WEBHOOK_URL) {
@@ -215,6 +265,9 @@ export const approveRegistration = (id: string): Registration | null => {
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isSupabaseConfigured()) {
+      saveRegistrationToSupabase(registrations[index]);
+    }
     return registrations[index];
   }
   return null;
@@ -228,6 +281,9 @@ export const rejectRegistration = (id: string, reason: string): Registration | n
     registrations[index].rejectionReason = reason;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isSupabaseConfigured()) {
+      saveRegistrationToSupabase(registrations[index]);
+    }
     return registrations[index];
   }
   return null;
@@ -292,6 +348,9 @@ export const markAsReported = (query: string): ScanResult => {
   registrations[index].reportedAt = nowString;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
   syncToIndexedDB(registrations[index]);
+  if (isSupabaseConfigured()) {
+    saveRegistrationToSupabase(registrations[index]);
+  }
 
   return {
     status: 'success',

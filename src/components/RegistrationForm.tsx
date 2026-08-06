@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, QrCode, Sparkles, RefreshCw, ShieldCheck, CreditCard, Image as ImageIcon, Layers, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { saveRegistration, type Registration } from '../services/registrationService';
+import { saveRegistrationAsync, type Registration } from '../services/registrationService';
+import { sendApprovalEmail } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 
 interface RegistrationProps {
@@ -89,7 +90,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     }, 1200);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!idCardPreview) {
@@ -109,36 +110,42 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    const randomId = 'KRP-' + Math.floor(100000 + Math.random() * 900000);
+    const draftReg: Registration = {
+      id: randomId,
+      ...formData,
+      idCardUrl: idCardPreview,
+      paymentScreenshotUrl: paymentScreenshotPreview,
+      paymentAmount: 700,
+      paymentStatus: 'Verified',
+      paymentUtr: paymentUtr,
+      approvalStatus: 'Pending',
+      submittedAt: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    };
 
-      const randomId = 'KRP-' + Math.floor(100000 + Math.random() * 900000);
-      const newReg: Registration = {
-        id: randomId,
-        ...formData,
-        idCardUrl: idCardPreview,
-        paymentScreenshotUrl: paymentScreenshotPreview,
-        paymentAmount: 700,
-        paymentStatus: 'Verified',
-        paymentUtr: paymentUtr,
-        approvalStatus: 'Pending',
-        submittedAt: new Date().toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        }),
-      };
+    // Save to database & cloud storage async
+    const savedReg = await saveRegistrationAsync(draftReg);
 
-      saveRegistration(newReg);
-      setSubmittedRegistration(newReg);
+    // Trigger ticket email generation
+    try {
+      await sendApprovalEmail(savedReg);
+    } catch (err) {
+      console.warn('Email trigger notice:', err);
+    }
 
-      confetti({
-        particleCount: 100,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
-      });
-    }, 1000);
+    setIsSubmitting(false);
+    setSubmittedRegistration(savedReg);
+
+    confetti({
+      particleCount: 100,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
+    });
   };
 
   return (

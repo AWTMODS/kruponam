@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck } from 'lucide-react';
+import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw } from 'lucide-react';
 import { findRegistration, type Registration } from '../services/registrationService';
+import { sendApprovalEmail } from '../services/emailService';
 
 interface LookupProps {
   onClose?: () => void;
@@ -10,6 +11,8 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Registration | null | undefined>(undefined);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,15 +177,46 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </div>
               </div>
 
-              <div className="flex justify-center pt-2">
+              <div className="flex flex-wrap justify-center gap-3 pt-2">
                 <button
                   onClick={handlePrint}
-                  className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-kerala-deep text-white text-xs font-bold uppercase tracking-wider hover:bg-kerala-emerald shadow-lg transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-kerala-deep text-white text-xs font-bold uppercase tracking-wider hover:bg-kerala-emerald shadow-lg transition-all"
                 >
                   <Download className="w-4 h-4 text-gold-royal" />
                   <span>Download / Print Official Pass</span>
                 </button>
+
+                <button
+                  onClick={async () => {
+                    if (!searchResult) return;
+                    setIsSendingEmail(true);
+                    setEmailNotice(null);
+                    const res = await sendApprovalEmail(searchResult);
+                    setIsSendingEmail(false);
+                    setEmailNotice(res.message);
+                  }}
+                  disabled={isSendingEmail}
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-gold-royal text-kerala-dark text-xs font-bold uppercase tracking-wider hover:bg-gold-light shadow-lg transition-all disabled:opacity-50"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Sending Ticket Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      <span>Email Ticket Pass To Me</span>
+                    </>
+                  )}
+                </button>
               </div>
+
+              {emailNotice && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs font-medium text-amber-900 animate-fadeIn">
+                  {emailNotice}
+                </div>
+              )}
             </div>
           ) : searchResult.approvalStatus === 'Pending' ? (
             <div className="p-8 bg-amber-50/90 border-2 border-amber-300 rounded-3xl text-center space-y-4 shadow-md">
