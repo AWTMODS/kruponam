@@ -48,10 +48,10 @@ export const getEmailConfig = (): EmailConfig => {
 
   let provider: EmailConfig['provider'] = 'none';
 
-  if (resendKey && resendKey.startsWith('re_')) {
-    provider = 'resend';
-  } else if (brevoKey) {
+  if (brevoKey && (brevoKey.startsWith('xsmtp') || brevoKey.startsWith('xkeysib') || brevoKey.length > 10)) {
     provider = 'brevo';
+  } else if (resendKey && (resendKey.startsWith('re_') || resendKey.length > 5)) {
+    provider = 'resend';
   } else if (
     emailjsServiceId && 
     emailjsTemplateId && 
