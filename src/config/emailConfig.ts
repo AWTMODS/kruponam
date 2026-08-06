@@ -21,6 +21,7 @@
 export interface EmailConfig {
   provider: 'resend' | 'brevo' | 'emailjs' | 'none';
   resendApiKey: string;
+  resendFromEmail: string;
   brevoApiKey: string;
   emailjsServiceId: string;
   emailjsTemplateId: string;
@@ -32,6 +33,7 @@ export const getEmailConfig = (): EmailConfig => {
     return {
       provider: 'none',
       resendApiKey: '',
+      resendFromEmail: 'Kruponam 2026 Pass <onboarding@resend.dev>',
       brevoApiKey: '',
       emailjsServiceId: '',
       emailjsTemplateId: '',
@@ -40,6 +42,7 @@ export const getEmailConfig = (): EmailConfig => {
   }
 
   const resendKey = localStorage.getItem('kruponam_resend_api_key') || import.meta.env.VITE_RESEND_API_KEY || '';
+  const resendFromEmail = localStorage.getItem('kruponam_resend_from_email') || import.meta.env.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 Pass <onboarding@resend.dev>';
   const brevoKey = localStorage.getItem('kruponam_brevo_api_key') || import.meta.env.VITE_BREVO_API_KEY || '';
   
   const emailjsServiceId = localStorage.getItem('kruponam_emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
@@ -48,10 +51,10 @@ export const getEmailConfig = (): EmailConfig => {
 
   let provider: EmailConfig['provider'] = 'none';
 
-  if (brevoKey && (brevoKey.startsWith('xsmtp') || brevoKey.startsWith('xkeysib') || brevoKey.length > 10)) {
-    provider = 'brevo';
-  } else if (resendKey && (resendKey.startsWith('re_') || resendKey.length > 5)) {
+  if (resendKey && (resendKey.startsWith('re_') || resendKey.length > 5)) {
     provider = 'resend';
+  } else if (brevoKey && (brevoKey.startsWith('xsmtp') || brevoKey.startsWith('xkeysib') || brevoKey.length > 10)) {
+    provider = 'brevo';
   } else if (
     emailjsServiceId && 
     emailjsTemplateId && 
@@ -64,6 +67,7 @@ export const getEmailConfig = (): EmailConfig => {
   return {
     provider,
     resendApiKey: resendKey,
+    resendFromEmail,
     brevoApiKey: brevoKey,
     emailjsServiceId,
     emailjsTemplateId,
@@ -71,9 +75,12 @@ export const getEmailConfig = (): EmailConfig => {
   };
 };
 
-export const saveResendApiKey = (apiKey: string) => {
+export const saveResendApiKey = (apiKey: string, fromEmail?: string) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem('kruponam_resend_api_key', apiKey.trim());
+    if (fromEmail) {
+      localStorage.setItem('kruponam_resend_from_email', fromEmail.trim());
+    }
   }
 };
 

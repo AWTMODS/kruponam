@@ -307,7 +307,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Kruponam 2026 Pass <onboarding@resend.dev>',
+          from: cfg.resendFromEmail || 'Kruponam 2026 Pass <onboarding@resend.dev>',
           to: [registration.email],
           subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
           html: html,
