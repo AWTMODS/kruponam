@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -41,6 +41,12 @@ jobs:
           if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then export VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbWdnbnR5eG13ZW5rbmhoYnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQwMjksImV4cCI6MjEwMTU5MDAyOX0.e0fkp2uUK6na-sjtIjUY56cIZMB26ipsKL-qtOSaq9U"; fi
           npm run build
 
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -56,3 +62,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
