@@ -253,6 +253,13 @@ export const saveRegistration = (registration: Registration): boolean => {
   }
 };
 
+export const isUtrAlreadyUsed = (utr: string): boolean => {
+  if (!utr || utr.trim().length < 6) return false;
+  const cleanUtr = utr.trim().toLowerCase();
+  const list = getRegistrations();
+  return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr);
+};
+
 export const approveRegistration = (id: string): Registration | null => {
   const registrations = getRegistrations();
   const index = registrations.findIndex((r) => r.id === id);

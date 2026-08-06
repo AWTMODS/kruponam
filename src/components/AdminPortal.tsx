@@ -82,7 +82,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     };
     updateClock();
     const timer = setInterval(updateClock, 1000);
-    return () => clearInterval(timer);
+
+    // Auto-polling interval for multi-device cloud database sync (10 seconds)
+    const syncInterval = setInterval(() => {
+      syncCloudRegistrations().then((regs) => {
+        setRegistrations(regs);
+      });
+    }, 10000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(syncInterval);
+    };
   }, []);
 
   const loadData = async () => {
@@ -100,9 +111,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    const expectedEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@kruponam';
+    const expectedPass = import.meta.env.VITE_ADMIN_PASSWORD || localStorage.getItem('kruponam_admin_pass') || 'kruponam@2026';
+
     if (
-      adminEmail.trim().toLowerCase() === 'admin@kruponam' &&
-      adminPassword === 'adminpass'
+      adminEmail.trim().toLowerCase() === expectedEmail.toLowerCase() &&
+      adminPassword === expectedPass
     ) {
       setIsAuthenticated(true);
       sessionStorage.setItem('kruponam_admin_auth', 'true');
@@ -110,13 +124,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       loadData();
       addToast('🔓 Welcome back! Authenticated as Lead Admin.', 'success');
     } else {
-      setLoginError('Invalid Admin credentials. Authorized login: admin@kruponam / adminpass');
+      setLoginError('Invalid Admin credentials. Please check your admin login email and password.');
     }
   };
 
   const handleAutoFillLogin = () => {
-    setAdminEmail('admin@kruponam');
-    setAdminPassword('adminpass');
+    const expectedEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@kruponam';
+    const expectedPass = import.meta.env.VITE_ADMIN_PASSWORD || localStorage.getItem('kruponam_admin_pass') || 'kruponam@2026';
+    setAdminEmail(expectedEmail);
+    setAdminPassword(expectedPass);
     setLoginError('');
   };
 

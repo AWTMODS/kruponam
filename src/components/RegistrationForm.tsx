@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, QrCode, Sparkles, RefreshCw, ShieldCheck, CreditCard, Image as ImageIcon, Layers, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { saveRegistrationAsync, type Registration } from '../services/registrationService';
+import { saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 
@@ -9,6 +9,38 @@ interface RegistrationProps {
   selectedPassFromParent?: string;
   onOpenLookup?: () => void;
 }
+
+const compressImageToDataUrl = (file: File, maxWidth = 1000, quality = 0.75): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } else {
+          resolve(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFromParent, onOpenLookup }) => {
   const [formData, setFormData] = useState({
@@ -50,31 +82,23 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleIdCardUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setIdCardFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setIdCardPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToDataUrl(file);
+      setIdCardPreview(compressed);
     }
   };
 
-  const handlePaymentScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePaymentScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setPaymentScreenshotFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPaymentScreenshotPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImageToDataUrl(file);
+      setPaymentScreenshotPreview(compressed);
     }
   };
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +110,11 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
     if (!paymentUtr || paymentUtr.trim().length < 6) {
       alert('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
+      return;
+    }
+
+    if (isUtrAlreadyUsed(paymentUtr)) {
+      alert(`⚠️ The UTR / Transaction ID (${paymentUtr.trim()}) has already been used for another registration. Please enter your own valid transaction UTR.`);
       return;
     }
 
