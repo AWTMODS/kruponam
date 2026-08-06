@@ -262,7 +262,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
   let lastErrorNotice = '';
 
   // 3A. Try Brevo API first if configured (9,000 Free Emails / Month)
-  if (cfg.brevoApiKey) {
+  if (cfg.brevoApiKey && !cfg.brevoApiKey.startsWith('xsmtp')) {
     const apiKey = getActiveBrevoKey(cfg.brevoApiKey);
     try {
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -272,7 +272,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: { name: 'Kruponam 2026', email: 'kruponam2026@gmail.com' },
+          sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
           to: [{ email: registration.email, name: registration.fullName }],
           subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
           htmlContent: html,
@@ -288,7 +288,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         };
       } else {
         const errorData = await res.json().catch(() => ({}));
-        lastErrorNotice = `⚠️ Brevo Notice: ${errorData.message || res.statusText}`;
+        lastErrorNotice = `⚠️ Brevo API Notice (${res.status}): ${errorData.message || res.statusText}`;
         console.warn('Brevo API notice:', lastErrorNotice);
       }
     } catch (err: any) {
@@ -323,7 +323,11 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         };
       } else {
         const errorData = await res.json().catch(() => ({}));
-        lastErrorNotice = `⚠️ Resend Notice: ${errorData.message || res.statusText}`;
+        if (res.status === 403 && errorData.message?.includes('testing emails')) {
+          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner (awtwhatsapp.crashlog@gmail.com). To send to ${registration.email}, add your domain at resend.com/domains or use Brevo xkeysib key.`;
+        } else {
+          lastErrorNotice = `⚠️ Resend API Notice (${res.status}): ${errorData.message || res.statusText}`;
+        }
         console.warn('Resend API notice:', lastErrorNotice);
       }
     } catch (err: any) {
