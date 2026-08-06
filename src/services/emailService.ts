@@ -1,6 +1,6 @@
 import emailjs from '@emailjs/browser';
 import QRCode from 'qrcode';
-import { EMAIL_CONFIG, EMAIL_ENABLED } from '../config/emailConfig';
+import { getEmailConfig } from '../config/emailConfig';
 import type { Registration } from './registrationService';
 
 // ── QR Code Generator ──────────────────────────────────────────────
@@ -229,6 +229,25 @@ export interface EmailResult {
   qrDataUrl: string;
 }
 
+let resendKeyIndex = 0;
+let brevoKeyIndex = 0;
+
+const getActiveResendKey = (rawKeys: string): string => {
+  const keys = rawKeys.split(/[\s,]+/).map(k => k.trim()).filter(k => k.length > 5);
+  if (keys.length === 0) return rawKeys;
+  const key = keys[resendKeyIndex % keys.length];
+  resendKeyIndex++;
+  return key;
+};
+
+const getActiveBrevoKey = (rawKeys: string): string => {
+  const keys = rawKeys.split(/[\s,]+/).map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return rawKeys;
+  const key = keys[brevoKeyIndex % keys.length];
+  brevoKeyIndex++;
+  return key;
+};
+
 // ── Main Send Function ──────────────────────────────────────────────
 export const sendApprovalEmail = async (registration: Registration): Promise<EmailResult> => {
   // 1. Generate QR code
@@ -238,13 +257,82 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
 
   // 2. Build HTML body
   const html = buildEmailHtml(registration, qrDataUrl);
+  const cfg = getEmailConfig();
 
-  // 3. Send via EmailJS if configured
-  if (EMAIL_ENABLED) {
+  // 3A. Try Brevo API first if configured (9,000 Free Emails / Month)
+  if (cfg.brevoApiKey) {
+    const apiKey = getActiveBrevoKey(cfg.brevoApiKey);
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: 'Kruponam 2026', email: 'kruponam2026@krupanidhi.edu.in' },
+          to: [{ email: registration.email, name: registration.fullName }],
+          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
+          htmlContent: html,
+        }),
+      });
+
+      if (res.ok) {
+        return {
+          success: true,
+          message: `✉️ [Brevo API] Invoice & QR Ticket sent directly to ${registration.email}!`,
+          previewHtml: html,
+          qrDataUrl,
+        };
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.warn('Brevo API notice:', errorData.message || res.statusText);
+      }
+    } catch (err: any) {
+      console.error('Brevo API send error:', err);
+    }
+  }
+
+  // 3B. Try Resend API (3,000 Free Emails / Month)
+  if (cfg.resendApiKey) {
+    const apiKey = getActiveResendKey(cfg.resendApiKey);
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Kruponam 2026 Pass <onboarding@resend.dev>',
+          to: [registration.email],
+          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
+          html: html,
+        }),
+      });
+
+      if (res.ok) {
+        return {
+          success: true,
+          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${registration.email}!`,
+          previewHtml: html,
+          qrDataUrl,
+        };
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.warn('Resend API notice:', errorData.message || res.statusText);
+      }
+    } catch (err: any) {
+      console.error('Resend API send error:', err);
+    }
+  }
+
+  // 3C. Send via EmailJS API (Free 200 emails / mo)
+  if (cfg.provider === 'emailjs') {
     try {
       await emailjs.send(
-        EMAIL_CONFIG.SERVICE_ID,
-        EMAIL_CONFIG.TEMPLATE_ID,
+        cfg.emailjsServiceId,
+        cfg.emailjsTemplateId,
         {
           to_email: registration.email,
           to_name: registration.fullName,
@@ -254,30 +342,30 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
           dept: `${registration.department} — ${registration.year}`,
           utr: registration.paymentUtr,
         },
-        EMAIL_CONFIG.PUBLIC_KEY
+        cfg.emailjsPublicKey
       );
 
       return {
         success: true,
-        message: `✉️ Invoice & QR Ticket emailed to ${registration.email}`,
+        message: `✉️ [EmailJS] Invoice & QR Ticket sent directly to ${registration.email}!`,
         previewHtml: html,
         qrDataUrl,
       };
-    } catch (err) {
+    } catch (err: any) {
       console.error('EmailJS send error:', err);
       return {
         success: false,
-        message: `⚠️ Email delivery failed (check EmailJS config). Preview shown below.`,
+        message: `⚠️ Email delivery notice: ${err?.text || err?.message || 'Check EmailJS API credentials'}. Preview shown below.`,
         previewHtml: html,
         qrDataUrl,
       };
     }
   }
 
-  // 4. Preview mode (EmailJS not configured yet)
+  // 4. Preview mode (No API key added yet)
   return {
     success: false,
-    message: `📧 Email Preview Mode — Configure EmailJS in src/config/emailConfig.ts to send real emails.`,
+    message: `📧 Email Preview Mode — Enter Resend Key (3k free/mo) or Brevo Key (9k free/mo) in Admin Portal → Cloud DB & Email Settings to auto-send to student inbox.`,
     previewHtml: html,
     qrDataUrl,
   };

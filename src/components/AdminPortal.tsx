@@ -10,6 +10,7 @@ import {
   exportBackupDataJson, importBackupDataJson, type Registration 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
+import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
 import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { AdminQrScanner } from './AdminQrScanner';
@@ -49,6 +50,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseCredentials().url);
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(getSupabaseCredentials().key);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  // EmailJS credentials state
+  const [emailServiceId, setEmailServiceId] = useState(getEmailConfig().emailjsServiceId === 'YOUR_EMAILJS_SERVICE_ID' ? '' : getEmailConfig().emailjsServiceId);
+  const [emailTemplateId, setEmailTemplateId] = useState(getEmailConfig().emailjsTemplateId === 'YOUR_EMAILJS_TEMPLATE_ID' ? '' : getEmailConfig().emailjsTemplateId);
+  const [emailPublicKey, setEmailPublicKey] = useState(getEmailConfig().emailjsPublicKey === 'YOUR_EMAILJS_PUBLIC_KEY' ? '' : getEmailConfig().emailjsPublicKey);
+
+  // High-Volume Email API state (3k-9k free emails/mo)
+  const [resendApiKey, setResendApiKey] = useState(getEmailConfig().resendApiKey);
+  const [brevoApiKey, setBrevoApiKey] = useState(getEmailConfig().brevoApiKey);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1281,6 +1291,166 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   >
                     <Save className="w-4 h-4" />
                     <span>Save Cloud Connection Settings</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* High-Volume Pass Email Dispatch Box (3,000+ to 9,000+ Free Emails) */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-gold-royal" />
+                      <span>High-Volume Email Pass Dispatch (1,000+ to 9,000+ Free Emails)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Choose a free email provider to automatically send HTML QR passes directly to student inboxes:
+                    </p>
+                  </div>
+
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    isEmailEnabled() ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                  }`}>
+                    {getEmailConfig().provider === 'resend'
+                      ? '✓ Resend Active (3,000 Free/Mo)'
+                      : getEmailConfig().provider === 'brevo'
+                      ? '✓ Brevo Active (9,000 Free/Mo)'
+                      : getEmailConfig().provider === 'emailjs'
+                      ? '✓ EmailJS Active (200 Free/Mo)'
+                      : 'Preview Mode'}
+                  </span>
+                </div>
+
+                {/* Option A: Resend API (3,000 Free Emails / Month) */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                      Option A: Resend API (3,000 Free Emails / Month) — Recommended for 1,000+ Emails
+                    </span>
+                    <a href="https://resend.com" target="_blank" rel="noreferrer" className="text-[11px] text-amber-400 font-bold underline">
+                      Get Free Resend API Key →
+                    </a>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="password"
+                      placeholder="Paste Resend API Key (e.g. re_12345678...)"
+                      value={resendApiKey}
+                      onChange={(e) => setResendApiKey(e.target.value)}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                    <button
+                      onClick={() => {
+                        saveResendApiKey(resendApiKey);
+                        addToast('✅ Resend API key saved! (3,000 free emails/month enabled)', 'success');
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold uppercase tracking-wider shrink-0 transition-all shadow-md"
+                    >
+                      Save Resend Key
+                    </button>
+                  </div>
+                </div>
+
+                {/* Option B: Brevo API (9,000 Free Emails / Month) */}
+                <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-teal-400 uppercase tracking-wider">
+                      Option B: Brevo API (9,000 Free Emails / Month)
+                    </span>
+                    <a href="https://www.brevo.com" target="_blank" rel="noreferrer" className="text-[11px] text-amber-400 font-bold underline">
+                      Get Free Brevo Key →
+                    </a>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="password"
+                      placeholder="Paste Brevo API Key (e.g. xkeysib-...)"
+                      value={brevoApiKey}
+                      onChange={(e) => setBrevoApiKey(e.target.value)}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                    <button
+                      onClick={() => {
+                        saveBrevoApiKey(brevoApiKey);
+                        addToast('✅ Brevo API key saved! (9,000 free emails/month enabled)', 'success');
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold uppercase tracking-wider shrink-0 transition-all shadow-md"
+                    >
+                      Save Brevo Key
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Automated Real Email Service Box (EmailJS) */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                    <Mail className="w-5 h-5 text-gold-royal" />
+                    <span>Option C: EmailJS Credentials (200 Free Emails / Month)</span>
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    isEmailEnabled() ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                  }`}>
+                    {isEmailEnabled() ? '✓ Real Email Live (200/mo)' : 'Preview Mode'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  To automatically deliver the QR pass & payment invoice directly into the student's email inbox on approval, create a free account at <a href="https://www.emailjs.com/" target="_blank" rel="noreferrer" className="text-amber-400 font-bold underline">emailjs.com</a> and enter your keys below:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      EmailJS Service ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. service_abc123"
+                      value={emailServiceId}
+                      onChange={(e) => setEmailServiceId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      EmailJS Template ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. template_xyz789"
+                      value={emailTemplateId}
+                      onChange={(e) => setEmailTemplateId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      EmailJS Public Key
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AbCdEfGh12345678"
+                      value={emailPublicKey}
+                      onChange={(e) => setEmailPublicKey(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      saveEmailCredentials(emailServiceId, emailTemplateId, emailPublicKey);
+                      addToast('✅ EmailJS credentials saved! Real pass emails are now enabled.', 'success');
+                    }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:opacity-90 shadow-md flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Pass Email API Keys</span>
                   </button>
                 </div>
               </div>

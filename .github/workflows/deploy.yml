@@ -35,8 +35,10 @@ jobs:
 
       - name: Build Vite App
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://ummggndyxmwenknhhbsr.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbWdnbnR5eG13ZW5rbmhoYnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQwMjksImV4cCI6MjEwMTU5MDAyOX0.e0fkp2uUK6na-sjtIjUY56cIZMB26ipsKL-qtOSaq9U' }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY || vars.VITE_RESEND_API_KEY }}
+          VITE_BREVO_API_KEY: ${{ secrets.VITE_BREVO_API_KEY || vars.VITE_BREVO_API_KEY }}
         run: npm run build
 
       - name: Setup Pages

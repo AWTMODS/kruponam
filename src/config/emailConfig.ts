@@ -1,31 +1,96 @@
 // ─────────────────────────────────────────────────────────
-//  KRUPONAM 2026 — EmailJS Configuration
+//  KRUPONAM 2026 — High-Volume Email Dispatch Configuration
 // ─────────────────────────────────────────────────────────
 //
-//  HOW TO SET UP REAL EMAILS (FREE — 200/month):
-//  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  1. Sign up at https://www.emailjs.com/ (free)
-//  2. Dashboard → Email Services → Add Service (Gmail / SMTP)
-//     → Copy the Service ID below.
-//  3. Dashboard → Email Templates → Create Template
-//     → Use the HTML body that emailService.ts sends.
-//     → Map variables: {{to_email}}, {{to_name}}, {{message_html}}
-//     → Copy the Template ID below.
-//  4. Dashboard → Account → General → Public Key
-//     → Copy the Public Key below.
-//  5. Save this file — emails will start sending instantly!
+//  FREE HIGH-VOLUME EMAIL OPTIONS:
+//  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  1. RESEND API (RECOMMENDED FOR 3,000+ FREE EMAILS / MONTH):
+//     - Sign up at https://resend.com/ (free)
+//     - Copy your API Key (e.g. 're_12345678...')
+//     - Capacity: 3,000 Free Emails / Month (100 / day)
 //
-//  Until configured, the system shows an on-screen Email Preview.
+//  2. BREVO API (FOR 9,000+ FREE EMAILS / MONTH):
+//     - Sign up at https://www.brevo.com/ (free)
+//     - Copy your SMTP/API Key (e.g. 'xkeysib-...')
+//     - Capacity: 9,000 Free Emails / Month (300 / day)
+//
+//  3. EMAILJS API (FOR 200 FREE EMAILS / MONTH):
+//     - Sign up at https://www.emailjs.com/
 // ─────────────────────────────────────────────────────────
 
-export const EMAIL_CONFIG = {
-  SERVICE_ID: 'YOUR_EMAILJS_SERVICE_ID',   // e.g. 'service_abc123'
-  TEMPLATE_ID: 'YOUR_EMAILJS_TEMPLATE_ID', // e.g. 'template_xyz789'
-  PUBLIC_KEY: 'YOUR_EMAILJS_PUBLIC_KEY',   // e.g. 'AbCdEfGh12345678'
+export interface EmailConfig {
+  provider: 'resend' | 'brevo' | 'emailjs' | 'none';
+  resendApiKey: string;
+  brevoApiKey: string;
+  emailjsServiceId: string;
+  emailjsTemplateId: string;
+  emailjsPublicKey: string;
+}
+
+export const getEmailConfig = (): EmailConfig => {
+  if (typeof window === 'undefined') {
+    return {
+      provider: 'none',
+      resendApiKey: '',
+      brevoApiKey: '',
+      emailjsServiceId: '',
+      emailjsTemplateId: '',
+      emailjsPublicKey: '',
+    };
+  }
+
+  const resendKey = localStorage.getItem('kruponam_resend_api_key') || import.meta.env.VITE_RESEND_API_KEY || '';
+  const brevoKey = localStorage.getItem('kruponam_brevo_api_key') || import.meta.env.VITE_BREVO_API_KEY || '';
+  
+  const emailjsServiceId = localStorage.getItem('kruponam_emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
+  const emailjsTemplateId = localStorage.getItem('kruponam_emailjs_template_id') || import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
+  const emailjsPublicKey = localStorage.getItem('kruponam_emailjs_public_key') || import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+
+  let provider: EmailConfig['provider'] = 'none';
+
+  if (resendKey && resendKey.startsWith('re_')) {
+    provider = 'resend';
+  } else if (brevoKey) {
+    provider = 'brevo';
+  } else if (
+    emailjsServiceId && 
+    emailjsTemplateId && 
+    emailjsPublicKey &&
+    emailjsServiceId !== 'YOUR_EMAILJS_SERVICE_ID'
+  ) {
+    provider = 'emailjs';
+  }
+
+  return {
+    provider,
+    resendApiKey: resendKey,
+    brevoApiKey: brevoKey,
+    emailjsServiceId,
+    emailjsTemplateId,
+    emailjsPublicKey,
+  };
 };
 
-// Set to true only when the 3 values above are filled in.
-export const EMAIL_ENABLED =
-  EMAIL_CONFIG.SERVICE_ID !== 'YOUR_EMAILJS_SERVICE_ID' &&
-  EMAIL_CONFIG.TEMPLATE_ID !== 'YOUR_EMAILJS_TEMPLATE_ID' &&
-  EMAIL_CONFIG.PUBLIC_KEY !== 'YOUR_EMAILJS_PUBLIC_KEY';
+export const saveResendApiKey = (apiKey: string) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('kruponam_resend_api_key', apiKey.trim());
+  }
+};
+
+export const saveBrevoApiKey = (apiKey: string) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('kruponam_brevo_api_key', apiKey.trim());
+  }
+};
+
+export const saveEmailCredentials = (serviceId: string, templateId: string, publicKey: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('kruponam_emailjs_service_id', serviceId.trim());
+  localStorage.setItem('kruponam_emailjs_template_id', templateId.trim());
+  localStorage.setItem('kruponam_emailjs_public_key', publicKey.trim());
+};
+
+export const isEmailEnabled = (): boolean => {
+  const cfg = getEmailConfig();
+  return cfg.provider !== 'none';
+};

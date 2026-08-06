@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw } from 'lucide-react';
 import { findRegistration, type Registration } from '../services/registrationService';
-import { sendApprovalEmail } from '../services/emailService';
+import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 
 interface LookupProps {
   onClose?: () => void;
@@ -13,6 +13,17 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [hasSearched, setHasSearched] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (searchResult && searchResult.approvalStatus === 'Approved') {
+      generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr}`).then((url) => {
+        setQrCodeUrl(url);
+      });
+    } else {
+      setQrCodeUrl('');
+    }
+  }, [searchResult]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,10 +175,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                   </div>
 
                   <div className="sm:col-span-4 flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-gold-royal/30 shadow-inner">
-                    <div className="w-28 h-28 bg-slate-900 rounded-xl p-2 flex items-center justify-center text-white">
-                      <QrCode className="w-full h-full text-gold-light" />
+                    <div className="w-32 h-32 bg-white rounded-xl p-1.5 border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
+                      {qrCodeUrl ? (
+                        <img
+                          src={qrCodeUrl}
+                          alt={`QR Pass ${searchResult.id}`}
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                      ) : (
+                        <QrCode className="w-16 h-16 text-kerala-deep animate-pulse" />
+                      )}
                     </div>
-                    <span className="text-[9px] font-mono text-slate-400 mt-2">Scan at Campus Gate</span>
+                    <span className="text-[10px] font-mono font-bold text-kerala-deep mt-2">TOKEN: {searchResult.id}</span>
+                    <span className="text-[9px] font-mono text-slate-400 mt-0.5">SCAN AT CAMPUS GATE</span>
                   </div>
                 </div>
 
