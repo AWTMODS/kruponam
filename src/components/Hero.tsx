@@ -135,9 +135,9 @@ export const Hero = () => {
               
               <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-cream-soft to-amber-50">
                 <img
-                  src={getAssetUrl('images/hero_illustration.png')}
-                  alt="Kruponam Onam Festival King Mahabali & Vallam Kali"
-                  className="w-full h-auto object-cover max-h-[520px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
+                  src={getAssetUrl('images/hero_poster.jpg?v=2')}
+                  alt="Kruponam 2026 Official Poster King Mahabali Krupanidhi Institutions"
+                  className="w-full h-auto object-cover max-h-[560px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
                 />
 
                 {/* Overlay Badge Top Right */}
