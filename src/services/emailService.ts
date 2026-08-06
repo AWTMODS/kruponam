@@ -1,24 +1,12 @@
 import emailjs from '@emailjs/browser';
-import QRCode from 'qrcode';
 import { getEmailConfig } from '../config/emailConfig';
 import type { Registration } from './registrationService';
 
-// ── QR Code Generator ──────────────────────────────────────────────
+// ── QR Code Generator (Gmail & Outlook Mobile Compatible) ─────────────
 export const generateQrCode = async (text: string): Promise<string> => {
-  try {
-    const dataUrl = await QRCode.toDataURL(text, {
-      width: 200,
-      margin: 2,
-      color: {
-        dark: '#0D472B',  // Kerala Deep Green
-        light: '#FFFBF0', // Cream White
-      },
-    });
-    return dataUrl;
-  } catch (err) {
-    console.error('QR generation error', err);
-    return '';
-  }
+  // Use public HTTPS QR Code API so Gmail, Outlook, Apple Mail, and Web Browsers render the image sharply.
+  // (Gmail mobile app strictly blocks inline base64 data URIs).
+  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}&color=0D472B&bgcolor=FFFBF0`;
 };
 
 // ── Kerala-themed HTML Email Template ─────────────────────────────
