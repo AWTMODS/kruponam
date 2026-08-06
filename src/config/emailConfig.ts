@@ -33,7 +33,7 @@ export const getEmailConfig = (): EmailConfig => {
     return {
       provider: 'none',
       resendApiKey: '',
-      resendFromEmail: 'Kruponam 2026 Pass <onboarding@resend.dev>',
+      resendFromEmail: 'Kruponam 2026 Pass <pass@lifestack.in>',
       brevoApiKey: '',
       emailjsServiceId: '',
       emailjsTemplateId: '',
@@ -42,7 +42,7 @@ export const getEmailConfig = (): EmailConfig => {
   }
 
   const resendKey = localStorage.getItem('kruponam_resend_api_key') || import.meta.env.VITE_RESEND_API_KEY || '';
-  const resendFromEmail = localStorage.getItem('kruponam_resend_from_email') || import.meta.env.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 Pass <onboarding@resend.dev>';
+  const resendFromEmail = localStorage.getItem('kruponam_resend_from_email') || import.meta.env.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 Pass <pass@lifestack.in>';
   const brevoKey = localStorage.getItem('kruponam_brevo_api_key') || import.meta.env.VITE_BREVO_API_KEY || '';
   
   const emailjsServiceId = localStorage.getItem('kruponam_emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || '';

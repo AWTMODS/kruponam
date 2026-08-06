@@ -35,6 +35,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY || vars.VITE_RESEND_API_KEY }}
+          VITE_RESEND_FROM_EMAIL: ${{ secrets.VITE_RESEND_FROM_EMAIL || vars.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 Pass <pass@lifestack.in>' }}
           VITE_BREVO_API_KEY: ${{ secrets.VITE_BREVO_API_KEY || vars.VITE_BREVO_API_KEY }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ]; then export VITE_SUPABASE_URL="https://ummggndyxmwenknhhbsr.supabase.co"; fi
