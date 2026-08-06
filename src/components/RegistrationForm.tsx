@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, QrCode, Sparkles, RefreshCw, ShieldCheck, CreditCard, Image as ImageIcon, Layers, Upload } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { saveRegistrationAsync, type Registration } from '../services/registrationService';
-import { sendApprovalEmail } from '../services/emailService';
+import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 
 interface RegistrationProps {
@@ -29,14 +29,21 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
   const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
 
   const [paymentUtr, setPaymentUtr] = useState('');
-  const [isPaymentVerified, setIsPaymentVerified] = useState(false);
-  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRegistration, setSubmittedRegistration] = useState<Registration | null>(null);
   const [upiSettings, setUpiSettings] = useState(getUpiSettings());
+  const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string>('');
 
   useEffect(() => {
-    setUpiSettings(getUpiSettings());
+    const s = getUpiSettings();
+    setUpiSettings(s);
+    if (s.qrImageDataUrl) {
+      setUpiQrCodeUrl(s.qrImageDataUrl);
+    } else {
+      generateQrCode(`upi://pay?pa=${s.upiId}&pn=Kruponam2026&am=700&cu=INR`).then((url) => {
+        setUpiQrCodeUrl(url);
+      });
+    }
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -67,28 +74,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     }
   };
 
-  const handleAutoVerifyPayment = () => {
-    if (!paymentUtr || paymentUtr.trim().length < 6) {
-      alert('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
-      return;
-    }
 
-    setIsVerifyingPayment(true);
-    setTimeout(() => {
-      setIsVerifyingPayment(false);
-      setIsPaymentVerified(true);
-      // Record payment to active UPI slot → auto-rotate if full
-      recordPaymentToActiveSlot();
-      // Refresh displayed UPI (may have rotated to a new slot)
-      setUpiSettings(getUpiSettings());
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#D4AF37', '#0D472B', '#EA580C'],
-      });
-    }, 1200);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,17 +84,21 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       return;
     }
 
+    if (!paymentUtr || paymentUtr.trim().length < 6) {
+      alert('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
+      return;
+    }
+
     if (!paymentScreenshotPreview) {
       alert('Please upload your Payment Screenshot showing the UTR / Ref ID clearly.');
       return;
     }
 
-    if (!isPaymentVerified) {
-      alert('Please verify your ₹700 payment transaction using UTR / Transaction ID before submitting.');
-      return;
-    }
-
     setIsSubmitting(true);
+
+    try {
+      recordPaymentToActiveSlot();
+    } catch (_) {}
 
     const randomId = 'KRP-' + Math.floor(100000 + Math.random() * 900000);
     const draftReg: Registration = {
@@ -419,15 +409,15 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-[11px] font-black uppercase tracking-wider">
                         ₹700 Event Fee
                       </span>
-                      <div className="w-36 h-36 mx-auto bg-white p-2.5 rounded-2xl border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
-                        {upiSettings.qrImageDataUrl ? (
+                      <div className="w-36 h-36 mx-auto bg-white p-2 rounded-2xl border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
+                        {upiQrCodeUrl ? (
                           <img
-                            src={upiSettings.qrImageDataUrl}
+                            src={upiQrCodeUrl}
                             alt="UPI QR Code"
                             className="w-full h-full object-contain rounded-xl"
                           />
                         ) : (
-                          <QrCode className="w-full h-full text-slate-900" />
+                          <QrCode className="w-full h-full text-slate-900 animate-pulse" />
                         )}
                       </div>
                       <p className="text-xs font-mono font-bold text-slate-700">{upiSettings.upiId}</p>
@@ -446,38 +436,20 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                           maxLength={16}
                           placeholder="e.g. 320918239012"
                           value={paymentUtr}
-                          onChange={(e) => {
-                            setPaymentUtr(e.target.value);
-                            setIsPaymentVerified(false);
-                          }}
+                          onChange={(e) => setPaymentUtr(e.target.value)}
                           className="w-full px-4 py-3 rounded-xl border border-slate-300 font-mono text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30"
                         />
                       </div>
 
-                      {isPaymentVerified ? (
-                        <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
+                      {paymentUtr.trim().length >= 6 ? (
+                        <div className="p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                          <span>₹700 Payment Verified! UTR recorded.</span>
+                          <span>✓ UTR Entered ({paymentUtr}) • Ready for Admin Review & Approval</span>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={handleAutoVerifyPayment}
-                          disabled={isVerifyingPayment}
-                          className="w-full py-3 rounded-xl bg-gold-royal text-kerala-dark font-bold text-xs uppercase tracking-wider hover:bg-gold-light transition-all flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          {isVerifyingPayment ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Verifying ₹700 Payment...</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="w-4 h-4 text-kerala-dark" />
-                              <span>Auto-Verify ₹700 Payment UTR</span>
-                            </>
-                          )}
-                        </button>
+                        <p className="text-[11px] text-slate-500 italic">
+                          ℹ️ Enter your 12-digit transaction UTR number from your payment app. Admin will verify your receipt and UTR upon submission.
+                        </p>
                       )}
                     </div>
                   </div>
