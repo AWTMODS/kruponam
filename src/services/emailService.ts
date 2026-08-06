@@ -259,6 +259,8 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
   const html = buildEmailHtml(registration, qrDataUrl);
   const cfg = getEmailConfig();
 
+  let lastErrorNotice = '';
+
   // 3A. Try Brevo API first if configured (9,000 Free Emails / Month)
   if (cfg.brevoApiKey) {
     const apiKey = getActiveBrevoKey(cfg.brevoApiKey);
@@ -270,7 +272,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: { name: 'Kruponam 2026', email: 'kruponam2026@krupanidhi.edu.in' },
+          sender: { name: 'Kruponam 2026', email: 'kruponam2026@gmail.com' },
           to: [{ email: registration.email, name: registration.fullName }],
           subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
           htmlContent: html,
@@ -286,7 +288,8 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         };
       } else {
         const errorData = await res.json().catch(() => ({}));
-        console.warn('Brevo API notice:', errorData.message || res.statusText);
+        lastErrorNotice = `⚠️ Brevo Notice: ${errorData.message || res.statusText}`;
+        console.warn('Brevo API notice:', lastErrorNotice);
       }
     } catch (err: any) {
       console.error('Brevo API send error:', err);
@@ -320,7 +323,8 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         };
       } else {
         const errorData = await res.json().catch(() => ({}));
-        console.warn('Resend API notice:', errorData.message || res.statusText);
+        lastErrorNotice = `⚠️ Resend Notice: ${errorData.message || res.statusText}`;
+        console.warn('Resend API notice:', lastErrorNotice);
       }
     } catch (err: any) {
       console.error('Resend API send error:', err);
@@ -365,7 +369,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
   // 4. Preview mode (No API key added yet)
   return {
     success: false,
-    message: `📧 Email Preview Mode — Enter Resend Key (3k free/mo) or Brevo Key (9k free/mo) in Admin Portal → Cloud DB & Email Settings to auto-send to student inbox.`,
+    message: lastErrorNotice || `📧 Email Preview Mode — Enter Resend Key (3k free/mo) or Brevo Key (9k free/mo) in Admin Portal → Cloud DB & Email Settings to auto-send to student inbox.`,
     previewHtml: html,
     qrDataUrl,
   };
