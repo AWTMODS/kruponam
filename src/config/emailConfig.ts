@@ -53,7 +53,7 @@ export const getEmailConfig = (): EmailConfig => {
 
   if (resendKey && (resendKey.startsWith('re_') || resendKey.length > 5)) {
     provider = 'resend';
-  } else if (brevoKey && (brevoKey.startsWith('xsmtp') || brevoKey.startsWith('xkeysib') || brevoKey.length > 10)) {
+  } else if (brevoKey && brevoKey.startsWith('xkeysib')) {
     provider = 'brevo';
   } else if (
     emailjsServiceId && 

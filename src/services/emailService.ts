@@ -261,8 +261,47 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
 
   let lastErrorNotice = '';
 
-  // 3A. Try Brevo API first if configured (9,000 Free Emails / Month)
-  if (cfg.brevoApiKey && !cfg.brevoApiKey.startsWith('xsmtp')) {
+  // 3A. Try Resend API first (3,000 Free Emails / Month with verified lifestack.in domain)
+  if (cfg.resendApiKey) {
+    const apiKey = getActiveResendKey(cfg.resendApiKey);
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: cfg.resendFromEmail || 'Kruponam 2026 Pass <pass@lifestack.in>',
+          to: [registration.email],
+          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
+          html: html,
+        }),
+      });
+
+      if (res.ok) {
+        return {
+          success: true,
+          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${registration.email}!`,
+          previewHtml: html,
+          qrDataUrl,
+        };
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        if (res.status === 403 && errorData.message?.includes('testing emails')) {
+          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner (awtwhatsapp.crashlog@gmail.com). Add domain at resend.com/domains or use Brevo xkeysib key.`;
+        } else {
+          lastErrorNotice = `⚠️ Resend API Notice (${res.status}): ${errorData.message || res.statusText}`;
+        }
+        console.warn('Resend API notice:', lastErrorNotice);
+      }
+    } catch (err: any) {
+      console.error('Resend API send error:', err);
+    }
+  }
+
+  // 3B. Try Brevo API second (9,000 Free Emails / Month)
+  if (cfg.brevoApiKey && cfg.brevoApiKey.startsWith('xkeysib')) {
     const apiKey = getActiveBrevoKey(cfg.brevoApiKey);
     try {
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -293,45 +332,6 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
       }
     } catch (err: any) {
       console.error('Brevo API send error:', err);
-    }
-  }
-
-  // 3B. Try Resend API (3,000 Free Emails / Month)
-  if (cfg.resendApiKey) {
-    const apiKey = getActiveResendKey(cfg.resendApiKey);
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: cfg.resendFromEmail || 'Kruponam 2026 Pass <onboarding@resend.dev>',
-          to: [registration.email],
-          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
-          html: html,
-        }),
-      });
-
-      if (res.ok) {
-        return {
-          success: true,
-          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${registration.email}!`,
-          previewHtml: html,
-          qrDataUrl,
-        };
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        if (res.status === 403 && errorData.message?.includes('testing emails')) {
-          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner (awtwhatsapp.crashlog@gmail.com). To send to ${registration.email}, add your domain at resend.com/domains or use Brevo xkeysib key.`;
-        } else {
-          lastErrorNotice = `⚠️ Resend API Notice (${res.status}): ${errorData.message || res.statusText}`;
-        }
-        console.warn('Resend API notice:', lastErrorNotice);
-      }
-    } catch (err: any) {
-      console.error('Resend API send error:', err);
     }
   }
 
