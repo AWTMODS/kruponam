@@ -74,8 +74,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-cream-warm text-slate-800 relative selection:bg-gold-royal selection:text-white">
-      {/* Floating Canvas Flower Petals */}
-      <FloatingPetals />
+      {/* Floating Canvas Flower Petals (Public Site Only - Hidden in Admin) */}
+      {activeView !== 'admin' && <FloatingPetals />}
 
       {/* Main App View Navigation */}
       {activeView === 'admin' ? (
