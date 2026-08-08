@@ -1,13 +1,13 @@
 import React from 'react';
 import { getAssetUrl } from '../utils/assetPath';
-import { Sparkles, ShieldCheck } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface ComingSoonProps {
   onOpenAdmin?: () => void;
   onOpenLookup?: () => void;
 }
 
-export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLookup }) => {
+export const ComingSoon: React.FC<ComingSoonProps> = () => {
   return (
     <div className="min-h-screen bg-cream-gradient text-slate-800 flex flex-col justify-between relative overflow-hidden select-none">
       
@@ -17,7 +17,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-kerala-mint/20 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* Top Header Bar */}
-      <header className="py-6 px-4 sm:px-8 max-w-7xl mx-auto w-full flex items-center justify-between z-10">
+      <header className="py-6 px-4 sm:px-8 max-w-7xl mx-auto w-full flex items-center justify-center sm:justify-start z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-kerala-deep via-gold-royal to-floral-yellow p-0.5 shadow-gold-glow">
             <div className="w-full h-full bg-cream-warm rounded-full flex items-center justify-center text-xl">
@@ -32,30 +32,6 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
               </span>
             </span>
           </div>
-        </div>
-
-        {/* Action Buttons Header */}
-        <div className="flex items-center gap-2">
-          {onOpenLookup && (
-            <button
-              onClick={onOpenLookup}
-              className="px-3.5 py-2 rounded-full bg-white/80 hover:bg-white text-slate-800 border border-gold-royal/30 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-              title="Check Pass Status"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-gold-royal" />
-              <span className="hidden sm:inline">Pass Status</span>
-            </button>
-          )}
-
-          {onOpenAdmin && (
-            <button
-              onClick={onOpenAdmin}
-              className="px-3.5 py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 text-gold-light text-xs font-mono font-bold transition-all shadow-sm"
-              title="Admin Portal Login"
-            >
-              👑 Admin
-            </button>
-          )}
         </div>
       </header>
 
