@@ -139,7 +139,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                       📅 6 September 2026 &nbsp;|&nbsp; 8:00 AM
                     </p>
                     <p style="margin:4px 0 0;font-size:11px;color:#a8d5b5;">
-                      📍 Krupanidhi Campus, Bengaluru
+                      📍 MANTRA - The Luxury Wedding Destination
                     </p>
                     <p style="margin:12px 0 0;display:inline-block;padding:5px 14px;background:#D4AF37;color:#0D472B;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:1px;">
                       ${registration.ticketType.toUpperCase()}

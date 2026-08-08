@@ -84,9 +84,9 @@ export const Contact: React.FC = () => {
                   <MapPin className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-serif font-bold text-lg text-slate-900">Campus Location</h3>
-                  <p className="text-xs text-slate-600 leading-relaxed mt-1">
-                    Krupanidhi Degree College, Chikkabellandur, Carmelaram Road, Off Sarjapur Road, Bengaluru, Karnataka 560035
+                  <h3 className="font-serif font-bold text-lg text-slate-900">Event Venue Location</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1 font-semibold">
+                    MANTRA - The Luxury Wedding Destination
                   </p>
                 </div>
               </div>

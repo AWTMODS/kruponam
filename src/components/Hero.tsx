@@ -57,7 +57,7 @@ export const Hero = () => {
               </div>
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm">
                 <MapPin className="w-4 h-4 text-kerala-deep" />
-                <span>Krupanidhi Campus, Bengaluru</span>
+                <span>MANTRA - The Luxury Wedding Destination</span>
               </div>
             </div>
 

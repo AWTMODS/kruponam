@@ -26,8 +26,8 @@ export const EventDetails: React.FC = () => {
     {
       icon: MapPin,
       title: 'Venue Location',
-      value: 'Krupanidhi Degree College',
-      subtext: 'Carmelaram Road, Varthur Hobli, Bengaluru',
+      value: 'MANTRA',
+      subtext: 'The Luxury Wedding Destination',
       color: 'from-amber-500/10 to-gold-light/20',
       borderColor: 'border-gold-royal/30',
       iconColor: 'text-gold-dark',

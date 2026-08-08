@@ -94,12 +94,10 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
 
           <div className="space-y-3">
             <h4 className="font-serif text-sm font-bold text-gold-royal uppercase tracking-wider">
-              College Venue
+              Event Venue
             </h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Krupanidhi Degree College<br />
-              Chikkabellandur, Carmelaram Rd,<br />
-              Off Sarjapur Rd, Bengaluru - 560035
+            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+              MANTRA - The Luxury Wedding Destination
             </p>
             <p className="text-xs text-emerald-400 font-mono">
               WhatsApp: +91 90724 28800
