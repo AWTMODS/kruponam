@@ -3,8 +3,11 @@ import {
   fetchRegistrationsFromSupabase, 
   saveRegistrationToSupabase, 
   uploadImageToSupabase, 
+  deleteRegistrationFromSupabase,
   isSupabaseConfigured 
 } from './supabaseService';
+
+export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending';
 
 export interface Registration {
   id: string;
@@ -21,7 +24,7 @@ export interface Registration {
   paymentAmount: number;
   paymentStatus: 'Verified' | 'Pending' | 'Failed';
   paymentUtr: string;
-  approvalStatus: 'Pending' | 'Approved' | 'Rejected';
+  approvalStatus: ApprovalStatus;
   rejectionReason?: string;
   submittedAt: string;
   approvedAt?: string;
@@ -63,6 +66,17 @@ export const syncToIndexedDB = async (item: Registration): Promise<void> => {
     store.put(item);
   } catch (e) {
     console.warn('IndexedDB sync notice:', e);
+  }
+};
+
+export const deleteFromIndexedDB = async (id: string): Promise<void> => {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(id);
+  } catch (e) {
+    console.warn('IndexedDB delete notice:', e);
   }
 };
 
@@ -253,11 +267,92 @@ export const saveRegistration = (registration: Registration): boolean => {
   }
 };
 
-export const isUtrAlreadyUsed = (utr: string): boolean => {
+export const isEmailAlreadyUsed = (email: string, excludeId?: string): boolean => {
+  if (!email || !email.trim()) return false;
+  const clean = email.trim().toLowerCase();
+  const list = getRegistrations();
+  return list.some((r) => r.email.trim().toLowerCase() === clean && r.id !== excludeId);
+};
+
+export const isPhoneAlreadyUsed = (phone: string, excludeId?: string): boolean => {
+  if (!phone || !phone.trim()) return false;
+  const clean = phone.replace(/\D/g, ''); // strip non-digits
+  if (!clean) return false;
+  const list = getRegistrations();
+  return list.some((r) => r.phone.replace(/\D/g, '') === clean && r.id !== excludeId);
+};
+
+export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
   if (!utr || utr.trim().length < 6) return false;
   const cleanUtr = utr.trim().toLowerCase();
   const list = getRegistrations();
-  return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr);
+  return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr && r.id !== excludeId);
+};
+
+export const approveIdCard = (id: string): Registration | null => {
+  const registrations = getRegistrations();
+  const index = registrations.findIndex((r) => r.id === id);
+  if (index !== -1) {
+    registrations[index].approvalStatus = 'ID_Approved';
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    syncToIndexedDB(registrations[index]);
+    if (isSupabaseConfigured()) {
+      saveRegistrationToSupabase(registrations[index]);
+    }
+    return registrations[index];
+  }
+  return null;
+};
+
+export const submitPaymentForRegistration = async (
+  id: string, 
+  utr: string, 
+  screenshotUrl: string
+): Promise<Registration | null> => {
+  const registrations = getRegistrations();
+  const index = registrations.findIndex((r) => r.id === id);
+  if (index !== -1) {
+    let finalPayUrl = screenshotUrl;
+    if (isSupabaseConfigured() && screenshotUrl.startsWith('data:image')) {
+      try {
+        const uploaded = await uploadImageToSupabase(screenshotUrl, `pay_${id}`);
+        if (uploaded) finalPayUrl = uploaded;
+      } catch (e) {
+        console.warn('Supabase upload notice:', e);
+      }
+    }
+
+    registrations[index].paymentUtr = utr;
+    registrations[index].paymentScreenshotUrl = finalPayUrl;
+    registrations[index].paymentStatus = 'Pending';
+    registrations[index].approvalStatus = 'Payment_Pending';
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    syncToIndexedDB(registrations[index]);
+    if (isSupabaseConfigured()) {
+      saveRegistrationToSupabase(registrations[index]);
+    }
+    return registrations[index];
+  }
+  return null;
+};
+
+export const deleteRegistration = async (id: string): Promise<boolean> => {
+  try {
+    const registrations = getRegistrations();
+    const filtered = registrations.filter((r) => r.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    
+    deleteFromIndexedDB(id);
+
+    if (isSupabaseConfigured()) {
+      await deleteRegistrationFromSupabase(id);
+    }
+    return true;
+  } catch (e) {
+    console.error('Error deleting registration:', e);
+    return false;
+  }
 };
 
 export const approveRegistration = (id: string): Registration | null => {

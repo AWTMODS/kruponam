@@ -6,7 +6,7 @@ import {
   Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy
 } from 'lucide-react';
 import { 
-  syncCloudRegistrations, approveRegistration, rejectRegistration, markAsReported, 
+  syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
   exportBackupDataJson, importBackupDataJson, type Registration 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
@@ -33,11 +33,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [loginError, setLoginError] = useState('');
 
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Pending' | 'Approved' | 'Rejected' | 'Reported'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Reported'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectItem, setInspectItem] = useState<Registration | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<Registration | null>(null);
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
@@ -128,14 +129,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
   };
 
-  const handleAutoFillLogin = () => {
-    const expectedEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@kruponam';
-    const expectedPass = import.meta.env.VITE_ADMIN_PASSWORD || localStorage.getItem('kruponam_admin_pass') || 'kruponam@2026';
-    setAdminEmail(expectedEmail);
-    setAdminPassword(expectedPass);
-    setLoginError('');
-  };
-
   const handleLogout = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('kruponam_admin_auth');
@@ -162,6 +155,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
       setEmailPreview(result);
     }
+  };
+
+  const handleApproveIdCard = (id: string) => {
+    const res = approveIdCard(id);
+    loadData();
+    if (inspectItem?.id === id) setInspectItem(null);
+    if (res) {
+      addToast(`✅ ${res.fullName}'s Student ID Card Approved! Payment QR code unlocked for student.`, 'success');
+    }
+  };
+
+  const handleConfirmDelete = async (id: string) => {
+    await deleteRegistration(id);
+    loadData();
+    setShowDeleteModal(null);
+    if (inspectItem?.id === id) setInspectItem(null);
+    addToast('🗑️ Registration request permanently deleted.', 'info');
   };
 
   const handleConfirmReject = (id: string) => {
@@ -296,7 +306,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const totalApps = registrations.length;
-  const pendingApps = registrations.filter((r) => r.approvalStatus === 'Pending').length;
+  const pendingIdApps = registrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
+  const idApprovedApps = registrations.filter((r) => r.approvalStatus === 'ID_Approved').length;
+  const paymentPendingApps = registrations.filter((r) => r.approvalStatus === 'Payment_Pending').length;
   const approvedApps = registrations.filter((r) => r.approvalStatus === 'Approved').length;
   const rejectedApps = registrations.filter((r) => r.approvalStatus === 'Rejected').length;
   const reportedApps = registrations.filter((r) => r.isReported).length;
@@ -308,6 +320,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     let matchesFilter = true;
     if (statusFilter === 'Reported') {
       matchesFilter = !!item.isReported;
+    } else if (statusFilter === 'Pending_ID_Approval') {
+      matchesFilter = item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending';
     } else if (statusFilter !== 'all') {
       matchesFilter = item.approvalStatus === statusFilter;
     }
@@ -318,7 +332,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       item.email.toLowerCase().includes(q) ||
       item.id.toLowerCase().includes(q) ||
       item.phone.toLowerCase().includes(q) ||
-      item.paymentUtr.toLowerCase().includes(q) ||
+      (item.paymentUtr && item.paymentUtr.toLowerCase().includes(q)) ||
       item.department.toLowerCase().includes(q) ||
       (item.section && item.section.toLowerCase().includes(q));
     return matchesFilter && matchesQuery;
@@ -544,17 +558,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <span>Login to Admin Dashboard</span>
               </button>
             </form>
-
-            <div className="pt-4 border-t border-slate-800/80 text-center">
-              <button
-                type="button"
-                onClick={handleAutoFillLogin}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-gold-light text-xs font-mono font-semibold transition-all border border-gold-royal/20 hover:border-gold-royal/50"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-gold-royal" />
-                <span>Auto-Fill: admin@kruponam / adminpass</span>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -641,7 +644,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <Clock className="w-4 h-4" />
                   </div>
                 </div>
-                <p className="font-serif text-3xl font-extrabold text-amber-400 mt-3">{pendingApps}</p>
+                <p className="font-serif text-3xl font-extrabold text-amber-400 mt-3">{pendingIdApps}</p>
                 <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-300/80 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
                   <span>Requires approval</span>
@@ -701,12 +704,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               <div className="flex-1 w-full space-y-1.5">
                 <div className="flex justify-between text-[11px] font-bold">
                   <span className="text-emerald-400">{approvedApps} Approved ({approvalRate}%)</span>
-                  <span className="text-amber-400">{pendingApps} Pending</span>
+                  <span className="text-amber-400">{pendingIdApps} Pending</span>
                   <span className="text-rose-400">{rejectedApps} Rejected</span>
                 </div>
                 <div className="h-2 rounded-full bg-slate-950 overflow-hidden flex">
                   <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(approvedApps / (totalApps || 1)) * 100}%` }} title="Approved" />
-                  <div className="bg-amber-500 h-full transition-all" style={{ width: `${(pendingApps / (totalApps || 1)) * 100}%` }} title="Pending" />
+                  <div className="bg-amber-500 h-full transition-all" style={{ width: `${(pendingIdApps / (totalApps || 1)) * 100}%` }} title="Pending" />
                   <div className="bg-rose-500 h-full transition-all" style={{ width: `${(rejectedApps / (totalApps || 1)) * 100}%` }} title="Rejected" />
                 </div>
               </div>
@@ -722,7 +725,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     { id: 'all', label: 'All Submissions', count: totalApps },
-                    { id: 'Pending', label: 'Pending Review', count: pendingApps, color: 'amber' },
+                    { id: 'Pending_ID_Approval', label: 'Pending ID Review', count: pendingIdApps, color: 'amber' },
+                    { id: 'ID_Approved', label: 'ID Approved (Pay Pending)', count: idApprovedApps, color: 'blue' },
+                    { id: 'Payment_Pending', label: 'Payment Submitted', count: paymentPendingApps, color: 'emerald' },
                     { id: 'Approved', label: 'Approved Passes', count: approvedApps, color: 'emerald' },
                     { id: 'Reported', label: 'Checked-In at Gate', count: reportedApps, color: 'cyan' },
                     { id: 'Rejected', label: 'Rejected', count: rejectedApps, color: 'rose' },
@@ -732,7 +737,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       <button
                         key={tab.id}
                         onClick={() => setStatusFilter(tab.id as any)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                           isSelected
                             ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-black shadow-md'
                             : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
@@ -850,12 +855,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
                           {/* ₹700 Payment UTR */}
                           <td className="p-4 font-mono">
-                            <span className="text-emerald-400 font-bold flex items-center gap-1">
-                              <Check className="w-3.5 h-3.5" /> ₹700 Paid
-                            </span>
-                            <span className="text-[11px] text-slate-400 block mt-0.5">
-                              UTR: {item.paymentUtr}
-                            </span>
+                            {item.paymentUtr ? (
+                              <>
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5" /> ₹700 Paid
+                                </span>
+                                <span className="text-[11px] text-slate-400 block mt-0.5">
+                                  UTR: {item.paymentUtr}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-slate-500 text-[11px] font-sans italic">
+                                Awaiting Student Payment
+                              </span>
+                            )}
                           </td>
 
                           {/* Approval Status */}
@@ -874,9 +887,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                                 </button>
                               </div>
                             )}
-                            {item.approvalStatus === 'Pending' && (
+                            {item.approvalStatus === 'Payment_Pending' && (
                               <span className="px-3 py-1 rounded-full bg-amber-950/90 text-amber-300 border border-amber-800 font-bold text-[11px] inline-flex items-center gap-1 animate-pulse">
-                                <Clock className="w-3 h-3 text-amber-400" /> Pending
+                                <Clock className="w-3 h-3 text-amber-400" /> Payment Submitted
+                              </span>
+                            )}
+                            {item.approvalStatus === 'ID_Approved' && (
+                              <span className="px-3 py-1 rounded-full bg-blue-950/90 text-blue-300 border border-blue-800 font-bold text-[11px] inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-blue-400" /> ID Approved (Pay Unlocked)
+                              </span>
+                            )}
+                            {(item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending') && (
+                              <span className="px-3 py-1 rounded-full bg-amber-950/90 text-amber-300 border border-amber-800 font-bold text-[11px] inline-flex items-center gap-1 animate-pulse">
+                                <Clock className="w-3 h-3 text-amber-400" /> Pending ID Review
                               </span>
                             )}
                             {item.approvalStatus === 'Rejected' && (
@@ -912,29 +935,54 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                           {/* Action Buttons */}
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {item.approvalStatus !== 'Approved' && (
+                              {/* Stage 1: Approve ID Card Button */}
+                              {(item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending') && (
+                                <button
+                                  onClick={() => handleApproveIdCard(item.id)}
+                                  className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow-md flex items-center gap-1"
+                                  title="Approve Student ID Card to unlock payment"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Approve ID</span>
+                                </button>
+                              )}
+
+                              {/* Stage 2 or Final Approval: Approve Pass Button */}
+                              {(item.approvalStatus === 'ID_Approved' || item.approvalStatus === 'Payment_Pending') && (
                                 <button
                                   onClick={() => handleApprove(item.id)}
                                   disabled={sendingEmail === item.id}
-                                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md disabled:opacity-50 flex items-center gap-1"
+                                  title="Approve final pass and email QR ticket"
                                 >
                                   {sendingEmail === item.id ? (
                                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                                   ) : (
                                     <Check className="w-3.5 h-3.5" />
                                   )}
-                                  <span>Approve</span>
+                                  <span>Approve Pass</span>
                                 </button>
                               )}
 
+                              {/* Reject Button */}
                               {item.approvalStatus !== 'Rejected' && (
                                 <button
                                   onClick={() => setShowRejectModal(item.id)}
-                                  className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/80 font-bold text-xs transition-all"
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-700 font-bold text-xs transition-all"
+                                  title="Reject request"
                                 >
                                   Reject
                                 </button>
                               )}
+
+                              {/* Delete Request Button with Trash Icon */}
+                              <button
+                                onClick={() => setShowDeleteModal(item)}
+                                className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all"
+                                title="Delete Request"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </td>
 
@@ -1649,12 +1697,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </button>
               )}
 
-              {inspectItem.approvalStatus !== 'Approved' && (
+              {(inspectItem.approvalStatus === 'Pending_ID_Approval' || inspectItem.approvalStatus === 'Pending') && (
+                <button
+                  onClick={() => { handleApproveIdCard(inspectItem.id); }}
+                  className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" /> Approve Student ID
+                </button>
+              )}
+
+              {(inspectItem.approvalStatus === 'ID_Approved' || inspectItem.approvalStatus === 'Payment_Pending') && (
                 <button
                   onClick={() => { handleApprove(inspectItem.id); }}
-                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-md"
+                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5"
                 >
-                  ✅ Approve & Dispatch Ticket
+                  <Check className="w-4 h-4" /> Approve Pass & Dispatch Ticket
                 </button>
               )}
 
@@ -1666,6 +1723,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   Reject Application
                 </button>
               )}
+
+              <button
+                onClick={() => { setShowDeleteModal(inspectItem); }}
+                className="px-4 py-2.5 rounded-2xl bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold text-xs uppercase tracking-wider border border-rose-800 flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Request
+              </button>
             </div>
 
           </div>
@@ -1702,6 +1766,48 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Request Confirmation Modal ────────────────────── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 border border-rose-500/80 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="w-12 h-12 rounded-2xl bg-rose-950 border border-rose-500/50 text-rose-400 flex items-center justify-center text-xl font-bold shadow-lg">
+              <Trash2 className="w-6 h-6 text-rose-400" />
+            </div>
+
+            <div>
+              <h3 className="font-serif text-xl font-bold text-white">Delete Registration Request?</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                This action is permanent and will remove the record from Local Storage, IndexedDB, and Cloud Database.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs space-y-1">
+              <p className="text-slate-400 font-bold uppercase text-[10px]">Target Record:</p>
+              <p className="text-white font-bold text-sm">{showDeleteModal.fullName} ({showDeleteModal.id})</p>
+              <p className="text-slate-400">{showDeleteModal.department} — {showDeleteModal.section || 'Section A'}</p>
+              <p className="text-slate-400">{showDeleteModal.email} • {showDeleteModal.phone}</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowDeleteModal(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={() => handleConfirmDelete(showDeleteModal.id)}
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold transition-all shadow-md flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Yes, Delete Request</span>
               </button>
             </div>
           </div>

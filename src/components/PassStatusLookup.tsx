@@ -1,11 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw } from 'lucide-react';
-import { findRegistration, type Registration } from '../services/registrationService';
+import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
+import { findRegistration, submitPaymentForRegistration, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
+import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 
 interface LookupProps {
   onClose?: () => void;
 }
+
+const compressImageToDataUrl = (
+  file: File, 
+  maxSizeBytes = 500 * 1024, 
+  initialMaxWidth = 1000, 
+  initialQuality = 0.75
+): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        let maxWidth = initialMaxWidth;
+        let quality = initialQuality;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        // Guarantee output size <= 500 KB
+        let attempts = 0;
+        while (dataUrl.length * 0.75 > maxSizeBytes && attempts < 8) {
+          attempts++;
+          quality -= 0.1;
+          if (quality < 0.3) {
+            maxWidth = Math.round(maxWidth * 0.75);
+            width = Math.round(width * 0.75);
+            height = Math.round(height * 0.75);
+            canvas.width = Math.max(width, 100);
+            canvas.height = Math.max(height, 100);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            quality = 0.6;
+          }
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+
+        resolve(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,6 +74,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  // Stage 2 Payment fields inside lookup
+  const [paymentUtr, setPaymentUtr] = useState('');
+  const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
+  const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const [upiSettings] = useState(getUpiSettings());
+  const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string>('');
 
   useEffect(() => {
     if (searchResult && searchResult.approvalStatus === 'Approved') {
@@ -25,13 +95,68 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     }
   }, [searchResult]);
 
+  useEffect(() => {
+    if (upiSettings.qrImageDataUrl) {
+      setUpiQrCodeUrl(upiSettings.qrImageDataUrl);
+    } else {
+      generateQrCode(`upi://pay?pa=${upiSettings.upiId}&pn=Kruponam2026&am=700&cu=INR`).then((url) => {
+        setUpiQrCodeUrl(url);
+      });
+    }
+  }, [upiSettings]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    setPaymentError(null);
     const found = findRegistration(searchQuery);
     setSearchResult(found);
     setHasSearched(true);
+  };
+
+  const handlePaymentScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentScreenshotFile(file);
+      const compressed = await compressImageToDataUrl(file);
+      setPaymentScreenshotPreview(compressed);
+      setPaymentError(null);
+    }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchResult) return;
+    setPaymentError(null);
+
+    if (!paymentUtr || paymentUtr.trim().length < 6) {
+      setPaymentError('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
+      return;
+    }
+
+    if (isUtrAlreadyUsed(paymentUtr, searchResult.id)) {
+      setPaymentError(`⚠️ The UTR / Transaction ID (${paymentUtr.trim()}) has already been used for another registration.`);
+      return;
+    }
+
+    if (!paymentScreenshotPreview) {
+      setPaymentError('Please upload your Payment Screenshot showing the UTR / Ref ID clearly.');
+      return;
+    }
+
+    setIsSubmittingPayment(true);
+
+    try {
+      recordPaymentToActiveSlot();
+    } catch (_) {}
+
+    const updated = await submitPaymentForRegistration(searchResult.id, paymentUtr, paymentScreenshotPreview);
+    setIsSubmittingPayment(false);
+
+    if (updated) {
+      setSearchResult(updated);
+    }
   };
 
   const handlePrint = () => {
@@ -49,7 +174,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           </div>
           <div>
             <h3 className="font-serif text-2xl font-bold text-kerala-deep">
-              Check Pass Status & Download Badge
+              Check Pass Status & Complete Payment
             </h3>
             <p className="text-xs text-slate-500">
               Enter your Email, Phone Number, or Registration ID (e.g. KRP-849201)
@@ -238,29 +363,188 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </div>
               )}
             </div>
-          ) : searchResult.approvalStatus === 'Pending' ? (
+          ) : searchResult.approvalStatus === 'ID_Approved' ? (
+            /* STAGE 2 UNLOCKED: ID APPROVED -> PAY ₹700 & UPLOAD SCREENSHOT */
+            <div className="space-y-6">
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-center font-bold text-sm space-y-1 shadow-sm">
+                <p className="flex items-center justify-center gap-2 text-emerald-700">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>🎉 STUDENT ID CARD APPROVED BY ADMIN!</span>
+                </p>
+                <p className="text-xs text-emerald-800 font-normal">
+                  Welcome <span className="font-bold">{searchResult.fullName}</span>! Please scan the QR code below to pay ₹700 pass fee, enter your 12-digit UTR, and upload your payment screenshot.
+                </p>
+              </div>
+
+              {paymentError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-rose-900 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{paymentError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handlePaymentSubmit} className="bg-gradient-to-br from-amber-50/70 via-white to-amber-50/70 rounded-3xl p-6 sm:p-8 border-2 border-gold-royal/40 shadow-md space-y-6">
+                
+                {/* QR Code & UTR input */}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                  <div className="sm:col-span-5 text-center space-y-2 border-b sm:border-b-0 sm:border-r border-gold-royal/20 pb-4 sm:pb-0 sm:pr-4">
+                    <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-[11px] font-black uppercase tracking-wider">
+                      ₹700 Pass Fee
+                    </span>
+                    <div className="w-36 h-36 mx-auto bg-white p-2 rounded-2xl border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
+                      {upiQrCodeUrl ? (
+                        <img
+                          src={upiQrCodeUrl}
+                          alt="UPI QR Code"
+                          className="w-full h-full object-contain rounded-xl"
+                        />
+                      ) : (
+                        <QrCode className="w-full h-full text-slate-900 animate-pulse" />
+                      )}
+                    </div>
+                    <p className="text-xs font-mono font-bold text-slate-700">{upiSettings.upiId}</p>
+                    <p className="text-[10px] text-slate-400">Scan using Google Pay, PhonePe, Paytm, BHIM</p>
+                  </div>
+
+                  <div className="sm:col-span-7 space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1">
+                        <CreditCard className="w-3.5 h-3.5 text-gold-royal" />
+                        Enter 12-Digit UPI UTR / Txn Reference ID *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={16}
+                        placeholder="e.g. 320918239012"
+                        value={paymentUtr}
+                        onChange={(e) => setPaymentUtr(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 font-mono text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 bg-white"
+                      />
+                    </div>
+
+                    {paymentUtr.trim().length >= 6 ? (
+                      <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>✓ UTR Entered: {paymentUtr}</span>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 italic">
+                        ℹ️ Enter the 12-digit UPI transaction UTR from GPay / PhonePe / Paytm.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Screenshot upload */}
+                <div className="pt-4 border-t border-gold-royal/20 space-y-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-gold-royal" />
+                    Upload Payment Screenshot (Showing UTR Number) *
+                  </label>
+
+                  <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-5 bg-white text-center hover:bg-amber-50/50 transition-all relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePaymentScreenshotUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+
+                    {paymentScreenshotPreview ? (
+                      <div className="space-y-2">
+                        <img
+                          src={paymentScreenshotPreview}
+                          alt="Payment Receipt Preview"
+                          className="max-h-44 mx-auto rounded-xl shadow-md border border-gold-royal/40 object-contain"
+                        />
+                        <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Payment Receipt Uploaded: {paymentScreenshotFile?.name || 'payment_receipt.png'}</span>
+                        </p>
+                        <span className="text-[11px] text-slate-400 underline">Click to replace screenshot</span>
+                      </div>
+                    ) : (
+                      <div className="py-3 space-y-2">
+                        <Upload className="w-7 h-7 mx-auto text-gold-dark" />
+                        <p className="text-xs font-bold text-slate-800">
+                          Upload GPay / PhonePe / Paytm Payment Screenshot
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Must clearly display ₹700 paid amount and 12-digit UTR number.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingPayment}
+                  className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
+                >
+                  {isSubmittingPayment ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
+                      <span>Submitting Payment & UTR to Admin...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-gold-royal" />
+                      <span>Submit Payment Screenshot & UTR (₹700 Paid)</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          ) : searchResult.approvalStatus === 'Payment_Pending' ? (
+            /* PAYMENT PENDING REVIEW */
+            <div className="p-8 bg-amber-50/90 border-2 border-amber-300 rounded-3xl text-center space-y-4 shadow-md">
+              <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 font-bold text-2xl animate-pulse">
+                💳
+              </div>
+
+              <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-extrabold uppercase tracking-wider">
+                Payment Submitted • Pending Final Pass Approval
+              </span>
+
+              <h4 className="font-serif text-2xl font-bold text-amber-950">
+                Payment Under Admin Verification
+              </h4>
+
+              <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your ₹700 payment screenshot & UTR (<span className="font-mono font-bold">{searchResult.paymentUtr}</span>) have been received. Admin is verifying the payment receipt to issue your official QR pass.
+              </p>
+
+              <div className="pt-2 text-xs text-amber-800 font-semibold">
+                ⏱️ Estimated Verification: 1-2 Hours • Check back soon!
+              </div>
+            </div>
+          ) : searchResult.approvalStatus === 'Pending_ID_Approval' || searchResult.approvalStatus === 'Pending' ? (
+            /* STAGE 1 PENDING ID REVIEW */
             <div className="p-8 bg-amber-50/90 border-2 border-amber-300 rounded-3xl text-center space-y-4 shadow-md">
               <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 font-bold text-2xl animate-pulse">
                 ⏳
               </div>
 
               <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-extrabold uppercase tracking-wider">
-                Pending Admin Approval
+                Stage 1 Pending • Student ID Review
               </span>
 
               <h4 className="font-serif text-2xl font-bold text-amber-950">
-                Application Under Verification
+                Student ID Card Under Verification
               </h4>
 
               <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your registration details, Student ID Card, and ₹700 Payment (UTR: <span className="font-mono font-bold">{searchResult.paymentUtr}</span>) have been received. The college admin committee is reviewing your details.
+                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your student details and Student ID Card photo have been received. The admin committee is verifying your Student ID Card.
               </p>
 
-              <div className="pt-2 text-xs text-amber-800 font-semibold">
-                ⏱️ Estimated Approval Time: 2-4 Hours • Check back soon!
+              <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl text-xs text-amber-950 font-medium">
+                ℹ️ Once Admin approves your Student ID Card, check back here to see the UPI QR Code (₹700) and upload your payment screenshot.
               </div>
             </div>
           ) : (
+            /* REJECTED STATE */
             <div className="p-8 bg-rose-50 border-2 border-rose-200 rounded-3xl text-center space-y-4 shadow-md">
               <div className="w-16 h-16 rounded-full bg-rose-100 mx-auto flex items-center justify-center text-rose-700 font-bold text-2xl">
                 ❌

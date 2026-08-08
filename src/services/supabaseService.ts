@@ -179,6 +179,23 @@ export const saveRegistrationToSupabase = async (reg: Registration): Promise<boo
   }
 };
 
+export const deleteRegistrationFromSupabase = async (id: string): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('registrations').delete().eq('id', id);
+    if (error) {
+      console.warn('Supabase delete error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Supabase delete exception:', err);
+    return false;
+  }
+};
+
 // SQL Setup script generator for user to copy-paste into Supabase SQL Editor
 export const SUPABASE_SQL_SETUP_SCRIPT = `-- 🌸 KRUPONAM 2026 — Free Supabase Database & Image Storage Setup
 -- Copy and run this script inside your Supabase Dashboard -> SQL Editor!
