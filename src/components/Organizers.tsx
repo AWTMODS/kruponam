@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Mail } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 export const Organizers: React.FC = () => {
   const team = [
@@ -9,7 +9,6 @@ export const Organizers: React.FC = () => {
       dept: 'Krupanidhi Degree College',
       avatar: '👨‍🏫',
       bio: 'Guiding Krupanidhi Degree College to academic & cultural excellence.',
-      email: 'principal@krupanidhi.edu.in',
     },
     {
       name: 'Prof. Anitha Nair',
@@ -17,7 +16,6 @@ export const Organizers: React.FC = () => {
       dept: 'Department of Humanities',
       avatar: '👩‍🏫',
       bio: 'Lead coordinator for Onam cultural events, Thiruvathira, and stage productions.',
-      email: 'anitha.nair@krupanidhi.edu.in',
     },
     {
       name: 'Adithya V. Menon',
@@ -25,7 +23,6 @@ export const Organizers: React.FC = () => {
       dept: 'BCA 3rd Year',
       avatar: '👨‍🎓',
       bio: 'Heading the student organizing committee for Kruponam 2026.',
-      email: 'adithya.m@student.krupanidhi.edu.in',
     },
     {
       name: 'Meera Rajagopal',
@@ -33,7 +30,6 @@ export const Organizers: React.FC = () => {
       dept: 'B.Com 3rd Year',
       avatar: '👩‍🎓',
       bio: 'Overseeing Pookalam competitions, music bands, and Onasadya logistics.',
-      email: 'meera.r@student.krupanidhi.edu.in',
     },
   ];
 
@@ -85,13 +81,6 @@ export const Organizers: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-gold-royal/20 flex justify-center gap-3">
-                <a
-                  href={`mailto:${member.email}`}
-                  className="p-2 rounded-full bg-white text-slate-600 hover:text-kerala-deep hover:bg-gold-light/30 transition-colors shadow-sm"
-                  title="Send Email"
-                >
-                  <Mail className="w-4 h-4" />
-                </a>
                 <a
                   href="#"
                   className="p-2 rounded-full bg-white text-slate-600 hover:text-kerala-deep hover:bg-gold-light/30 transition-colors shadow-sm text-xs font-bold"

@@ -81,6 +81,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
 
   const [upiSettings] = useState(getUpiSettings());
   const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string>('');
@@ -245,16 +246,64 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </div>
               )}
 
-              {/* Digital Pass Card */}
-              <div className="kasavu-card rounded-3xl overflow-hidden shadow-2xl border-2 border-gold-royal bg-gradient-to-b from-white via-cream-warm to-white p-6 sm:p-8 relative">
-                <div className="flex items-center justify-between pb-6 border-b border-gold-royal/30">
+              {/* Pass Theme Toggle Bar */}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Official Event Entry Badge</span>
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-full border border-gold-royal/30">
+                  <button
+                    type="button"
+                    onClick={() => setTicketTheme('light')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
+                      ticketTheme === 'light'
+                        ? 'bg-gold-royal text-slate-950 shadow-sm font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ☀️ Light Mode
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTicketTheme('dark')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
+                      ticketTheme === 'dark'
+                        ? 'bg-slate-900 text-gold-amber border border-gold-royal/40 shadow-sm font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🌙 Dark Mode
+                  </button>
+                </div>
+              </div>
+
+              {/* Digital Pass Card (Light & Dark Mode Optimized) */}
+              <div
+                className={`rounded-3xl overflow-hidden shadow-2xl border-2 transition-all duration-300 p-6 sm:p-8 relative ${
+                  ticketTheme === 'dark'
+                    ? 'bg-slate-950 text-slate-100 border-gold-royal/80 shadow-gold-glow'
+                    : 'kasavu-card border-gold-royal bg-gradient-to-b from-white via-cream-warm to-white text-slate-800'
+                }`}
+              >
+                {/* Decorative Top Accent Stripe */}
+                <div className={`absolute top-0 inset-x-0 h-1.5 ${
+                  ticketTheme === 'dark'
+                    ? 'bg-gradient-to-r from-gold-royal via-amber-400 to-gold-royal'
+                    : 'bg-gradient-to-r from-kerala-deep via-gold-royal to-kerala-deep'
+                }`} />
+
+                <div className={`flex items-center justify-between pb-6 border-b ${
+                  ticketTheme === 'dark' ? 'border-slate-800' : 'border-gold-royal/30'
+                }`}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-kerala-deep text-gold-royal flex items-center justify-center text-xl font-bold shadow-md">
                       🌼
                     </div>
                     <div>
-                      <h3 className="font-serif font-bold text-xl text-kerala-deep">Kruponam 2026</h3>
-                      <p className="text-[10px] text-slate-500 font-sans uppercase tracking-widest font-bold">
+                      <h3 className={`font-serif font-bold text-xl ${
+                        ticketTheme === 'dark' ? 'text-white' : 'text-kerala-deep'
+                      }`}>Kruponam 2026</h3>
+                      <p className={`text-[10px] font-sans uppercase tracking-widest font-bold ${
+                        ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
                         Krupanidhi Degree College
                       </p>
                     </div>
@@ -264,42 +313,65 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-xs font-black uppercase tracking-wider shadow-sm">
                       {searchResult.ticketType}
                     </span>
-                    <p className="text-[11px] font-mono text-slate-500 mt-1">
+                    <p className={`text-[11px] font-mono mt-1 ${
+                      ticketTheme === 'dark' ? 'text-amber-400' : 'text-slate-500'
+                    }`}>
                       {searchResult.id}
                     </p>
                   </div>
                 </div>
 
                 <div className="py-6 grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-                  <div className="sm:col-span-8 space-y-3 text-slate-800">
+                  <div className="sm:col-span-8 space-y-3">
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Attendee Name</p>
-                      <p className="font-serif text-2xl font-bold text-kerala-deep">{searchResult.fullName}</p>
+                      <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                        ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                      }`}>Attendee Name</p>
+                      <p className={`font-serif text-2xl font-bold ${
+                        ticketTheme === 'dark' ? 'text-amber-300' : 'text-kerala-deep'
+                      }`}>{searchResult.fullName}</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Department & Section</p>
-                        <p className="font-semibold">{searchResult.department} — {searchResult.section || 'Section A'}</p>
+                        <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                          ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>Department & Section</p>
+                        <p className={`font-semibold ${ticketTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {searchResult.department} — {searchResult.section || 'Section A'}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Academic Year</p>
-                        <p className="font-semibold">{searchResult.year}</p>
+                        <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                          ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>Academic Year</p>
+                        <p className={`font-semibold ${ticketTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {searchResult.year}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Payment Status</p>
-                        <p className="font-semibold text-emerald-700">✓ ₹700 Paid ({searchResult.paymentUtr})</p>
+                        <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                          ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>Payment Status</p>
+                        <p className="font-semibold text-emerald-400 font-mono">✓ ₹700 Paid ({searchResult.paymentUtr})</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Campus Gate Status</p>
-                        <p className="font-semibold text-emerald-700">
+                        <p className={`text-[10px] uppercase font-bold tracking-wider ${
+                          ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
+                        }`}>Campus Gate Status</p>
+                        <p className="font-semibold text-emerald-400">
                           {searchResult.isReported ? '✓ Reported & Checked In' : 'Ready for Entry'}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="sm:col-span-4 flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-gold-royal/30 shadow-inner">
+                  <div className={`sm:col-span-4 flex flex-col items-center justify-center p-4 rounded-2xl border shadow-inner ${
+                    ticketTheme === 'dark'
+                      ? 'bg-slate-900 border-slate-800'
+                      : 'bg-white border-gold-royal/30'
+                  }`}>
+                    {/* Always white QR container for 100% scanner compatibility */}
                     <div className="w-32 h-32 bg-white rounded-xl p-1.5 border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
                       {qrCodeUrl ? (
                         <img
@@ -311,12 +383,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         <QrCode className="w-16 h-16 text-kerala-deep animate-pulse" />
                       )}
                     </div>
-                    <span className="text-[10px] font-mono font-bold text-kerala-deep mt-2">TOKEN: {searchResult.id}</span>
+                    <span className={`text-[10px] font-mono font-bold mt-2 ${
+                      ticketTheme === 'dark' ? 'text-gold-royal' : 'text-kerala-deep'
+                    }`}>TOKEN: {searchResult.id}</span>
                     <span className="text-[9px] font-mono text-slate-400 mt-0.5">SCAN AT CAMPUS GATE</span>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-dashed border-gold-royal/40 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <div className={`pt-4 border-t border-dashed flex flex-wrap items-center justify-between gap-3 text-xs ${
+                  ticketTheme === 'dark' ? 'border-slate-800 text-slate-400' : 'border-gold-royal/40 text-slate-500'
+                }`}>
                   <span>📍 Krupanidhi Campus • Sep 6, 2026</span>
                   <span>Approved: {searchResult.approvedAt || searchResult.submittedAt}</span>
                 </div>
