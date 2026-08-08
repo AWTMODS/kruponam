@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, ArrowUp, ShieldCheck } from 'lucide-react';
+import { getSiteSettings } from '../services/siteSettingsService';
 
 interface FooterProps {
   onOpenAdmin?: () => void;
@@ -7,6 +8,19 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
+  const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
+
+  useEffect(() => {
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.showProgramsSchedule === 'boolean') {
+        setShowProgramsSchedule(customEv.detail.showProgramsSchedule);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    return () => window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+  }, []);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -43,7 +57,9 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
             <ul className="space-y-2 text-xs text-slate-300">
               <li><a href="#home" className="hover:text-gold-royal transition-colors">Home</a></li>
               <li><a href="#about" className="hover:text-gold-royal transition-colors">About Kruponam</a></li>
-              <li><a href="#programs" className="hover:text-gold-royal transition-colors">Program Schedule</a></li>
+              {showProgramsSchedule && (
+                <li><a href="#programs" className="hover:text-gold-royal transition-colors">Program Schedule</a></li>
+              )}
               <li><a href="#tickets" className="hover:text-gold-royal transition-colors">Ticket Passes</a></li>
               <li><a href="#contact" className="hover:text-gold-royal transition-colors">Contact Organizers</a></li>
             </ul>
@@ -87,9 +103,6 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
             </p>
             <p className="text-xs text-emerald-400 font-mono">
               WhatsApp: +91 90724 28800
-            </p>
-            <p className="text-xs text-slate-400 font-mono">
-              kruponam@krupanidhi.edu.in
             </p>
           </div>
         </div>

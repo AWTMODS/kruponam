@@ -1,13 +1,7 @@
-import { useState } from 'react';
-import { Ticket, Calendar, MapPin, Sparkles, Volume2, VolumeX, ArrowRight } from 'lucide-react';
+import { Ticket, Calendar, MapPin, Sparkles, ArrowRight } from 'lucide-react';
 import { getAssetUrl } from '../utils/assetPath';
 
 export const Hero = () => {
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-
-  const toggleAudio = () => {
-    setIsPlayingAudio(!isPlayingAudio);
-  };
 
   return (
     <section id="home" className="relative pt-28 pb-16 lg:pt-36 lg:pb-28 overflow-hidden bg-cream-gradient">
@@ -84,25 +78,6 @@ export const Hero = () => {
                 <span>Explore Schedule</span>
                 <ArrowRight className="w-4 h-4 text-gold-royal group-hover:translate-x-1 transition-transform" />
               </a>
-
-              {/* Audio Ambience Toggle Button */}
-              <button
-                onClick={toggleAudio}
-                className="p-3.5 rounded-full bg-white/80 border border-gold-royal/40 text-kerala-deep hover:bg-gold-light/20 transition-all shadow-sm flex items-center gap-2 text-xs font-semibold"
-                title="Toggle Onam Ambient Rhythm"
-              >
-                {isPlayingAudio ? (
-                  <>
-                    <Volume2 className="w-4 h-4 text-gold-royal animate-pulse" />
-                    <span className="hidden xl:inline text-gold-dark">Rhythm On</span>
-                  </>
-                ) : (
-                  <>
-                    <VolumeX className="w-4 h-4 text-slate-400" />
-                    <span className="hidden xl:inline text-slate-500">Music</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* Quick Live Stats Row */}

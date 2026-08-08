@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Phone, MapPin, Send, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 export const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -103,18 +103,6 @@ export const Contact: React.FC = () => {
                   >
                     +91 90724 28800 (Aadith)
                   </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 pt-4 border-t border-slate-100">
-                <div className="w-12 h-12 rounded-2xl bg-gold-light/30 text-gold-dark flex items-center justify-center shrink-0">
-                  <Mail className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-serif font-bold text-lg text-slate-900">Email Address</h3>
-                  <p className="text-xs text-slate-600 mt-1 font-mono">
-                    kruponam@krupanidhi.edu.in
-                  </p>
                 </div>
               </div>
 

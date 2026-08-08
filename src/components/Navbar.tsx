@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, Ticket, ShieldCheck } from 'lucide-react';
+import { getSiteSettings } from '../services/siteSettingsService';
 
 interface NavbarProps {
   onOpenLookup?: () => void;
@@ -10,6 +11,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
+  const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,7 +22,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
       }
     };
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.showProgramsSchedule === 'boolean') {
+        setShowProgramsSchedule(customEv.detail.showProgramsSchedule);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    };
   }, []);
 
   // Secret 5-tap on logo triggers Admin Portal
@@ -36,13 +50,15 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
     setTimeout(() => setLogoClickCount(0), 3000);
   };
 
-  const navLinks = [
+  const allNavLinks = [
     { name: 'Home', href: '#home' },
     { name: 'About', href: '#about' },
-    { name: 'Programs', href: '#programs' },
+    { name: 'Programs', href: '#programs', hide: !showProgramsSchedule },
     { name: 'Tickets', href: '#tickets' },
     { name: 'Contact', href: '#contact' },
   ];
+
+  const navLinks = allNavLinks.filter((link) => !link.hide);
 
   return (
     <header

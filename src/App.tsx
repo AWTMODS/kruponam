@@ -11,12 +11,18 @@ import { PassStatusLookup } from './components/PassStatusLookup';
 import { AdminPortal } from './components/AdminPortal';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
+import { getSiteSettings } from './services/siteSettingsService';
+import { startLivePresenceHeartbeat } from './services/livePresenceService';
 
 export function App() {
   const [selectedPass, setSelectedPass] = useState<string>('Student Pass');
   const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin'>('main');
+  const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
 
   useEffect(() => {
+    // Start tracking live active visitor presence
+    startLivePresenceHeartbeat();
+
     // 1. Check URL Hash (e.g., #admin or ?admin=true)
     const checkAdminTrigger = () => {
       const hash = window.location.hash.toLowerCase();
@@ -28,6 +34,15 @@ export function App() {
 
     checkAdminTrigger();
     window.addEventListener('hashchange', checkAdminTrigger);
+
+    // Listen to site settings changes
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.showProgramsSchedule === 'boolean') {
+        setShowProgramsSchedule(customEv.detail.showProgramsSchedule);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
 
     // 2. Secret Keyboard Shortcut: Ctrl + Shift + A (or Cmd + Shift + A)
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,6 +57,7 @@ export function App() {
     return () => {
       window.removeEventListener('hashchange', checkAdminTrigger);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
     };
   }, []);
 
@@ -80,7 +96,7 @@ export function App() {
             <Hero />
             <About />
             <Countdown />
-            <ProgramsTimeline />
+            {showProgramsSchedule && <ProgramsTimeline />}
             <TicketPasses onSelectTicket={handleSelectTicketFromPasses} />
             <RegistrationForm
               selectedPassFromParent={selectedPass}

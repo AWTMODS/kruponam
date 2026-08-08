@@ -13,6 +13,8 @@ import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
 import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
+import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
+import { getLiveActiveCount } from '../services/livePresenceService';
 import { AdminQrScanner } from './AdminQrScanner';
 
 interface AdminPortalProps {
@@ -43,9 +45,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings' | 'database'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings' | 'database' | 'site-settings'>('registrations');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  // Site Feature Settings State
+  const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
+
+  const handleToggleProgramsSchedule = (val: boolean) => {
+    setShowProgramsSchedule(val);
+    saveSiteSettings({ showProgramsSchedule: val });
+    addToast(val ? '✅ Programs & Schedule section is now VISIBLE on website' : '👁️ Programs & Schedule section is now HIDDEN from website', 'info');
+  };
 
   // Supabase Database state
   const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseCredentials().url);
@@ -69,12 +80,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [upiSaved, setUpiSaved] = useState(false);
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
 
+  // Live Active Visitors State
+  const [activeVisitors, setActiveVisitors] = useState<number>(() => getLiveActiveCount());
+
   useEffect(() => {
     const storedAuth = sessionStorage.getItem('kruponam_admin_auth');
     if (storedAuth === 'true') {
       setIsAuthenticated(true);
     }
     loadData();
+
+    // Live active presence listener
+    const handlePresenceUpdate = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.activeCount === 'number') {
+        setActiveVisitors(customEv.detail.activeCount);
+      }
+    };
+    window.addEventListener('kruponam-presence-updated', handlePresenceUpdate);
+    const presenceTimer = setInterval(() => {
+      setActiveVisitors(getLiveActiveCount());
+    }, 3000);
 
     // Live clock interval
     const updateClock = () => {
@@ -94,6 +120,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     return () => {
       clearInterval(timer);
       clearInterval(syncInterval);
+      clearInterval(presenceTimer);
+      window.removeEventListener('kruponam-presence-updated', handlePresenceUpdate);
     };
   }, []);
 
@@ -402,8 +430,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Action Controls, Data Safety Backup & Clock */}
+        {/* Action Controls, Data Safety Backup, Live Active Counter & Clock */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-start md:justify-end">
+          
+          {/* Live Active Visitor Counter Pill */}
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-emerald-950/90 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold shadow-lg shadow-emerald-950/50">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>{activeVisitors} {activeVisitors === 1 ? 'User' : 'Users'} Active Online</span>
+          </div>
+
           {currentTime && (
             <div className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300 text-xs font-mono font-bold">
               <Clock className="w-3.5 h-3.5 text-gold-royal" />
@@ -611,6 +646,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   {isSupabaseConfigured() ? '✓ Connected' : 'Local Backup'}
                 </span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('site-settings')}
+                className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                  activeTab === 'site-settings'
+                    ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 shadow-gold-glow font-black'
+                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Website Controls</span>
+                <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] ${
+                  showProgramsSchedule ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-slate-950 text-slate-400 border border-slate-700'
+                }`}>
+                  {showProgramsSchedule ? 'Programs: Visible' : 'Programs: Hidden'}
+                </span>
+              </button>
             </div>
 
             <div className="px-3 py-1.5 text-xs text-slate-400 font-mono font-medium flex items-center gap-2">
@@ -622,8 +674,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {activeTab === 'registrations' && (<>
 
             {/* Metrics Overview Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
               
+              {/* Real-time Live Visitors Online Card */}
+              <div className="bg-slate-900/80 rounded-3xl p-5 border border-emerald-500/40 shadow-xl hover:border-emerald-500/70 transition-all group relative overflow-hidden">
+                <div className="flex justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  <span className="text-emerald-400 font-extrabold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Active Now
+                  </span>
+                  <div className="p-2 rounded-xl bg-emerald-950 text-emerald-300 group-hover:bg-emerald-900 transition-colors">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="font-serif text-3xl font-extrabold text-white mt-3 flex items-baseline gap-2">
+                  <span>{activeVisitors}</span>
+                  <span className="text-xs font-sans font-bold text-emerald-400">{activeVisitors === 1 ? 'User' : 'Users'}</span>
+                </p>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 font-medium">
+                  <span>Realtime site traffic</span>
+                  <span className="text-emerald-400 font-mono text-[10px]">● Live</span>
+                </div>
+              </div>
+
               <div className="bg-slate-900/80 rounded-3xl p-5 border border-slate-800 shadow-xl hover:border-slate-700 transition-all group">
                 <div className="flex justify-between items-center text-slate-400 text-xs font-bold uppercase tracking-wider">
                   <span>Total Applied</span>
@@ -1552,6 +1625,69 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === 'site-settings' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="bg-slate-900/90 rounded-3xl p-6 sm:p-8 border border-gold-royal/30 shadow-2xl space-y-6">
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider mb-2">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Public Website Visibility Controls</span>
+                    </div>
+                    <h2 className="font-serif text-2xl font-bold text-white">
+                      Website Feature & Section Controls
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Toggle visibility of sections on the live public website. Changes apply immediately across all client devices.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Control Card for Programs & Schedule */}
+                <div className="bg-slate-950/80 rounded-2xl p-6 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-slate-700 transition-all">
+                  <div className="space-y-1.5 max-w-xl">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-lg text-white">Programs & Schedule Section</h3>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        showProgramsSchedule 
+                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' 
+                          : 'bg-slate-900 text-slate-400 border border-slate-800'
+                      }`}>
+                        {showProgramsSchedule ? 'Currently Visible' : 'Currently Hidden'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Controls whether the &quot;Programs & Schedule&quot; timeline section and its navigation links appear on the public Kruponam 2026 homepage.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleProgramsSchedule(!showProgramsSchedule)}
+                    className={`px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2.5 shadow-lg shrink-0 ${
+                      showProgramsSchedule
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-950/50 hover:scale-[1.02]'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:scale-[1.02]'
+                    }`}
+                  >
+                    {showProgramsSchedule ? (
+                      <>
+                        <Eye className="w-4 h-4" />
+                        <span>Section Enabled (Visible)</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-4 h-4" />
+                        <span>Section Disabled (Hidden)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </div>
             </div>
           )}
 
