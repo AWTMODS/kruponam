@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { FloatingPetals } from './components/FloatingPetals';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -108,6 +109,7 @@ export function App() {
           <Footer onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
         </>
       )}
+      <Analytics />
     </div>
   );
 }
