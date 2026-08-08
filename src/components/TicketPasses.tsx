@@ -8,8 +8,8 @@ interface PassProps {
 export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket }) => {
   const passes = [
     {
-      id: 'Student Pass',
-      name: 'Student Pass',
+      id: 'General Pass',
+      name: 'General Pass',
       price: '₹700',
       subtitle: 'For Krupanidhi Students & Alumni',
       popular: false,

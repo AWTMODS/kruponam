@@ -81,7 +81,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     section: 'Section A',
     year: '2nd Year',
     gender: 'Male',
-    ticketType: selectedPassFromParent || 'Student Pass',
+    ticketType: selectedPassFromParent || 'General Pass',
   });
 
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -364,17 +364,15 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                 <div className="pt-2">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1 flex items-center gap-1.5">
                     <Ticket className="w-3.5 h-3.5 text-gold-royal" />
-                    Pass Tier Selection *
+                    Event Pass Tier *
                   </label>
                   <select
                     name="ticketType"
-                    value={formData.ticketType}
+                    value={formData.ticketType || 'General Pass'}
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-xl border border-gold-royal/50 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 outline-none text-sm font-bold text-kerala-deep transition-all bg-gold-light/20"
                   >
-                    <option value="Student Pass">Student Pass (General Access)</option>
-                    <option value="VIP Cultural Pass">VIP Cultural Pass (Front Seating)</option>
-                    <option value="Group Pass">Group Pass (5+ Squad)</option>
+                    <option value="General Pass">General Pass (All Access & Onasadya Feast — ₹700)</option>
                   </select>
                 </div>
               </div>
