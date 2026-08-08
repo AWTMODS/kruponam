@@ -3,17 +3,12 @@ import { FloatingPetals } from './components/FloatingPetals';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { About } from './components/About';
-import { EventDetails } from './components/EventDetails';
 import { Countdown } from './components/Countdown';
 import { ProgramsTimeline } from './components/ProgramsTimeline';
 import { TicketPasses } from './components/TicketPasses';
 import { RegistrationForm } from './components/RegistrationForm';
 import { PassStatusLookup } from './components/PassStatusLookup';
 import { AdminPortal } from './components/AdminPortal';
-import { GalleryMasonry } from './components/GalleryMasonry';
-import { Organizers } from './components/Organizers';
-import { Sponsors } from './components/Sponsors';
-import { FAQ } from './components/FAQ';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
 
@@ -84,7 +79,6 @@ export function App() {
           <main>
             <Hero />
             <About />
-            <EventDetails />
             <Countdown />
             <ProgramsTimeline />
             <TicketPasses onSelectTicket={handleSelectTicketFromPasses} />
@@ -92,10 +86,6 @@ export function App() {
               selectedPassFromParent={selectedPass}
               onOpenLookup={() => setActiveView('lookup')}
             />
-            <GalleryMasonry />
-            <Organizers />
-            <Sponsors />
-            <FAQ />
             <Contact />
           </main>
 

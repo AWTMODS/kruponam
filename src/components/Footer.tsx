@@ -43,9 +43,9 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
             <ul className="space-y-2 text-xs text-slate-300">
               <li><a href="#home" className="hover:text-gold-royal transition-colors">Home</a></li>
               <li><a href="#about" className="hover:text-gold-royal transition-colors">About Kruponam</a></li>
-              <li><a href="#event-info" className="hover:text-gold-royal transition-colors">Event Details</a></li>
               <li><a href="#programs" className="hover:text-gold-royal transition-colors">Program Schedule</a></li>
               <li><a href="#tickets" className="hover:text-gold-royal transition-colors">Ticket Passes</a></li>
+              <li><a href="#contact" className="hover:text-gold-royal transition-colors">Contact Organizers</a></li>
             </ul>
           </div>
 
@@ -63,8 +63,16 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
                   </button>
                 </li>
               )}
-              <li><a href="#gallery" className="hover:text-gold-royal transition-colors">Photo Gallery</a></li>
-              <li><a href="#faq" className="hover:text-gold-royal transition-colors">FAQ & Guidelines</a></li>
+              <li>
+                <a
+                  href="https://wa.me/919072428800"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-gold-royal transition-colors text-emerald-400 font-semibold"
+                >
+                  WhatsApp Organizer (+91 90724 28800)
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -76,6 +84,9 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
               Krupanidhi Degree College<br />
               Chikkabellandur, Carmelaram Rd,<br />
               Off Sarjapur Rd, Bengaluru - 560035
+            </p>
+            <p className="text-xs text-emerald-400 font-mono">
+              WhatsApp: +91 90724 28800
             </p>
             <p className="text-xs text-slate-400 font-mono">
               kruponam@krupanidhi.edu.in

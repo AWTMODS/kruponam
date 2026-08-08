@@ -39,11 +39,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
   const navLinks = [
     { name: 'Home', href: '#home' },
     { name: 'About', href: '#about' },
-    { name: 'Event Details', href: '#event-info' },
     { name: 'Programs', href: '#programs' },
     { name: 'Tickets', href: '#tickets' },
-    { name: 'Gallery', href: '#gallery' },
-    { name: 'Sponsors', href: '#sponsors' },
     { name: 'Contact', href: '#contact' },
   ];
 
