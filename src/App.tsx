@@ -11,6 +11,7 @@ import { PassStatusLookup } from './components/PassStatusLookup';
 import { AdminPortal } from './components/AdminPortal';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
+import { ComingSoon } from './components/ComingSoon';
 import { getSiteSettings } from './services/siteSettingsService';
 import { startLivePresenceHeartbeat } from './services/livePresenceService';
 
@@ -18,6 +19,7 @@ export function App() {
   const [selectedPass, setSelectedPass] = useState<string>('Student Pass');
   const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin'>('main');
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
+  const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
 
   useEffect(() => {
     // Start tracking live active visitor presence
@@ -38,8 +40,13 @@ export function App() {
     // Listen to site settings changes
     const handleSettingsChanged = (e: Event) => {
       const customEv = e as CustomEvent;
-      if (customEv.detail && typeof customEv.detail.showProgramsSchedule === 'boolean') {
-        setShowProgramsSchedule(customEv.detail.showProgramsSchedule);
+      if (customEv.detail) {
+        if (typeof customEv.detail.showProgramsSchedule === 'boolean') {
+          setShowProgramsSchedule(customEv.detail.showProgramsSchedule);
+        }
+        if (typeof customEv.detail.comingSoonMode === 'boolean') {
+          setComingSoonMode(customEv.detail.comingSoonMode);
+        }
       }
     };
     window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
@@ -74,8 +81,8 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-cream-warm text-slate-800 relative selection:bg-gold-royal selection:text-white">
-      {/* Floating Canvas Flower Petals (Public Site Only - Hidden in Admin) */}
-      {activeView !== 'admin' && <FloatingPetals />}
+      {/* Floating Canvas Flower Petals (Public Site Only - Hidden in Admin or Coming Soon) */}
+      {activeView !== 'admin' && !comingSoonMode && <FloatingPetals />}
 
       {/* Main App View Navigation */}
       {activeView === 'admin' ? (
@@ -88,6 +95,11 @@ export function App() {
           </div>
           <Footer onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
         </div>
+      ) : comingSoonMode ? (
+        <ComingSoon
+          onOpenAdmin={() => setActiveView('admin')}
+          onOpenLookup={() => setActiveView('lookup')}
+        />
       ) : (
         <>
           <Navbar onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />

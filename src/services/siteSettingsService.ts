@@ -1,15 +1,17 @@
 // ── Site Settings Service ─────────────────────────────────────────
-// Controls website feature toggles (e.g., showing/hiding Programs & Schedule section).
+// Controls website feature toggles (e.g., comingSoonMode, showing/hiding Programs & Schedule section).
 // Admins can toggle these settings live from the Admin Portal.
 
 const STORAGE_KEY = 'kruponam_site_settings_v1';
 
 export interface SiteSettings {
   showProgramsSchedule: boolean;
+  comingSoonMode: boolean;
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  showProgramsSchedule: false, // Default hidden as requested
+  showProgramsSchedule: false, // Default hidden
+  comingSoonMode: true,        // Default Coming Soon Mode active
 };
 
 export const getSiteSettings = (): SiteSettings => {
@@ -19,6 +21,7 @@ export const getSiteSettings = (): SiteSettings => {
       const parsed = JSON.parse(raw);
       return {
         showProgramsSchedule: typeof parsed.showProgramsSchedule === 'boolean' ? parsed.showProgramsSchedule : false,
+        comingSoonMode: typeof parsed.comingSoonMode === 'boolean' ? parsed.comingSoonMode : true,
       };
     }
   } catch (_) {}

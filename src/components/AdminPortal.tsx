@@ -51,11 +51,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   // Site Feature Settings State
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
+  const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
 
   const handleToggleProgramsSchedule = (val: boolean) => {
     setShowProgramsSchedule(val);
     saveSiteSettings({ showProgramsSchedule: val });
     addToast(val ? '✅ Programs & Schedule section is now VISIBLE on website' : '👁️ Programs & Schedule section is now HIDDEN from website', 'info');
+  };
+
+  const handleToggleComingSoonMode = (val: boolean) => {
+    setComingSoonMode(val);
+    saveSiteSettings({ comingSoonMode: val });
+    addToast(val ? '🚀 Public site is now in COMING SOON Mode' : '🌐 FULL MAIN WEBSITE is now LIVE to everyone!', val ? 'info' : 'success');
   };
 
   // Supabase Database state
@@ -1645,6 +1652,46 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       Toggle visibility of sections on the live public website. Changes apply immediately across all client devices.
                     </p>
                   </div>
+                </div>
+
+                {/* Control Card 1: Public Website Status Mode (Coming Soon vs Full Website Live) */}
+                <div className="bg-slate-950/80 rounded-2xl p-6 border border-gold-royal/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-gold-royal/70 transition-all shadow-md">
+                  <div className="space-y-1.5 max-w-xl">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-lg text-white">Public Website Status Mode</h3>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        comingSoonMode 
+                          ? 'bg-amber-950 text-amber-300 border border-amber-500/40' 
+                          : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                      }`}>
+                        {comingSoonMode ? '🚀 Coming Soon Mode Active' : '🌐 Main Website Live'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      When <strong>Coming Soon Mode</strong> is active, public visitors see the minimalist Kruponam 2026 poster page. Click the button to launch the full main website live to everyone!
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleComingSoonMode(!comingSoonMode)}
+                    className={`px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all duration-300 flex items-center gap-2.5 shadow-lg shrink-0 ${
+                      comingSoonMode
+                        ? 'bg-gradient-to-r from-gold-royal to-amber-500 hover:from-amber-400 hover:to-gold-royal text-slate-950 shadow-gold-glow hover:scale-[1.02]'
+                        : 'bg-amber-600 hover:bg-amber-500 text-white border border-amber-500/40 hover:scale-[1.02]'
+                    }`}
+                  >
+                    {comingSoonMode ? (
+                      <>
+                        <Sparkles className="w-4 h-4 text-slate-950" />
+                        <span>Enable Main Website Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-4 h-4 text-amber-200" />
+                        <span>Switch Back to Coming Soon Mode</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Control Card for Programs & Schedule */}
