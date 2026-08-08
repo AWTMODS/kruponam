@@ -85,10 +85,20 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
 
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <p className="flex items-center gap-1">
-            Made with <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" /> by Krupanidhi Degree College
+            <span>Made with</span>
+            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline-block animate-pulse" />
+            <span>by</span>
+            <a
+              href="https://www.instagram.com/aadith.cv"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gold-royal font-bold hover:underline hover:text-amber-400 transition-colors"
+            >
+              Aadith C V
+            </a>
           </p>
 
-          <p>© 2026 Krupanidhi Degree College. All Rights Reserved.</p>
+          <p>© 2026 HyreBit Innovations LLP. All Rights Reserved.</p>
 
           <button
             onClick={scrollToTop}
