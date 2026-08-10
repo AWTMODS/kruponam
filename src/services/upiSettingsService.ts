@@ -3,6 +3,8 @@
 // When a slot reaches its maxPayments limit, it auto-rotates to the next slot.
 // Students always see the currently active slot's UPI ID & QR code.
 
+import { getSiteSettings } from './siteSettingsService';
+
 const STORAGE_KEY = 'kruponam_multi_upi_settings_v2';
 
 export interface UpiSlot {
@@ -25,11 +27,11 @@ const DEFAULT_SETTINGS: MultiUpiSettings = {
   slots: [
     {
       id: 'slot-1',
-      label: 'UPI Slot 1',
+      label: 'Merchant UPI Slot 1',
       upiId: 'kruponam2026@upi',
       merchantName: 'Kruponam 2026 – Krupanidhi Degree College',
-      qrImageDataUrl: null,
-      maxPayments: 20,
+      qrImageDataUrl: '/images/merchant_qr.png',
+      maxPayments: 999999,
       paymentCount: 0,
     },
   ],
@@ -142,7 +144,7 @@ export const getUpiSettings = () => {
     upiId: slot.upiId || 'kruponam2026@upi',
     qrImageDataUrl: slot.qrImageDataUrl,
     merchantName: slot.merchantName,
-    amount: 700,
+    amount: getSiteSettings().ticketAmount,
   };
 };
 

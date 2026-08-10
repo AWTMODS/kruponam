@@ -1,16 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, CheckCircle2, ArrowDown } from 'lucide-react';
+import { getSiteSettings } from '../services/siteSettingsService';
 
 interface PassProps {
   onSelectTicket?: (ticketType: string) => void;
 }
 
 export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket }) => {
+  const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
+
+  useEffect(() => {
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.ticketAmount === 'number') {
+        setTicketAmount(customEv.detail.ticketAmount);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    return () => {
+      window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    };
+  }, []);
+
   const passes = [
     {
       id: 'General Pass',
       name: 'General Pass',
-      price: '₹700',
+      price: `₹${ticketAmount}`,
       subtitle: 'For Krupanidhi Students & Alumni',
       popular: false,
       badge: 'College ID Required',
@@ -20,12 +36,11 @@ export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket }) => {
         'Entry to Games & Cultural Contests',
         'Digital Pass Badge Generator',
       ],
-      ctaText: 'Register & Pay ₹700',
+      ctaText: `Register & Pay ₹${ticketAmount}`,
       icon: Ticket,
       borderColor: 'border-slate-200',
       buttonBg: 'bg-kerala-deep text-white hover:bg-kerala-emerald',
     },
-
   ];
 
   const handleSelect = (passId: string) => {

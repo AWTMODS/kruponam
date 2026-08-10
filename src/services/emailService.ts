@@ -88,7 +88,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Phone Number', registration.phone],
                   ['Department & Section', `${registration.department} — ${registration.section || 'Section A'} (${registration.year})`],
                   ['Pass Type', registration.ticketType],
-                  ['Amount Paid', '₹700.00'],
+                  ['Amount Paid', `₹${registration.paymentAmount || 700}.00`],
                   ['Payment UTR / Ref', registration.paymentUtr],
                   ['Payment Status', '✅ Verified & Confirmed'],
                   ['Event Date', '6 September 2026, 8:00 AM onwards'],

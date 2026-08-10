@@ -3,6 +3,7 @@ import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, Ref
 import { findRegistration, submitPaymentForRegistration, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
+import { getSiteSettings } from '../services/siteSettingsService';
 
 interface LookupProps {
   onClose?: () => void;
@@ -68,6 +69,21 @@ const compressImageToDataUrl = (
 };
 
 export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
+  const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
+
+  useEffect(() => {
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.ticketAmount === 'number') {
+        setTicketAmount(customEv.detail.ticketAmount);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    return () => {
+      window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    };
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<Registration | null | undefined>(undefined);
   const [hasSearched, setHasSearched] = useState(false);
@@ -100,11 +116,11 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     if (upiSettings.qrImageDataUrl) {
       setUpiQrCodeUrl(upiSettings.qrImageDataUrl);
     } else {
-      generateQrCode(`upi://pay?pa=${upiSettings.upiId}&pn=Kruponam2026&am=700&cu=INR`).then((url) => {
+      generateQrCode(`upi://pay?pa=${upiSettings.upiId}&pn=Kruponam2026&am=${ticketAmount}&cu=INR`).then((url) => {
         setUpiQrCodeUrl(url);
       });
     }
-  }, [upiSettings]);
+  }, [upiSettings, ticketAmount]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,7 +251,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
             <div className="space-y-4">
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Pass Approved by Admin! ₹700 Payment & Student ID Verified.</span>
+                <span>Pass Approved by Admin! ₹{searchResult.paymentAmount || ticketAmount} Payment & Student ID Verified.</span>
               </div>
 
               {/* Gate Reported Banner */}
@@ -353,7 +369,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
                         }`}>Payment Status</p>
-                        <p className="font-semibold text-emerald-400 font-mono">✓ ₹700 Paid ({searchResult.paymentUtr})</p>
+                        <p className="font-semibold text-emerald-400 font-mono">✓ ₹{searchResult.paymentAmount || ticketAmount} Paid ({searchResult.paymentUtr})</p>
                       </div>
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
@@ -448,7 +464,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                   <span>🎉 STUDENT ID CARD APPROVED BY ADMIN!</span>
                 </p>
                 <p className="text-xs text-emerald-800 font-normal">
-                  Welcome <span className="font-bold">{searchResult.fullName}</span>! Please scan the QR code below to pay ₹700 pass fee, enter your 12-digit UTR, and upload your payment screenshot.
+                  Welcome <span className="font-bold">{searchResult.fullName}</span>! Please scan the QR code below to pay ₹{ticketAmount} pass fee, enter your 12-digit UTR, and upload your payment screenshot.
                 </p>
               </div>
 
@@ -465,7 +481,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
                   <div className="sm:col-span-5 text-center space-y-2 border-b sm:border-b-0 sm:border-r border-gold-royal/20 pb-4 sm:pb-0 sm:pr-4">
                     <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-[11px] font-black uppercase tracking-wider">
-                      ₹700 Pass Fee
+                      ₹{ticketAmount} Pass Fee
                     </span>
                     <div className="w-36 h-36 mx-auto bg-white p-2 rounded-2xl border-2 border-gold-royal shadow-md flex items-center justify-center overflow-hidden">
                       {upiQrCodeUrl ? (
@@ -547,7 +563,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                           Upload GPay / PhonePe / Paytm Payment Screenshot
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          Must clearly display ₹700 paid amount and 12-digit UTR number.
+                          Must clearly display ₹{ticketAmount} paid amount and 12-digit UTR number.
                         </p>
                       </div>
                     )}
@@ -567,7 +583,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-gold-royal" />
-                      <span>Submit Payment Screenshot & UTR (₹700 Paid)</span>
+                      <span>Submit Payment Screenshot & UTR (₹{ticketAmount} Paid)</span>
                     </>
                   )}
                 </button>
@@ -589,7 +605,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </h4>
 
               <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your ₹700 payment screenshot & UTR (<span className="font-mono font-bold">{searchResult.paymentUtr}</span>) have been received. Admin is verifying the payment receipt to issue your official QR pass.
+                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your ₹{searchResult.paymentAmount || ticketAmount} payment screenshot & UTR (<span className="font-mono font-bold">{searchResult.paymentUtr}</span>) have been received. Admin is verifying the payment receipt to issue your official QR pass.
               </p>
 
               <div className="pt-2 text-xs text-amber-800 font-semibold">

@@ -52,6 +52,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   // Site Feature Settings State
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
   const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
+  const [ticketAmountInput, setTicketAmountInput] = useState<number>(() => getSiteSettings().ticketAmount);
 
   const handleToggleProgramsSchedule = (val: boolean) => {
     setShowProgramsSchedule(val);
@@ -63,6 +64,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setComingSoonMode(val);
     saveSiteSettings({ comingSoonMode: val });
     addToast(val ? '🚀 Public site is now in COMING SOON Mode' : '🌐 FULL MAIN WEBSITE is now LIVE to everyone!', val ? 'info' : 'success');
+  };
+
+  const handleSaveTicketAmount = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = Number(ticketAmountInput);
+    if (!isNaN(val) && val >= 0) {
+      saveSiteSettings({ ticketAmount: val });
+      addToast(`✅ Event Pass Fee updated to ₹${val}`, 'success');
+    } else {
+      addToast('⚠️ Please enter a valid ticket amount.', 'error');
+    }
   };
 
   // Supabase Database state
@@ -1732,6 +1744,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Control Card 3: Ticket Pass Fee Control */}
+                <div className="bg-slate-950/80 rounded-2xl p-6 border border-gold-royal/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 hover:border-gold-royal/70 transition-all shadow-md">
+                  <div className="space-y-1.5 max-w-xl">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-bold text-lg text-white">Event Ticket Pass Amount (₹)</h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gold-royal/20 text-gold-light border border-gold-royal/40">
+                        Current Fee: ₹{ticketAmountInput}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Set the standard entry pass amount in INR (₹) for Kruponam 2026. This value updates pass badges, registration forms, payment QR instructions, and email receipts immediately across the site.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSaveTicketAmount} className="flex items-center gap-2 shrink-0">
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gold-royal font-bold text-sm">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={ticketAmountInput}
+                        onChange={(e) => setTicketAmountInput(Number(e.target.value))}
+                        className="w-32 pl-8 pr-3 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white font-mono text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="px-5 py-3 rounded-2xl bg-gradient-to-r from-gold-royal to-amber-500 hover:from-amber-400 hover:to-gold-royal text-slate-950 font-black text-xs uppercase tracking-wider shadow-gold-glow transition-all flex items-center gap-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Fee</span>
+                    </button>
+                  </form>
                 </div>
 
               </div>

@@ -7,11 +7,13 @@ const STORAGE_KEY = 'kruponam_site_settings_v1';
 export interface SiteSettings {
   showProgramsSchedule: boolean;
   comingSoonMode: boolean;
+  ticketAmount: number;
 }
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   showProgramsSchedule: false, // Default hidden
-  comingSoonMode: true,        // Default Coming Soon Mode active
+  comingSoonMode: false,       // Default Main Website active (coming soon disabled)
+  ticketAmount: 700,           // Default ticket pass price in ₹
 };
 
 export const getSiteSettings = (): SiteSettings => {
@@ -21,7 +23,8 @@ export const getSiteSettings = (): SiteSettings => {
       const parsed = JSON.parse(raw);
       return {
         showProgramsSchedule: typeof parsed.showProgramsSchedule === 'boolean' ? parsed.showProgramsSchedule : false,
-        comingSoonMode: typeof parsed.comingSoonMode === 'boolean' ? parsed.comingSoonMode : true,
+        comingSoonMode: typeof parsed.comingSoonMode === 'boolean' ? parsed.comingSoonMode : false,
+        ticketAmount: typeof parsed.ticketAmount === 'number' && parsed.ticketAmount >= 0 ? parsed.ticketAmount : 700,
       };
     }
   } catch (_) {}

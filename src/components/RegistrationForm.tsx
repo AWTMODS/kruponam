@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles, RefreshCw, ShieldCheck, Image as ImageIcon, Layers, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -7,6 +7,7 @@ import {
   isPhoneAlreadyUsed, 
   type Registration 
 } from '../services/registrationService';
+import { getSiteSettings } from '../services/siteSettingsService';
 
 interface RegistrationProps {
   selectedPassFromParent?: string;
@@ -73,6 +74,21 @@ const compressImageToDataUrl = (
 };
 
 export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFromParent, onOpenLookup }) => {
+  const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
+
+  useEffect(() => {
+    const handleSettingsChanged = (e: Event) => {
+      const customEv = e as CustomEvent;
+      if (customEv.detail && typeof customEv.detail.ticketAmount === 'number') {
+        setTicketAmount(customEv.detail.ticketAmount);
+      }
+    };
+    window.addEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    return () => {
+      window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
+    };
+  }, []);
+
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -135,7 +151,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       ...formData,
       idCardUrl: idCardPreview,
       paymentScreenshotUrl: '',
-      paymentAmount: 700,
+      paymentAmount: ticketAmount,
       paymentStatus: 'Pending',
       paymentUtr: '',
       approvalStatus: 'Pending_ID_Approval',
@@ -175,7 +191,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
             Student <span className="text-gold-gradient font-normal italic">&</span> Pass Verification Portal
           </h2>
           <p className="text-slate-600 text-base sm:text-lg">
-            Enter your details and upload your Student ID Card photo. Once Admin approves your ID card, you will be able to pay ₹700 and download your official event pass.
+            Enter your details and upload your Student ID Card photo. Once Admin approves your ID card, you will be able to pay ₹{ticketAmount} and download your official event pass.
           </p>
         </div>
 
@@ -207,7 +223,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
               <div className="p-3 bg-amber-100/60 rounded-xl text-xs text-amber-900 text-left space-y-1 font-medium">
                 <p className="font-bold">Next Steps:</p>
                 <p>1. Admin will review your uploaded Student ID Card photo.</p>
-                <p>2. Once approved, search your Email/Phone/ID in <strong>Check Pass Status</strong> to see the UPI QR Code and pay ₹700.</p>
+                <p>2. Once approved, search your Email/Phone/ID in <strong>Check Pass Status</strong> to see the UPI QR Code and pay ₹{ticketAmount}.</p>
               </div>
 
               <div className="pt-2 flex flex-wrap justify-center gap-3">
