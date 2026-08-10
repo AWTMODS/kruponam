@@ -28,7 +28,7 @@ const DEFAULT_SETTINGS: MultiUpiSettings = {
     {
       id: 'slot-1',
       label: 'Merchant UPI Slot 1',
-      upiId: 'kruponam2026@upi',
+      upiId: 'q062769226@ybl',
       merchantName: 'Kruponam 2026 – Krupanidhi Degree College',
       qrImageDataUrl: '/images/merchant_qr.png',
       maxPayments: 999999,
@@ -44,7 +44,14 @@ export const getMultiUpiSettings = (): MultiUpiSettings => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as MultiUpiSettings;
-      if (parsed.slots && parsed.slots.length > 0) return parsed;
+      if (parsed.slots && parsed.slots.length > 0) {
+        // Auto-update legacy placeholder upiId to new official merchant UPI ID
+        parsed.slots = parsed.slots.map((s) => ({
+          ...s,
+          upiId: s.upiId === 'kruponam2026@upi' ? 'q062769226@ybl' : (s.upiId || 'q062769226@ybl'),
+        }));
+        return parsed;
+      }
     }
   } catch (_) {}
   return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -141,7 +148,7 @@ export const resetSlotCount = (id: string): MultiUpiSettings => {
 export const getUpiSettings = () => {
   const slot = getActiveUpiSlot();
   return {
-    upiId: slot.upiId || 'kruponam2026@upi',
+    upiId: slot.upiId || 'q062769226@ybl',
     qrImageDataUrl: slot.qrImageDataUrl,
     merchantName: slot.merchantName,
     amount: getSiteSettings().ticketAmount,

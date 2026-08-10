@@ -180,6 +180,24 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     window.print();
   };
 
+  const handleDownloadPaymentQr = async () => {
+    if (!upiQrCodeUrl) return;
+    try {
+      const response = await fetch(upiQrCodeUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Kruponam2026_Payment_QR.png';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (_) {
+      window.open(upiQrCodeUrl, '_blank');
+    }
+  };
+
   return (
     <div className="bg-white rounded-3xl p-6 sm:p-10 border border-gold-royal/40 shadow-card-hover max-w-3xl mx-auto my-8">
       
@@ -495,6 +513,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                       )}
                     </div>
                     <p className="text-xs font-mono font-bold text-slate-700">{upiSettings.upiId}</p>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadPaymentQr}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gold-royal text-slate-950 hover:bg-gold-light text-[11px] font-extrabold transition-all shadow-sm border border-gold-royal/50 hover:scale-105 active:scale-95"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Payment QR</span>
+                    </button>
+
                     <p className="text-[10px] text-slate-400">Scan using Google Pay, PhonePe, Paytm, BHIM</p>
                   </div>
 
