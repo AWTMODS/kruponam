@@ -45,6 +45,29 @@ export const isSupabaseConfigured = (): boolean => {
   return getSupabaseClient() !== null;
 };
 
+export const testSupabaseConnection = async (): Promise<{ success: boolean; message: string }> => {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase URL or Anon Key is missing.' };
+  }
+
+  try {
+    const { error } = await client.from('registrations').select('id').limit(1);
+    if (error) {
+      if (error.message.includes('Invalid API key') || error.code === 'PGRST301' || error.message.includes('JWT')) {
+        return { success: false, message: 'Invalid Supabase API Key. Please update VITE_SUPABASE_ANON_KEY in project settings or Admin Dashboard.' };
+      }
+      if (error.message.includes('relation "public.registrations" does not exist') || error.code === '42P01') {
+        return { success: false, message: 'Table "registrations" does not exist in Supabase SQL database yet.' };
+      }
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: 'Supabase Cloud Database connected and operational!' };
+  } catch (err: any) {
+    return { success: false, message: err?.message || 'Connection error' };
+  }
+};
+
 // ── Image Storage Helper (Free Supabase Storage) ────────────────────────
 export const uploadImageToSupabase = async (
   file: File | string,

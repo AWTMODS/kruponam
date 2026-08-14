@@ -7,11 +7,11 @@ import {
 } from 'lucide-react';
 import { 
   syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
-  exportBackupDataJson, importBackupDataJson, type Registration 
+  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
-import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
+import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, testSupabaseConnection, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
 import { getLiveActiveCount } from '../services/livePresenceService';
@@ -48,6 +48,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings' | 'database' | 'site-settings'>('registrations');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
+
+  // Manual Add / Restore Registration State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [manualIdInput, setManualIdInput] = useState('KRP-865167');
+  const [manualNameInput, setManualNameInput] = useState('');
+  const [manualEmailInput, setManualEmailInput] = useState('');
+  const [manualPhoneInput, setManualPhoneInput] = useState('');
+  const [manualDeptInput, setManualDeptInput] = useState('BCA');
+  const [manualSectionInput, setManualSectionInput] = useState('Section A');
+  const [manualYearInput, setManualYearInput] = useState('2nd Year');
+  const [manualStatusInput, setManualStatusInput] = useState<ApprovalStatus>('Pending_ID_Approval');
+  const [supabaseConnNotice, setSupabaseConnNotice] = useState<string | null>(null);
 
   // Site Feature Settings State
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
@@ -148,7 +160,48 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setIsRefreshing(true);
     const regs = await syncCloudRegistrations();
     setRegistrations(regs);
+    if (isSupabaseConfigured()) {
+      testSupabaseConnection().then((res) => {
+        if (!res.success) {
+          setSupabaseConnNotice(res.message);
+        } else {
+          setSupabaseConnNotice(null);
+        }
+      });
+    }
     setTimeout(() => setIsRefreshing(false), 300);
+  };
+
+  const handleCreateManualReg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualIdInput.trim() || !manualNameInput.trim()) {
+      addToast('⚠️ Registration ID and Student Name are required.', 'error');
+      return;
+    }
+    const cleanId = manualIdInput.trim().toUpperCase();
+    const newReg: Registration = {
+      id: cleanId,
+      fullName: manualNameInput.trim(),
+      email: manualEmailInput.trim() || `${cleanId.toLowerCase()}@kruponam.edu.in`,
+      phone: manualPhoneInput.trim() || '9876543210',
+      department: manualDeptInput,
+      section: manualSectionInput,
+      year: manualYearInput,
+      gender: 'Other',
+      ticketType: 'General Pass',
+      idCardUrl: '',
+      paymentScreenshotUrl: '',
+      paymentAmount: 700,
+      paymentStatus: manualStatusInput === 'Approved' ? 'Verified' : 'Pending',
+      paymentUtr: '',
+      approvalStatus: manualStatusInput,
+      submittedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    };
+
+    await saveRegistrationAsync(newReg);
+    await loadData();
+    setShowAddModal(false);
+    addToast(`✅ Registration ${cleanId} added & saved successfully!`, 'success');
   };
 
   const addToast = (message: string, type: Toast['type'] = 'success') => {
@@ -468,6 +521,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {isAuthenticated && (
             <>
               <button
+                onClick={() => setShowAddModal(true)}
+                title="Manually Add or Restore Missing Student Registration ID (e.g. KRP-865167)"
+                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-gold-royal to-amber-500 hover:from-gold-light hover:to-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add / Restore ID</span>
+              </button>
+
+              <button
                 onClick={() => setShowScannerModal(true)}
                 className="px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-950/40 flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
               >
@@ -689,6 +751,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               <span>Data Preserved & Synced</span>
             </div>
           </div>
+
+          {supabaseConnNotice && (
+            <div className="p-4 rounded-2xl bg-amber-950/90 border-2 border-amber-500/60 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fadeIn shadow-xl">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-300">Cloud Database Warning: {supabaseConnNotice}</p>
+                  <p className="text-[11px] text-amber-200/80 mt-0.5">
+                    Multi-device cloud sync requires valid Supabase credentials. Go to <strong>Cloud DB & Storage</strong> tab to update credentials, or click <strong>+ Add / Restore ID</strong> to enter student IDs manually.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTab('database')}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-[11px] uppercase tracking-wider hover:bg-amber-400 shrink-0 transition-all shadow-md"
+              >
+                Fix Credentials
+              </button>
+            </div>
+          )}
 
           {activeTab === 'registrations' && (<>
 
@@ -2041,6 +2123,177 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <span>Yes, Delete Request</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Manual Add / Restore Registration Modal ───────────────────── */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-gold-royal/50 shadow-2xl space-y-6 animate-fadeIn">
+            
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gold-royal/20 border border-gold-royal/50 text-gold-royal flex items-center justify-center font-bold">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-white">Add / Restore Registration ID</h3>
+                  <p className="text-xs text-slate-400">Manually insert a missing student pass (e.g. KRP-865167)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateManualReg} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Reference Pass ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. KRP-865167"
+                    value={manualIdInput}
+                    onChange={(e) => setManualIdInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs outline-none focus:border-gold-royal font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Student Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Student Name"
+                    value={manualNameInput}
+                    onChange={(e) => setManualNameInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="student@example.com"
+                    value={manualEmailInput}
+                    onChange={(e) => setManualEmailInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="9876543210"
+                    value={manualPhoneInput}
+                    onChange={(e) => setManualPhoneInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={manualDeptInput}
+                    onChange={(e) => setManualDeptInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  >
+                    <option value="BCA">Computer Applications (BCA)</option>
+                    <option value="B.Com">Commerce (B.Com)</option>
+                    <option value="BBA">Business Administration (BBA)</option>
+                    <option value="B.Sc">Science (B.Sc)</option>
+                    <option value="BA">Humanities & Arts (BA)</option>
+                    <option value="PG/MBA/MCA">Post Graduate (MBA / MCA)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Section
+                  </label>
+                  <select
+                    value={manualSectionInput}
+                    onChange={(e) => setManualSectionInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold"
+                  >
+                    <option value="Section A">Section A</option>
+                    <option value="Section B">Section B</option>
+                    <option value="Section C">Section C</option>
+                    <option value="Section D">Section D</option>
+                    <option value="Section E">Section E</option>
+                    <option value="Section F">Section F</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Academic Year
+                  </label>
+                  <select
+                    value={manualYearInput}
+                    onChange={(e) => setManualYearInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="PG / Alumni">PG / Alumni</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Approval Status
+                  </label>
+                  <select
+                    value={manualStatusInput}
+                    onChange={(e) => setManualStatusInput(e.target.value as ApprovalStatus)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold text-amber-400"
+                  >
+                    <option value="Pending_ID_Approval">Pending ID Approval</option>
+                    <option value="ID_Approved">ID Approved (Pay Pending)</option>
+                    <option value="Payment_Pending">Payment Submitted</option>
+                    <option value="Approved">Approved & Active</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-90 shadow-md flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Save & Restore Registration</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
