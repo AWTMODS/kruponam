@@ -3,7 +3,7 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil
 } from 'lucide-react';
 import { 
   syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
@@ -49,17 +49,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
 
-  // Manual Add / Restore Registration State
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [manualIdInput, setManualIdInput] = useState('KRP-865167');
-  const [manualNameInput, setManualNameInput] = useState('');
-  const [manualEmailInput, setManualEmailInput] = useState('');
-  const [manualPhoneInput, setManualPhoneInput] = useState('');
-  const [manualDeptInput, setManualDeptInput] = useState('BCA');
-  const [manualSectionInput, setManualSectionInput] = useState('Section A');
-  const [manualYearInput, setManualYearInput] = useState('2nd Year');
-  const [manualStatusInput, setManualStatusInput] = useState<ApprovalStatus>('Pending_ID_Approval');
-  const [supabaseConnNotice, setSupabaseConnNotice] = useState<string | null>(null);
+  // Registered Emails Directory Modal State
+  const [showEmailDirectoryModal, setShowEmailDirectoryModal] = useState(false);
+  const [emailSearchQuery, setEmailSearchQuery] = useState('');
+
+  // Edit / Update Registration Modal State
+  const [editItem, setEditItem] = useState<Registration | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editDept, setEditDept] = useState('');
+  const [editSection, setEditSection] = useState('');
+  const [editYear, setEditYear] = useState('');
+  const [editStatus, setEditStatus] = useState<ApprovalStatus>('Pending_ID_Approval');
+  const [editUtr, setEditUtr] = useState('');
+  const [editRejectionReason, setEditRejectionReason] = useState('');
 
   // Site Feature Settings State
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
@@ -170,6 +174,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       });
     }
     setTimeout(() => setIsRefreshing(false), 300);
+  };
+
+  // Manual Add / Restore Registration State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [manualIdInput, setManualIdInput] = useState('KRP-865167');
+  const [manualNameInput, setManualNameInput] = useState('');
+  const [manualEmailInput, setManualEmailInput] = useState('');
+  const [manualPhoneInput, setManualPhoneInput] = useState('');
+  const [manualDeptInput, setManualDeptInput] = useState('BCA');
+  const [manualSectionInput, setManualSectionInput] = useState('Section A');
+  const [manualYearInput, setManualYearInput] = useState('2nd Year');
+  const [manualStatusInput, setManualStatusInput] = useState<ApprovalStatus>('Pending_ID_Approval');
+  const [supabaseConnNotice, setSupabaseConnNotice] = useState<string | null>(null);
+
+  const handleOpenEditModal = (reg: Registration) => {
+    setEditItem(reg);
+    setEditName(reg.fullName);
+    setEditEmail(reg.email);
+    setEditPhone(reg.phone);
+    setEditDept(reg.department);
+    setEditSection(reg.section || 'Section A');
+    setEditYear(reg.year);
+    setEditStatus(reg.approvalStatus);
+    setEditUtr(reg.paymentUtr || '');
+    setEditRejectionReason(reg.rejectionReason || '');
+  };
+
+  const handleSaveEditModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editItem) return;
+
+    const updatedReg: Registration = {
+      ...editItem,
+      fullName: editName.trim(),
+      email: editEmail.trim(),
+      phone: editPhone.trim(),
+      department: editDept,
+      section: editSection,
+      year: editYear,
+      approvalStatus: editStatus,
+      paymentUtr: editUtr.trim(),
+      rejectionReason: editRejectionReason.trim(),
+    };
+
+    await saveRegistrationAsync(updatedReg);
+    await loadData();
+    setEditItem(null);
+    if (inspectItem?.id === editItem.id) setInspectItem(updatedReg);
+    addToast(`✅ Updated details for ${updatedReg.fullName} (${updatedReg.id})`, 'success');
+  };
+
+  const handleCopyAllEmails = () => {
+    const emails = Array.from(new Set(registrations.map((r) => r.email.trim()))).filter(Boolean);
+    if (emails.length === 0) {
+      addToast('⚠️ No registered emails found.', 'error');
+      return;
+    }
+    const text = emails.join(', ');
+    navigator.clipboard.writeText(text);
+    addToast(`📋 Copied ${emails.length} registered email addresses to clipboard!`, 'success');
   };
 
   const handleCreateManualReg = async (e: React.FormEvent) => {
@@ -520,6 +584,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
           {isAuthenticated && (
             <>
+              <button
+                onClick={() => setShowEmailDirectoryModal(true)}
+                title="View All Registered Student Email Addresses"
+                className="px-3.5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-blue-500/40 text-blue-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>Email Directory ({registrations.length})</span>
+              </button>
+
               <button
                 onClick={() => setShowAddModal(true)}
                 title="Manually Add or Restore Missing Student Registration ID (e.g. KRP-865167)"
@@ -1148,6 +1221,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                                   Reject
                                 </button>
                               )}
+
+                              {/* Edit / Update Student Record Button */}
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                className="p-2 rounded-xl bg-slate-900 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-800 transition-all"
+                                title="Edit / Update Student Registration Details"
+                              >
+                                <Pencil className="w-4 h-4 text-amber-400" />
+                              </button>
 
                               {/* Delete Request Button with Trash Icon */}
                               <button
@@ -2001,6 +2083,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
             {/* Action Bar */}
             <div className="flex flex-wrap justify-end gap-3 pt-2">
+              <button
+                onClick={() => { handleOpenEditModal(inspectItem); }}
+                className="px-5 py-2.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/40 flex items-center gap-1.5 shadow-md"
+              >
+                <Pencil className="w-4 h-4 text-amber-400" /> Edit Details
+              </button>
               {inspectItem.approvalStatus === 'Approved' && !inspectItem.isReported && (
                 <button
                   onClick={() => { handleMarkReportedDirect(inspectItem.id); setInspectItem(null); }}
@@ -2291,6 +2379,311 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 >
                   <Plus className="w-4 h-4" />
                   <span>Save & Restore Registration</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Registered Email Directory Modal ───────────────────────────── */}
+      {showEmailDirectoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-3xl w-full p-6 sm:p-8 border border-blue-500/50 shadow-2xl space-y-6 animate-fadeIn max-h-[85vh] flex flex-col">
+            
+            <div className="flex justify-between items-center pb-4 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/50 text-blue-400 flex items-center justify-center font-bold">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-white flex items-center gap-2">
+                    <span>Registered Student Emails</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono bg-blue-950 text-blue-300 border border-blue-800">
+                      {registrations.length} Total
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">View, search, edit, or copy all registered email addresses</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowEmailDirectoryModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search & Bulk Copy Toolbar */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter emails, names, dept..."
+                  value={emailSearchQuery}
+                  onChange={(e) => setEmailSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <button
+                onClick={handleCopyAllEmails}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy All Emails to Clipboard</span>
+              </button>
+            </div>
+
+            {/* Scrollable Email Directory List */}
+            <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-2 divide-y divide-slate-800/60">
+              {registrations
+                .filter((r) => {
+                  const q = emailSearchQuery.toLowerCase().trim();
+                  if (!q) return true;
+                  return (
+                    r.email.toLowerCase().includes(q) ||
+                    r.fullName.toLowerCase().includes(q) ||
+                    r.id.toLowerCase().includes(q) ||
+                    r.department.toLowerCase().includes(q)
+                  );
+                })
+                .map((r) => (
+                  <div key={r.id} className="p-3 hover:bg-slate-900/60 transition-colors rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-xs">{r.fullName}</span>
+                        <span className="font-mono text-[10px] text-amber-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">{r.id}</span>
+                        <span className="text-[10px] text-slate-400">({r.department} — {r.section || 'Section A'})</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-xs font-mono text-blue-300">
+                        <span>{r.email}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(r.email);
+                            addToast(`📋 Copied ${r.email}`, 'info');
+                          }}
+                          className="text-slate-500 hover:text-white text-[10px] underline"
+                          title="Copy Email"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        onClick={() => {
+                          setShowEmailDirectoryModal(false);
+                          handleOpenEditModal(r);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-amber-500/20 text-amber-300 border border-slate-800 font-bold text-xs transition-all flex items-center gap-1"
+                        title="Edit Student Record"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Edit</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowEmailDirectoryModal(false);
+                          setShowDeleteModal(r);
+                        }}
+                        className="p-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all"
+                        title="Delete Student Record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit / Update Student Registration Modal ───────────────────── */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-xl w-full p-6 sm:p-8 border border-amber-500/50 shadow-2xl space-y-6 animate-fadeIn max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/50 text-amber-400 flex items-center justify-center font-bold">
+                  <Pencil className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-white">Edit Student Details</h3>
+                  <p className="text-xs text-slate-400">Update information for Ref ID: <span className="font-mono text-gold-light font-bold">{editItem.id}</span></p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditItem(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditModal} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Student Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={editDept}
+                    onChange={(e) => setEditDept(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
+                  >
+                    <option value="BCA">Computer Applications (BCA)</option>
+                    <option value="B.Com">Commerce (B.Com)</option>
+                    <option value="BBA">Business Administration (BBA)</option>
+                    <option value="B.Sc">Science (B.Sc)</option>
+                    <option value="BA">Humanities & Arts (BA)</option>
+                    <option value="PG/MBA/MCA">Post Graduate (MBA / MCA)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Section
+                  </label>
+                  <select
+                    value={editSection}
+                    onChange={(e) => setEditSection(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400 font-bold"
+                  >
+                    <option value="Section A">Section A</option>
+                    <option value="Section B">Section B</option>
+                    <option value="Section C">Section C</option>
+                    <option value="Section D">Section D</option>
+                    <option value="Section E">Section E</option>
+                    <option value="Section F">Section F</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Academic Year
+                  </label>
+                  <select
+                    value={editYear}
+                    onChange={(e) => setEditYear(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400"
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="PG / Alumni">PG / Alumni</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Approval Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as ApprovalStatus)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-amber-400 font-bold text-amber-400"
+                  >
+                    <option value="Pending_ID_Approval">Pending ID Approval</option>
+                    <option value="ID_Approved">ID Approved (Pay Pending)</option>
+                    <option value="Payment_Pending">Payment Submitted</option>
+                    <option value="Approved">Approved & Active</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Payment UTR Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 981204918234"
+                    value={editUtr}
+                    onChange={(e) => setEditUtr(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {editStatus === 'Rejected' && (
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-rose-300 mb-1">
+                    Rejection Reason
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editRejectionReason}
+                    onChange={(e) => setEditRejectionReason(e.target.value)}
+                    placeholder="Reason for rejection..."
+                    className="w-full p-3 rounded-xl bg-slate-950 border border-rose-800 text-xs text-white outline-none focus:border-rose-500"
+                  />
+                </div>
+              )}
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditItem(null)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-gold-royal text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-90 shadow-md flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>
