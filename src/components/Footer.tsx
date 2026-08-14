@@ -96,9 +96,15 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
             <h4 className="font-serif text-sm font-bold text-gold-royal uppercase tracking-wider">
               Event Venue
             </h4>
-            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-              MANTRA - The Luxury Wedding Destination
-            </p>
+            <a
+              href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-slate-300 hover:text-gold-royal transition-colors leading-relaxed font-semibold block group"
+              title="Open location in Google Maps"
+            >
+              MANTRA - The Luxury Wedding Destination <span className="text-gold-royal group-hover:translate-x-0.5 inline-block transition-transform">↗</span>
+            </a>
             <p className="text-xs text-emerald-400 font-mono">
               WhatsApp: +91 90724 28800
             </p>

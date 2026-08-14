@@ -111,14 +111,23 @@ export const EventDetails: React.FC = () => {
                 </div>
 
                 {card.hasMapAction && (
-                  <div className="mt-5 pt-4 border-t border-slate-100">
+                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
                     <button
                       onClick={() => setShowMapModal(true)}
                       className="inline-flex items-center gap-2 text-xs font-bold text-kerala-deep hover:text-gold-dark transition-colors uppercase tracking-wider"
                     >
                       <Navigation className="w-3.5 h-3.5 text-gold-royal" />
-                      <span>Open Google Maps</span>
+                      <span>Preview Map</span>
                     </button>
+                    <a
+                      href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-gold-dark hover:text-kerala-deep transition-colors uppercase tracking-wider"
+                    >
+                      <span>Open Maps</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                   </div>
                 )}
               </div>
@@ -146,10 +155,10 @@ export const EventDetails: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-serif text-xl font-bold text-kerala-deep">
-                    Krupanidhi Degree College Venue
+                    MANTRA - Event Venue Location
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Carmelaram Road, Chikkabellandur, Off Sarjapur Road, Bengaluru - 560035
+                    PSR Auditorium, Carmelaram, Off Sarjapur Road, Bengaluru
                   </p>
                 </div>
               </div>
@@ -157,8 +166,8 @@ export const EventDetails: React.FC = () => {
               {/* Map Iframe */}
               <div className="rounded-2xl overflow-hidden border border-gold-royal/30 h-80 bg-slate-100">
                 <iframe
-                  title="Krupanidhi Degree College Map"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.8876800760447!2d77.70295807584742!3d12.915014915428613!2m3!1f0!0f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae132ef16b124d%3A0x6b44ddc8810ddf3b!2sKrupanidhi%20Group%20of%20Institutions!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin"
+                  title="MANTRA Event Venue Location Map"
+                  src="https://maps.google.com/maps?q=12.8897514,77.7290285&hl=en&z=15&output=embed"
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}
@@ -172,9 +181,9 @@ export const EventDetails: React.FC = () => {
                   💡 Free parking available for registered students & guests.
                 </p>
                 <a
-                  href="https://maps.google.com/?q=Krupanidhi+Degree+College+Bengaluru"
+                  href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-kerala-deep text-white text-xs font-bold hover:bg-kerala-emerald transition-colors"
                 >
                   <span>Open in Google Maps App</span>

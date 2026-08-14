@@ -55,10 +55,16 @@ export const Hero = () => {
                 <Calendar className="w-4 h-4 text-gold-royal" />
                 <span>6 September 2026</span>
               </div>
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm">
-                <MapPin className="w-4 h-4 text-kerala-deep" />
+              <a
+                href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm hover:border-gold-royal hover:bg-white hover:shadow transition-all group cursor-pointer"
+                title="Open location on Google Maps"
+              >
+                <MapPin className="w-4 h-4 text-kerala-deep group-hover:scale-110 transition-transform" />
                 <span>MANTRA - The Luxury Wedding Destination</span>
-              </div>
+              </a>
             </div>
 
             {/* Primary & Secondary Call to Actions */}

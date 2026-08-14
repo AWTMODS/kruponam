@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Phone, MapPin, Send, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { Phone, MapPin, Send, MessageSquare, CheckCircle2, ExternalLink } from 'lucide-react';
 
 export const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -83,11 +83,20 @@ export const Contact: React.FC = () => {
                 <div className="w-12 h-12 rounded-2xl bg-gold-light/30 text-gold-dark flex items-center justify-center shrink-0">
                   <MapPin className="w-6 h-6" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="font-serif font-bold text-lg text-slate-900">Event Venue Location</h3>
                   <p className="text-xs text-slate-600 leading-relaxed mt-1 font-semibold">
                     MANTRA - The Luxury Wedding Destination
                   </p>
+                  <a
+                    href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-gold-dark font-bold hover:underline hover:text-kerala-deep mt-2 transition-colors"
+                  >
+                    <span>Open in Google Maps</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
 
