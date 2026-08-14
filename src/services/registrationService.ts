@@ -198,15 +198,49 @@ export const getRegistrations = (): Registration[] => {
 };
 
 export const syncCloudRegistrations = async (): Promise<Registration[]> => {
+  const localList = getRegistrations();
+  const idbList = await loadAllFromIndexedDB();
+  
+  // Combine local and IndexedDB records
+  const localMap = new Map<string, Registration>();
+  [...idbList, ...localList].forEach((r) => {
+    if (r && r.id) localMap.set(r.id, r);
+  });
+
   if (isSupabaseConfigured()) {
-    const cloudRecords = await fetchRegistrationsFromSupabase();
-    if (cloudRecords && cloudRecords.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudRecords));
-      cloudRecords.forEach(syncToIndexedDB);
-      return cloudRecords;
+    try {
+      const cloudRecords = await fetchRegistrationsFromSupabase();
+      if (cloudRecords) {
+        const mergedMap = new Map<string, Registration>(localMap);
+
+        // Cloud records take priority if present
+        cloudRecords.forEach((r) => {
+          if (r && r.id) {
+            mergedMap.set(r.id, r);
+          }
+        });
+
+        // Push any local-only records to Supabase so they are not lost across devices
+        localMap.forEach((localReg, id) => {
+          const inCloud = cloudRecords.some((cr) => cr.id === id);
+          if (!inCloud) {
+            saveRegistrationToSupabase(localReg).catch((err) =>
+              console.warn('Background sync to Supabase failed for local record:', id, err)
+            );
+          }
+        });
+
+        const finalMerged = Array.from(mergedMap.values());
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
+        finalMerged.forEach(syncToIndexedDB);
+        return finalMerged;
+      }
+    } catch (e) {
+      console.warn('Supabase sync notice:', e);
     }
   }
-  return getRegistrations();
+
+  return Array.from(localMap.values());
 };
 
 export const saveRegistrationAsync = async (registration: Registration): Promise<Registration> => {

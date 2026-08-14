@@ -150,7 +150,7 @@ export const saveRegistrationToSupabase = async (reg: Registration): Promise<boo
       email: reg.email,
       phone: reg.phone,
       department: reg.department,
-      section: reg.section,
+      section: reg.section || 'Section A',
       year: reg.year,
       gender: reg.gender,
       ticket_type: reg.ticketType,
@@ -170,6 +170,19 @@ export const saveRegistrationToSupabase = async (reg: Registration): Promise<boo
     const { error } = await client.from('registrations').upsert(rowData, { onConflict: 'id' });
     if (error) {
       console.warn('Supabase save error:', error.message);
+      // Fallback: If payload size failed due to large base64 strings, save text metadata with empty string image fallback so record is not lost
+      if (
+        (reg.idCardUrl && reg.idCardUrl.startsWith('data:image')) || 
+        (reg.paymentScreenshotUrl && reg.paymentScreenshotUrl.startsWith('data:image'))
+      ) {
+        const fallbackData = {
+          ...rowData,
+          id_card_url: reg.idCardUrl.startsWith('data:image') ? '' : reg.idCardUrl,
+          payment_screenshot_url: (reg.paymentScreenshotUrl && reg.paymentScreenshotUrl.startsWith('data:image')) ? '' : reg.paymentScreenshotUrl,
+        };
+        const { error: fallbackErr } = await client.from('registrations').upsert(fallbackData, { onConflict: 'id' });
+        if (!fallbackErr) return true;
+      }
       return false;
     }
     return true;
