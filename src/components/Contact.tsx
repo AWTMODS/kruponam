@@ -86,7 +86,7 @@ export const Contact: React.FC = () => {
                 <div className="flex-1">
                   <h3 className="font-serif font-bold text-lg text-slate-900">Event Venue Location</h3>
                   <p className="text-xs text-slate-600 leading-relaxed mt-1 font-semibold">
-                    MANTRA - The Luxury Wedding Destination
+                    PSR Convention Centre
                   </p>
                   <a
                     href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"

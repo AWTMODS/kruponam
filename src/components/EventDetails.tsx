@@ -26,8 +26,8 @@ export const EventDetails: React.FC = () => {
     {
       icon: MapPin,
       title: 'Venue Location',
-      value: 'MANTRA',
-      subtext: 'The Luxury Wedding Destination',
+      value: 'PSR Convention Centre',
+      subtext: 'Carmelaram, Bengaluru',
       color: 'from-amber-500/10 to-gold-light/20',
       borderColor: 'border-gold-royal/30',
       iconColor: 'text-gold-dark',
@@ -155,10 +155,10 @@ export const EventDetails: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-serif text-xl font-bold text-kerala-deep">
-                    MANTRA - Event Venue Location
+                    PSR Convention Centre
                   </h3>
                   <p className="text-xs text-slate-500">
-                    PSR Auditorium, Carmelaram, Off Sarjapur Road, Bengaluru
+                    Carmelaram, Off Sarjapur Road, Bengaluru
                   </p>
                 </div>
               </div>
@@ -166,7 +166,7 @@ export const EventDetails: React.FC = () => {
               {/* Map Iframe */}
               <div className="rounded-2xl overflow-hidden border border-gold-royal/30 h-80 bg-slate-100">
                 <iframe
-                  title="MANTRA Event Venue Location Map"
+                  title="PSR Convention Centre Location Map"
                   src="https://maps.google.com/maps?q=12.8897514,77.7290285&hl=en&z=15&output=embed"
                   width="100%"
                   height="100%"

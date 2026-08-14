@@ -63,7 +63,7 @@ export const Hero = () => {
                 title="Open location on Google Maps"
               >
                 <MapPin className="w-4 h-4 text-kerala-deep group-hover:scale-110 transition-transform" />
-                <span>MANTRA - The Luxury Wedding Destination</span>
+                <span>PSR Convention Centre</span>
               </a>
             </div>
 
