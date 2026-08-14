@@ -157,6 +157,25 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     isReported: false,
   },
   {
+    id: 'KRP-865167',
+    fullName: 'Sniya M',
+    email: 'sniya9528@gmail.com',
+    phone: '9562820757',
+    department: 'BCA',
+    section: 'Section A',
+    year: '2nd Year',
+    gender: 'Female',
+    ticketType: 'General Pass',
+    idCardUrl: getAssetUrl('images/hero_illustration.png'),
+    paymentScreenshotUrl: '',
+    paymentAmount: 700,
+    paymentStatus: 'Pending',
+    paymentUtr: '',
+    approvalStatus: 'Pending_ID_Approval',
+    submittedAt: 'Aug 14, 2026',
+    isReported: false,
+  },
+  {
     id: 'KRP-519283',
     fullName: 'Sneha Menon',
     email: 'sneha.m@example.com',
@@ -187,7 +206,22 @@ export const getRegistrations = (): Registration[] => {
     return INITIAL_REGISTRATIONS;
   }
   try {
-    const list = JSON.parse(data);
+    const list: Registration[] = JSON.parse(data);
+    const existingIds = new Set(list.map((r) => r.id));
+    let hasNewSeed = false;
+    
+    INITIAL_REGISTRATIONS.forEach((seed) => {
+      if (!existingIds.has(seed.id)) {
+        list.unshift(seed);
+        syncToIndexedDB(seed);
+        hasNewSeed = true;
+      }
+    });
+
+    if (hasNewSeed) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
     return list.map((item: any) => ({
       ...item,
       section: item.section || 'Section A',
