@@ -33,8 +33,32 @@ export interface Registration {
 }
 
 const STORAGE_KEY = 'kruponam_registrations_v2';
+const DELETED_KEY = 'kruponam_deleted_ids_v1';
 const DB_NAME = 'KruponamDB_v1';
 const STORE_NAME = 'registrations_store';
+
+export const getDeletedIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(DELETED_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
+};
+
+export const markIdAsDeleted = (id: string) => {
+  const set = getDeletedIds();
+  set.add(id);
+  localStorage.setItem(DELETED_KEY, JSON.stringify(Array.from(set)));
+};
+
+export const unmarkIdAsDeleted = (id: string) => {
+  const set = getDeletedIds();
+  if (set.has(id)) {
+    set.delete(id);
+    localStorage.setItem(DELETED_KEY, JSON.stringify(Array.from(set)));
+  }
+};
 
 // Optional Webhook endpoint for external Cloud DB / Google Sheets (e.g. Firebase, Supabase, Google Apps Script)
 export const EXTERNAL_WEBHOOK_URL = ''; 
@@ -47,8 +71,8 @@ const openIDB = (): Promise<IDBDatabase> => {
       return;
     }
     const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e: any) => {
-      const db = e.target.result;
+    request.onupgradeneeded = () => {
+      const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
@@ -58,104 +82,44 @@ const openIDB = (): Promise<IDBDatabase> => {
   });
 };
 
-export const syncToIndexedDB = async (item: Registration): Promise<void> => {
+const syncToIndexedDB = async (registration: Registration) => {
   try {
     const db = await openIDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put(item);
+    store.put(registration);
   } catch (e) {
-    console.warn('IndexedDB sync notice:', e);
+    console.warn('IndexedDB sync error:', e);
   }
 };
 
-export const deleteFromIndexedDB = async (id: string): Promise<void> => {
+const deleteFromIndexedDB = async (id: string) => {
   try {
     const db = await openIDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     store.delete(id);
   } catch (e) {
-    console.warn('IndexedDB delete notice:', e);
+    console.warn('IndexedDB delete error:', e);
   }
 };
 
-export const loadAllFromIndexedDB = async (): Promise<Registration[]> => {
-  try {
-    const db = await openIDB();
-    return new Promise((resolve, reject) => {
+const loadAllFromIndexedDB = (): Promise<Registration[]> => {
+  return new Promise(async (resolve) => {
+    try {
+      const db = await openIDB();
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
       req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
-  } catch (e) {
-    return [];
-  }
+      req.onerror = () => resolve([]);
+    } catch (e) {
+      resolve([]);
+    }
+  });
 };
 
-const INITIAL_REGISTRATIONS: Registration[] = [
-  {
-    id: 'KRP-849201',
-    fullName: 'Anand Nair',
-    email: 'anand.nair@example.com',
-    phone: '9876543210',
-    department: 'BCA',
-    section: 'Section A',
-    year: '2nd Year',
-    gender: 'Male',
-    ticketType: 'Student Pass',
-    idCardUrl: getAssetUrl('images/hero_illustration.png'),
-    paymentScreenshotUrl: getAssetUrl('images/pookalam.png'),
-    paymentAmount: 700,
-    paymentStatus: 'Verified',
-    paymentUtr: '320918239012',
-    approvalStatus: 'Approved',
-    submittedAt: 'Jul 29, 2026',
-    approvedAt: 'Jul 30, 2026',
-    isReported: true,
-    reportedAt: 'Jul 30, 2026, 08:30 AM',
-  },
-  {
-    id: 'KRP-712394',
-    fullName: 'Priya Rajendran',
-    email: 'priya.r@example.com',
-    phone: '9845123789',
-    department: 'B.Com',
-    section: 'Section B',
-    year: '3rd Year',
-    gender: 'Female',
-    ticketType: 'VIP Cultural Pass',
-    idCardUrl: getAssetUrl('images/pookalam.png'),
-    paymentScreenshotUrl: getAssetUrl('images/hero_illustration.png'),
-    paymentAmount: 700,
-    paymentStatus: 'Verified',
-    paymentUtr: '482019384912',
-    approvalStatus: 'Approved',
-    submittedAt: 'Jul 30, 2026',
-    approvedAt: 'Jul 30, 2026',
-    isReported: false,
-  },
-  {
-    id: 'KRP-602938',
-    fullName: 'Rohan Sharma',
-    email: 'rohan.s@example.com',
-    phone: '9123456780',
-    department: 'BBA',
-    section: 'Section A',
-    year: '1st Year',
-    gender: 'Male',
-    ticketType: 'Student Pass',
-    idCardUrl: getAssetUrl('images/onasadya.png'),
-    paymentScreenshotUrl: getAssetUrl('images/pookalam.png'),
-    paymentAmount: 700,
-    paymentStatus: 'Verified',
-    paymentUtr: '981204918234',
-    approvalStatus: 'Pending',
-    submittedAt: 'Jul 30, 2026',
-    isReported: false,
-  },
+export const INITIAL_REGISTRATIONS: Registration[] = [
   {
     id: 'KRP-865167',
     fullName: 'Sniya M',
@@ -166,7 +130,7 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     year: '2nd Year',
     gender: 'Female',
     ticketType: 'General Pass',
-    idCardUrl: getAssetUrl('images/hero_illustration.png'),
+    idCardUrl: getAssetUrl('images/thiruvathira.png'),
     paymentScreenshotUrl: '',
     paymentAmount: 700,
     paymentStatus: 'Pending',
@@ -176,7 +140,47 @@ const INITIAL_REGISTRATIONS: Registration[] = [
     isReported: false,
   },
   {
+    id: 'KRP-849201',
+    fullName: 'Anand Nair',
+    email: 'anand.nair@example.com',
+    phone: '9876543210',
+    department: 'BCA',
+    section: 'Section A',
+    year: '2nd Year',
+    gender: 'Male',
+    ticketType: 'VIP Pass',
+    idCardUrl: getAssetUrl('images/pookalam.png'),
+    paymentScreenshotUrl: getAssetUrl('images/onasadya.png'),
+    paymentAmount: 700,
+    paymentStatus: 'Verified',
+    paymentUtr: '320918239012',
+    approvalStatus: 'Approved',
+    submittedAt: 'Jul 30, 2026',
+    approvedAt: 'Jul 30, 2026',
+    isReported: true,
+    reportedAt: 'Aug 14, 2026, 08:30 AM',
+  },
+  {
     id: 'KRP-519283',
+    fullName: 'Devika Pillai',
+    email: 'devika.p@example.com',
+    phone: '9812345678',
+    department: 'B.Com',
+    section: 'Section B',
+    year: '3rd Year',
+    gender: 'Female',
+    ticketType: 'General Pass',
+    idCardUrl: getAssetUrl('images/maveli.png'),
+    paymentScreenshotUrl: getAssetUrl('images/onasadya.png'),
+    paymentAmount: 700,
+    paymentStatus: 'Pending',
+    paymentUtr: '981204918234',
+    approvalStatus: 'Payment_Pending',
+    submittedAt: 'Aug 02, 2026',
+    isReported: false,
+  },
+  {
+    id: 'KRP-109283',
     fullName: 'Sneha Menon',
     email: 'sneha.m@example.com',
     phone: '9765432109',
@@ -198,20 +202,22 @@ const INITIAL_REGISTRATIONS: Registration[] = [
 ];
 
 export const getRegistrations = (): Registration[] => {
+  const deletedIds = getDeletedIds();
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_REGISTRATIONS));
-    // Asynchronously seed IndexedDB
-    INITIAL_REGISTRATIONS.forEach(syncToIndexedDB);
-    return INITIAL_REGISTRATIONS;
+    const initialFiltered = INITIAL_REGISTRATIONS.filter((r) => !deletedIds.has(r.id));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialFiltered));
+    initialFiltered.forEach(syncToIndexedDB);
+    return initialFiltered;
   }
   try {
-    const list: Registration[] = JSON.parse(data);
+    let list: Registration[] = JSON.parse(data);
+    list = list.filter((r) => !deletedIds.has(r.id));
     const existingIds = new Set(list.map((r) => r.id));
     let hasNewSeed = false;
     
     INITIAL_REGISTRATIONS.forEach((seed) => {
-      if (!existingIds.has(seed.id)) {
+      if (!existingIds.has(seed.id) && !deletedIds.has(seed.id)) {
         list.unshift(seed);
         syncToIndexedDB(seed);
         hasNewSeed = true;
@@ -227,29 +233,33 @@ export const getRegistrations = (): Registration[] => {
       section: item.section || 'Section A',
     }));
   } catch (e) {
-    return INITIAL_REGISTRATIONS;
+    return INITIAL_REGISTRATIONS.filter((r) => !deletedIds.has(r.id));
   }
 };
 
 export const syncCloudRegistrations = async (): Promise<Registration[]> => {
+  const deletedIds = getDeletedIds();
   const localList = getRegistrations();
   const idbList = await loadAllFromIndexedDB();
   
   // Combine local and IndexedDB records
   const localMap = new Map<string, Registration>();
   [...idbList, ...localList].forEach((r) => {
-    if (r && r.id) localMap.set(r.id, r);
+    if (r && r.id && !deletedIds.has(r.id)) {
+      localMap.set(r.id, r);
+    }
   });
 
+  // Try fetching remote cloud records from Supabase
   if (isSupabaseConfigured()) {
     try {
       const cloudRecords = await fetchRegistrationsFromSupabase();
-      if (cloudRecords) {
+      if (cloudRecords && cloudRecords.length > 0) {
         const mergedMap = new Map<string, Registration>(localMap);
 
-        // Cloud records take priority if present
+        // Cloud records take priority if present & not deleted
         cloudRecords.forEach((r) => {
-          if (r && r.id) {
+          if (r && r.id && !deletedIds.has(r.id)) {
             mergedMap.set(r.id, r);
           }
         });
@@ -257,14 +267,14 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
         // Push any local-only records to Supabase so they are not lost across devices
         localMap.forEach((localReg, id) => {
           const inCloud = cloudRecords.some((cr) => cr.id === id);
-          if (!inCloud) {
+          if (!inCloud && !deletedIds.has(id)) {
             saveRegistrationToSupabase(localReg).catch((err) =>
               console.warn('Background sync to Supabase failed for local record:', id, err)
             );
           }
         });
 
-        const finalMerged = Array.from(mergedMap.values());
+        const finalMerged = Array.from(mergedMap.values()).filter((r) => !deletedIds.has(r.id));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
         finalMerged.forEach(syncToIndexedDB);
         return finalMerged;
@@ -274,7 +284,7 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   }
 
-  return Array.from(localMap.values());
+  return Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
 };
 
 export const saveRegistrationAsync = async (registration: Registration): Promise<Registration> => {
@@ -304,6 +314,7 @@ export const saveRegistrationAsync = async (registration: Registration): Promise
 
 export const saveRegistration = (registration: Registration): boolean => {
   try {
+    unmarkIdAsDeleted(registration.id);
     const registrations = getRegistrations();
     // Prevent duplicate entries
     const filtered = registrations.filter((r) => r.id !== registration.id);
@@ -407,6 +418,8 @@ export const submitPaymentForRegistration = async (
 
 export const deleteRegistration = async (id: string): Promise<boolean> => {
   try {
+    markIdAsDeleted(id);
+
     const registrations = getRegistrations();
     const filtered = registrations.filter((r) => r.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
