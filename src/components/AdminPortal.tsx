@@ -2140,19 +2140,57 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       {/* ── Reject Reason Modal ───────────────────────────────────── */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 border border-rose-500/80 shadow-2xl space-y-4">
-            <h3 className="font-serif text-xl font-bold text-rose-400">Reject Application</h3>
+          <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-rose-500/80 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+              <h3 className="font-serif text-xl font-bold text-rose-400">Reject Application</h3>
+              <button
+                onClick={() => setShowRejectModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
             <p className="text-xs text-slate-300">
-              Provide feedback for rejection (sent to student):
+              Select a quick reason or type custom feedback (sent to student for re-uploading):
             </p>
 
-            <textarea
-              rows={3}
-              value={rejectionReasonInput}
-              placeholder="e.g. Student ID image unreadable / Payment UTR verification failed."
-              onChange={(e) => setRejectionReasonInput(e.target.value)}
-              className="w-full p-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-xs text-white outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 placeholder-slate-600"
-            />
+            {/* Quick Preset Reason Chips */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                Quick Rejection Reasons:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '📛 Name Mismatch with ID', reason: 'Student Name does not match the name printed on uploaded Student ID Card.' },
+                  { label: '📷 Unclear / Blurry ID', reason: 'Uploaded Student ID Card photo is blurry, unreadable, or missing.' },
+                  { label: '💳 Invalid Payment UTR', reason: 'Payment UTR / Txn Reference ID could not be verified or does not match receipt.' },
+                  { label: '🏢 Incorrect Dept / Year', reason: 'Department or Academic Year selected does not match Student ID Card records.' },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => setRejectionReasonInput(chip.reason)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-rose-950 text-slate-300 hover:text-rose-200 border border-slate-800 hover:border-rose-500/50 text-xs font-medium transition-all text-left"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                Rejection Note / Feedback:
+              </label>
+              <textarea
+                rows={3}
+                value={rejectionReasonInput}
+                placeholder="e.g. Student Name does not match ID proof, please re-upload clear ID."
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                className="w-full p-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-xs text-white outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 placeholder-slate-600 font-medium"
+              />
+            </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
@@ -2164,7 +2202,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               
               <button
                 onClick={() => handleConfirmReject(showRejectModal)}
-                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md"
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold transition-colors shadow-md"
               >
                 Confirm Rejection
               </button>

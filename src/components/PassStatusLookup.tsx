@@ -100,10 +100,17 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
 
   // Resubmit / Re-upload state for rejected applications
+  const [resubmitName, setResubmitName] = useState('');
   const [reuploadIdFile, setReuploadIdFile] = useState<File | null>(null);
   const [reuploadIdPreview, setReuploadIdPreview] = useState<string | null>(null);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [resubmitSuccessNotice, setResubmitSuccessNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchResult) {
+      setResubmitName(searchResult.fullName);
+    }
+  }, [searchResult]);
 
   const handleReuploadIdCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,6 +135,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
     const updated: Registration = {
       ...searchResult,
+      fullName: resubmitName.trim() || searchResult.fullName,
       idCardUrl: reuploadIdPreview || searchResult.idCardUrl,
       approvalStatus: 'Pending_ID_Approval',
       rejectionReason: undefined,
@@ -753,6 +761,23 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                       <span>{paymentError}</span>
                     </div>
                   )}
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Student Full Name (Matches Student ID Proof) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Sniya M"
+                      value={resubmitName}
+                      onChange={(e) => setResubmitName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 font-bold text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 bg-white"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Ensure your full name matches the printed name on your College Student ID Card proof.
+                    </p>
+                  </div>
 
                   <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-6 bg-white text-center hover:bg-amber-50/50 transition-all relative">
                     <input
