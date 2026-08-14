@@ -37,7 +37,7 @@ export const Contact: React.FC = () => {
             Contact Organizers <span className="text-gold-gradient font-normal italic">&</span> Location
           </h2>
           <p className="text-slate-600 text-base sm:text-lg">
-            Have questions about Kruponam 2026? Connect directly with organizer Aadith on WhatsApp or visit our campus.
+            Have questions about Kruponam 2026? Connect directly with Ticket Booking Coordinator Aadith on WhatsApp or visit our campus.
           </p>
         </div>
 
@@ -59,7 +59,7 @@ export const Contact: React.FC = () => {
 
               <div>
                 <h3 className="font-serif text-2xl font-bold text-white">Aadith</h3>
-                <p className="text-xs text-emerald-200 mt-0.5">Event Organizer & Coordinator</p>
+                <p className="text-xs text-emerald-200 mt-0.5">Ticket Booking Coordinator</p>
                 <p className="text-lg font-mono font-bold text-gold-amber mt-2">+91 90724 28800</p>
               </div>
 

@@ -86,7 +86,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
                   rel="noopener noreferrer"
                   className="hover:text-gold-royal transition-colors text-emerald-400 font-semibold"
                 >
-                  WhatsApp Organizer (+91 90724 28800)
+                  WhatsApp Ticket Booking Coordinator (+91 90724 28800)
                 </a>
               </li>
             </ul>
