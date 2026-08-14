@@ -5,6 +5,7 @@ import {
   saveRegistrationAsync, 
   isEmailAlreadyUsed, 
   isPhoneAlreadyUsed, 
+  findRegistration,
   type Registration 
 } from '../services/registrationService';
 import { getSiteSettings } from '../services/siteSettingsService';
@@ -126,15 +127,62 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     e.preventDefault();
     setValidationError(null);
 
-    // 1. Email & Phone Uniqueness Check
-    if (isEmailAlreadyUsed(formData.email)) {
-      setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. Users cannot use the same email for multiple registrations.`);
+    // ID Card Upload Requirement
+    if (!idCardPreview) {
+      setValidationError('Please upload a clear scanned copy or photo of your College Student ID Card.');
       return;
     }
 
-    if (isPhoneAlreadyUsed(formData.phone)) {
-      setValidationError(`⚠️ The Phone Number "${formData.phone}" is already registered. Users cannot use the same phone number for multiple registrations.`);
-      return;
+    // Check if user already exists
+    const existing = findRegistration(formData.email) || findRegistration(formData.phone);
+
+    if (existing) {
+      // If previous application was Rejected, allow student to update and resubmit!
+      if (existing.approvalStatus === 'Rejected') {
+        setIsSubmitting(true);
+        const updatedReg: Registration = {
+          ...existing,
+          ...formData,
+          idCardUrl: idCardPreview || existing.idCardUrl,
+          approvalStatus: 'Pending_ID_Approval',
+          rejectionReason: undefined,
+          submittedAt: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        };
+        const savedReg = await saveRegistrationAsync(updatedReg);
+        setIsSubmitting(false);
+        setSubmittedRegistration(savedReg);
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
+        });
+        return;
+      }
+
+      if (isEmailAlreadyUsed(formData.email, existing.id)) {
+        setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+        return;
+      }
+
+      if (isPhoneAlreadyUsed(formData.phone, existing.id)) {
+        setValidationError(`⚠️ The Phone Number "${formData.phone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+        return;
+      }
+    } else {
+      if (isEmailAlreadyUsed(formData.email)) {
+        setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+        return;
+      }
+
+      if (isPhoneAlreadyUsed(formData.phone)) {
+        setValidationError(`⚠️ The Phone Number "${formData.phone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+        return;
+      }
     }
 
     // 2. ID Card Upload Requirement

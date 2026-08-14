@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
-import { findRegistration, submitPaymentForRegistration, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
+import { findRegistration, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { getSiteSettings } from '../services/siteSettingsService';
@@ -98,6 +98,51 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
+
+  // Resubmit / Re-upload state for rejected applications
+  const [reuploadIdFile, setReuploadIdFile] = useState<File | null>(null);
+  const [reuploadIdPreview, setReuploadIdPreview] = useState<string | null>(null);
+  const [isResubmitting, setIsResubmitting] = useState(false);
+  const [resubmitSuccessNotice, setResubmitSuccessNotice] = useState<string | null>(null);
+
+  const handleReuploadIdCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReuploadIdFile(file);
+      const compressed = await compressImageToDataUrl(file);
+      setReuploadIdPreview(compressed);
+    }
+  };
+
+  const handleResubmitApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchResult) return;
+
+    if (!reuploadIdPreview && !searchResult.idCardUrl) {
+      setPaymentError('Please upload a clear photo of your Student ID Card.');
+      return;
+    }
+
+    setIsResubmitting(true);
+    setPaymentError(null);
+
+    const updated: Registration = {
+      ...searchResult,
+      idCardUrl: reuploadIdPreview || searchResult.idCardUrl,
+      approvalStatus: 'Pending_ID_Approval',
+      rejectionReason: undefined,
+      submittedAt: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    };
+
+    const saved = await saveRegistrationAsync(updated);
+    setIsResubmitting(false);
+    setSearchResult(saved);
+    setResubmitSuccessNotice('🎉 Your application & Student ID Card have been resubmitted successfully! Admin will re-verify your ID Card shortly.');
+  };
 
   const [upiSettings] = useState(getUpiSettings());
   const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string>('');
@@ -664,28 +709,104 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </div>
             </div>
           ) : (
-            /* REJECTED STATE */
-            <div className="p-8 bg-rose-50 border-2 border-rose-200 rounded-3xl text-center space-y-4 shadow-md">
-              <div className="w-16 h-16 rounded-full bg-rose-100 mx-auto flex items-center justify-center text-rose-700 font-bold text-2xl">
-                ❌
+            /* REJECTED STATE WITH INLINE RE-UPLOAD FORM */
+            <div className="space-y-6">
+              <div className="p-6 bg-rose-50 border-2 border-rose-300 rounded-3xl text-center space-y-4 shadow-md">
+                <div className="w-16 h-16 rounded-full bg-rose-100 mx-auto flex items-center justify-center text-rose-700 font-bold text-2xl">
+                  ❌
+                </div>
+
+                <span className="px-3 py-1 rounded-full bg-rose-200 text-rose-900 text-xs font-extrabold uppercase tracking-wider">
+                  Application Rejected • Re-Upload Required
+                </span>
+
+                <h4 className="font-serif text-2xl font-bold text-rose-950">
+                  Verification Issue Detected
+                </h4>
+
+                <div className="bg-white p-4 rounded-2xl border border-rose-200 text-xs text-rose-900 font-medium max-w-md mx-auto text-left space-y-1">
+                  <span className="font-bold block text-rose-950">Reason provided by Admin:</span>
+                  <p className="text-slate-800 italic">"{searchResult.rejectionReason || 'Uploaded ID Card or Payment UTR could not be verified.'}"</p>
+                </div>
+
+                <p className="text-slate-600 text-xs font-medium">
+                  Don't worry! You can upload a new clear Student ID Card photo below to resubmit your application for re-review.
+                </p>
               </div>
 
-              <span className="px-3 py-1 rounded-full bg-rose-200 text-rose-900 text-xs font-extrabold uppercase tracking-wider">
-                Application Rejected
-              </span>
+              {resubmitSuccessNotice ? (
+                <div className="p-6 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center space-y-2 animate-fadeIn shadow-md">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <p className="font-bold text-emerald-950 text-sm">{resubmitSuccessNotice}</p>
+                  <p className="text-xs text-emerald-800">Admin will review your newly uploaded Student ID Card shortly.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleResubmitApplication} className="bg-amber-50/60 rounded-3xl p-6 sm:p-8 border-2 border-amber-300 shadow-md space-y-6">
+                  <h4 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-gold-royal" />
+                    <span>Re-Upload Student ID Card Photo</span>
+                  </h4>
 
-              <h4 className="font-serif text-2xl font-bold text-rose-950">
-                Verification Issue Detected
-              </h4>
+                  {paymentError && (
+                    <div className="p-3 bg-rose-100 border border-rose-300 rounded-xl text-rose-900 text-xs font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{paymentError}</span>
+                    </div>
+                  )}
 
-              <div className="bg-white p-4 rounded-2xl border border-rose-200 text-xs text-rose-900 font-medium max-w-md mx-auto">
-                <span className="font-bold block mb-1">Reason provided by Admin:</span>
-                "{searchResult.rejectionReason || 'Uploaded ID Card or Payment UTR could not be verified.'}"
-              </div>
+                  <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-6 bg-white text-center hover:bg-amber-50/50 transition-all relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleReuploadIdCard}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
 
-              <p className="text-slate-600 text-xs">
-                Please re-submit your registration with a clear Student ID Card photo or valid ₹700 UTR number.
-              </p>
+                    {reuploadIdPreview ? (
+                      <div className="space-y-3">
+                        <img
+                          src={reuploadIdPreview}
+                          alt="New Student ID Preview"
+                          className="max-h-48 mx-auto rounded-xl shadow-md border border-gold-royal/30 object-contain"
+                        />
+                        <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>New Student ID Uploaded: {reuploadIdFile?.name || 'student_id.jpg'}</span>
+                        </p>
+                        <span className="text-[11px] text-slate-400 underline">Click to choose a different photo</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 py-3">
+                        <Upload className="w-8 h-8 mx-auto text-gold-dark" />
+                        <p className="text-sm font-bold text-slate-800">
+                          Click to upload or drag & drop New Student ID Photo
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Clear phone photo or scanned copy of Student ID Card
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isResubmitting || !reuploadIdPreview}
+                    className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
+                  >
+                    {isResubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
+                        <span>Resubmitting Application to Admin...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-gold-royal" />
+                        <span>Resubmit Application for Admin Re-Review</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>
