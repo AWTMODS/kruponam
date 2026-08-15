@@ -669,6 +669,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         </div>
       </header>
 
+      {/* Supabase Connection Alert Banner */}
+      {supabaseConnNotice && (
+        <div className="max-w-7xl mx-auto mb-6 bg-amber-500/10 border-2 border-amber-500/50 rounded-2xl p-4 text-amber-200 text-xs flex items-center justify-between gap-4 shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold text-amber-300">Cloud Sync Notice</p>
+              <p className="text-[11px] text-amber-200/80">{supabaseConnNotice}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Login Screen ─────────────────────────────────────────────── */}
       {!isAuthenticated ? (
         <div className="max-w-md mx-auto my-12 animate-fadeIn">
