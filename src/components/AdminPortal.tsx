@@ -3,7 +3,7 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame
 } from 'lucide-react';
 import { 
   syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
@@ -12,6 +12,7 @@ import {
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
 import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, testSupabaseConnection, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
+import { getFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConfigured, testFirebaseConnection } from '../services/firebaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
 import { getLiveActiveCount } from '../services/livePresenceService';
@@ -97,6 +98,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseCredentials().url);
   const [supabaseAnonKey, setSupabaseAnonKey] = useState(getSupabaseCredentials().key);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  // Firebase Database state
+  const [firebaseApiKey, setFirebaseApiKey] = useState(getFirebaseConfig()?.apiKey || '');
+  const [firebaseProjectId, setFirebaseProjectId] = useState(getFirebaseConfig()?.projectId || '');
 
   // EmailJS credentials state
   const [emailServiceId, setEmailServiceId] = useState(getEmailConfig().emailjsServiceId === 'YOUR_EMAILJS_SERVICE_ID' ? '' : getEmailConfig().emailjsServiceId);
@@ -1624,6 +1629,98 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   >
                     <Save className="w-4 h-4" />
                     <span>Save Cloud Connection Settings</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Firebase Firestore Setup Credentials Form */}
+              <div className="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 space-y-5">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-lg font-bold text-white flex items-center gap-2">
+                    <Flame className="w-5 h-5 text-amber-500" />
+                    <span>Firebase Firestore (Realtime Multi-Device Sync)</span>
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    isFirebaseConfigured() ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {isFirebaseConfigured() ? '✓ Firebase Realtime Live' : 'Not Connected'}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Firebase Firestore provides instant real-time synchronization across all mobile phones & laptops. Create a project at <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-amber-400 font-bold underline">console.firebase.google.com</a>, add a Web App, and paste your API Key & Project ID below:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Firebase API Key
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AIzaSy..."
+                      value={firebaseApiKey}
+                      onChange={(e) => setFirebaseApiKey(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Firebase Project ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. kruponam-2026"
+                      value={firebaseProjectId}
+                      onChange={(e) => setFirebaseProjectId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-white outline-none focus:border-gold-royal"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  {isFirebaseConfigured() && (
+                    <button
+                      onClick={() => {
+                        clearFirebaseConfig();
+                        setFirebaseApiKey('');
+                        setFirebaseProjectId('');
+                        addToast('🗑️ Firebase configuration cleared.', 'info');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-rose-950/80 text-rose-300 text-xs font-bold border border-rose-800"
+                    >
+                      Clear Firebase
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      if (!firebaseApiKey || !firebaseProjectId) {
+                        addToast('⚠️ Firebase API Key & Project ID are required.', 'error');
+                        return;
+                      }
+                      saveFirebaseConfig({
+                        apiKey: firebaseApiKey.trim(),
+                        authDomain: `${firebaseProjectId.trim()}.firebaseapp.com`,
+                        projectId: firebaseProjectId.trim(),
+                        storageBucket: `${firebaseProjectId.trim()}.appspot.com`,
+                        messagingSenderId: '',
+                        appId: '',
+                      });
+                      testFirebaseConnection().then((res) => {
+                        if (res.success) {
+                          addToast('🔥 Firebase Firestore connected & real-time sync active!', 'success');
+                          loadData();
+                        } else {
+                          addToast(`⚠️ ${res.message}`, 'error');
+                        }
+                      });
+                    }}
+                    className="ml-auto px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:opacity-90 shadow-md flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Firebase Connection</span>
                   </button>
                 </div>
               </div>

@@ -23,6 +23,7 @@
     "autoprefixer": "^10.5.4",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "firebase": "^12.17.1",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",
     "oxlint": "^1.75.0",
@@ -34,6 +35,5 @@
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
-  },
-  "devDependencies": {}
+  }
 }

@@ -6,6 +6,12 @@ import {
   deleteRegistrationFromSupabase,
   isSupabaseConfigured 
 } from './supabaseService';
+import {
+  isFirebaseConfigured,
+  fetchRegistrationsFromFirebase,
+  saveRegistrationToFirebase,
+  deleteRegistrationFromFirebase,
+} from './firebaseService';
 
 export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending';
 
@@ -269,17 +275,31 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   });
 
-  // Try fetching remote cloud records from Supabase
+  // 1. Try fetching remote cloud records from Firebase
+  if (isFirebaseConfigured()) {
+    try {
+      const fbRecords = await fetchRegistrationsFromFirebase();
+      if (fbRecords && fbRecords.length > 0) {
+        fbRecords.forEach((r) => {
+          if (r && r.id && !deletedIds.has(r.id)) {
+            localMap.set(r.id, r);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Firebase sync notice:', e);
+    }
+  }
+
+  // 2. Try fetching remote cloud records from Supabase
   if (isSupabaseConfigured()) {
     try {
       const cloudRecords = await fetchRegistrationsFromSupabase();
       if (cloudRecords && cloudRecords.length > 0) {
-        const mergedMap = new Map<string, Registration>(localMap);
-
         // Cloud records take priority if present & not deleted
         cloudRecords.forEach((r) => {
           if (r && r.id && !deletedIds.has(r.id)) {
-            mergedMap.set(r.id, r);
+            localMap.set(r.id, r);
           }
         });
 
@@ -292,24 +312,31 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
             );
           }
         });
-
-        const finalMerged = Array.from(mergedMap.values()).filter((r) => !deletedIds.has(r.id));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
-        finalMerged.forEach(syncToIndexedDB);
-        return finalMerged;
       }
     } catch (e) {
       console.warn('Supabase sync notice:', e);
     }
   }
 
-  return Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
+  const finalMerged = Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
+  finalMerged.forEach(syncToIndexedDB);
+  return finalMerged;
 };
 
 export const saveRegistrationAsync = async (registration: Registration): Promise<Registration> => {
   let finalReg = { ...registration };
 
-  // 1. Upload ID Card & Payment Screenshot to Free Supabase Storage if configured
+  // 1. Save to Firebase Cloud Database if configured (Realtime Firestore)
+  if (isFirebaseConfigured()) {
+    try {
+      await saveRegistrationToFirebase(finalReg);
+    } catch (e) {
+      console.warn('Firebase cloud upload notice:', e);
+    }
+  }
+
+  // 2. Upload ID Card & Payment Screenshot to Free Supabase Storage if configured
   if (isSupabaseConfigured()) {
     try {
       if (finalReg.idCardUrl && finalReg.idCardUrl.startsWith('data:image')) {
@@ -326,7 +353,7 @@ export const saveRegistrationAsync = async (registration: Registration): Promise
     }
   }
 
-  // 2. Save locally in LocalStorage & IndexedDB
+  // 3. Save locally in LocalStorage & IndexedDB
   saveRegistration(finalReg);
   return finalReg;
 };
@@ -444,6 +471,10 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     
     deleteFromIndexedDB(id);
+
+    if (isFirebaseConfigured()) {
+      await deleteRegistrationFromFirebase(id);
+    }
 
     if (isSupabaseConfigured()) {
       await deleteRegistrationFromSupabase(id);
