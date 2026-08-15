@@ -2054,11 +2054,41 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   </label>
                 </div>
                 <div className="h-60 flex items-center justify-center bg-slate-900/50 rounded-xl overflow-hidden p-2">
-                  <img
-                    src={inspectItem.idCardUrl}
-                    alt="Student ID Card"
-                    className="max-h-full max-w-full object-contain rounded-lg border border-gold-royal/30 shadow-md"
-                  />
+                  {inspectItem.idCardUrl ? (
+                    <img
+                      src={inspectItem.idCardUrl}
+                      alt="Student ID Card"
+                      className="max-h-full max-w-full object-contain rounded-lg border border-gold-royal/30 shadow-md"
+                    />
+                  ) : (
+                    <div className="text-center p-4 space-y-2">
+                      <p className="text-slate-500 text-xs font-mono">No Student ID Photo Uploaded Yet</p>
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold cursor-pointer hover:bg-amber-500/30 transition-all shadow-sm">
+                        <span>📷 Click to Upload ID Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                const newUrl = reader.result as string;
+                                const updated = { ...inspectItem, idCardUrl: newUrl };
+                                saveRegistrationAsync(updated).then(() => {
+                                  loadData();
+                                  setInspectItem(updated);
+                                  addToast(`✅ Student ID Card Photo updated for ${inspectItem.fullName}`, 'success');
+                                });
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -130,7 +130,7 @@ export const INITIAL_REGISTRATIONS: Registration[] = [
     year: '2nd Year',
     gender: 'Female',
     ticketType: 'General Pass',
-    idCardUrl: '',
+    idCardUrl: getAssetUrl('images/thiruvathira.png'),
     paymentScreenshotUrl: '',
     paymentAmount: 700,
     paymentStatus: 'Pending',
