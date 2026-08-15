@@ -2024,9 +2024,35 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               
               {/* Student ID Card */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
-                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
-                  🪪 Student ID Card Photo
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
+                    🪪 Student ID Card Photo
+                  </p>
+                  <label className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/40 cursor-pointer font-bold transition-all flex items-center gap-1 shadow-sm">
+                    <span>📷 Upload / Replace</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const newUrl = reader.result as string;
+                            const updated = { ...inspectItem, idCardUrl: newUrl };
+                            saveRegistrationAsync(updated).then(() => {
+                              loadData();
+                              setInspectItem(updated);
+                              addToast(`✅ Student ID Card Photo updated for ${inspectItem.fullName}`, 'success');
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
                 <div className="h-60 flex items-center justify-center bg-slate-900/50 rounded-xl overflow-hidden p-2">
                   <img
                     src={inspectItem.idCardUrl}
@@ -2038,9 +2064,35 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
               {/* Payment Screenshot showing UTR */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
-                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
-                  💳 Payment Screenshot (Showing UTR)
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">
+                    💳 Payment Screenshot (Showing UTR)
+                  </p>
+                  <label className="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-500/40 cursor-pointer font-bold transition-all flex items-center gap-1 shadow-sm">
+                    <span>💳 Upload / Replace</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            const newUrl = reader.result as string;
+                            const updated = { ...inspectItem, paymentScreenshotUrl: newUrl };
+                            saveRegistrationAsync(updated).then(() => {
+                              loadData();
+                              setInspectItem(updated);
+                              addToast(`✅ Payment Screenshot updated for ${inspectItem.fullName}`, 'success');
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
                 <div className="h-60 flex items-center justify-center bg-slate-900/50 rounded-xl overflow-hidden p-2">
                   {inspectItem.paymentScreenshotUrl ? (
                     <img
