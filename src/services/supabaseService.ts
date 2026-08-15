@@ -127,10 +127,18 @@ export const fetchRegistrationsFromSupabase = async (): Promise<Registration[] |
   if (!client) return null;
 
   try {
-    const { data, error } = await client
+    let { data, error } = await client
       .from('registrations')
       .select('*')
-      .order('submittedAt', { ascending: false });
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase ordered query notice:', error.message);
+      // Fallback query without ordering constraint to ensure data is retrieved
+      const fallback = await client.from('registrations').select('*');
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.warn('Supabase fetch error:', error.message);
