@@ -22,6 +22,15 @@ export interface FirebaseConfig {
   appId: string;
 }
 
+const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
+  apiKey: "AIzaSyCG3Sf5ew8iNGSbFtjRRchOoWFj8DwWeew",
+  authDomain: "zeach-74490.firebaseapp.com",
+  projectId: "zeach-74490",
+  storageBucket: "zeach-74490.firebasestorage.app",
+  messagingSenderId: "150983027907",
+  appId: "1:150983027907:web:ff0ab0fbbf5f7afcbd4676",
+};
+
 export const getFirebaseConfig = (): FirebaseConfig | null => {
   const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY || '';
   const envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || '';
@@ -42,12 +51,12 @@ export const getFirebaseConfig = (): FirebaseConfig | null => {
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${envProjectId}.firebaseapp.com`,
       projectId: envProjectId,
       storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${envProjectId}.appspot.com`,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-      appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '150983027907',
+      appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:150983027907:web:ff0ab0fbbf5f7afcbd4676',
     };
   }
 
-  return null;
+  return DEFAULT_FIREBASE_CONFIG;
 };
 
 export const saveFirebaseConfig = (config: FirebaseConfig): void => {
