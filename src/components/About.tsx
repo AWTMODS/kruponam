@@ -34,7 +34,7 @@ export const About: React.FC = () => {
         'Celebrated in the Malayalam Harvest Month Chingam',
         'Symbol of Unity, Joy, and Generosity',
       ],
-      image: getAssetUrl('images/hero_illustration.png'),
+      image: getAssetUrl('images/hero_illustration.png?v=3'),
     },
     {
       id: 'why',

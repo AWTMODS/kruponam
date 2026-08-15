@@ -8,8 +8,8 @@ export const EventDetails: React.FC = () => {
     {
       icon: Calendar,
       title: 'Event Date',
-      value: '6 September 2026',
-      subtext: 'Sunday • Malayalam Month Chingam',
+      value: '4 September 2026',
+      subtext: 'Friday • Malayalam Month Chingam',
       color: 'from-amber-500/10 to-gold-light/20',
       borderColor: 'border-gold-royal/30',
       iconColor: 'text-gold-dark',

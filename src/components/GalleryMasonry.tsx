@@ -52,7 +52,7 @@ export const GalleryMasonry: React.FC = () => {
       id: 'g5',
       title: 'King Mahabali Maveli Welcome',
       category: 'culturals',
-      image: getAssetUrl('images/hero_illustration.png'),
+      image: getAssetUrl('images/hero_illustration.png?v=3'),
       caption: 'Student dressed as King Mahabali blessing students and spreading festival joy.',
       aspect: 'h-80',
     },

@@ -53,7 +53,7 @@ export const Hero = () => {
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2 text-xs sm:text-sm text-slate-700 font-semibold">
               <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 border border-gold-royal/30 shadow-sm">
                 <Calendar className="w-4 h-4 text-gold-royal" />
-                <span>6 September 2026</span>
+                <span>4 September 2026</span>
               </div>
               <a
                 href="https://maps.app.goo.gl/GpJjwXrD4WWqqi8z9"
@@ -116,7 +116,7 @@ export const Hero = () => {
               
               <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-cream-soft to-amber-50">
                 <img
-                  src={getAssetUrl('images/hero_poster.jpg?v=2')}
+                  src={getAssetUrl('images/hero_poster.jpg?v=3')}
                   alt="Kruponam 2026 Official Poster King Mahabali Krupanidhi Institutions"
                   className="w-full h-auto object-cover max-h-[560px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
                 />
@@ -139,7 +139,7 @@ export const Hero = () => {
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg bg-kerala-mint text-kerala-deep text-[11px] font-bold">
-                    Sep 6
+                    Sep 4
                   </span>
                 </div>
 

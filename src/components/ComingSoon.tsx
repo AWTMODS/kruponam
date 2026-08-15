@@ -61,7 +61,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = () => {
         <div className="relative z-10 rounded-3xl p-3 bg-white/95 shadow-2xl border-2 border-gold-royal/40 backdrop-blur-md max-w-md w-full transform hover:scale-[1.01] transition-transform duration-500 group">
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-cream-soft to-amber-50">
             <img
-              src={getAssetUrl('images/hero_poster.jpg?v=2')}
+              src={getAssetUrl('images/hero_poster.jpg?v=3')}
               alt="Kruponam 2026 Official Poster King Mahabali Krupanidhi Institutions"
               className="w-full h-auto object-cover max-h-[580px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
             />
