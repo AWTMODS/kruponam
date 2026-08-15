@@ -4,6 +4,9 @@ import type { Registration } from './registrationService';
 const SUPABASE_URL_KEY = 'kruponam_supabase_url';
 const SUPABASE_ANON_KEY = 'kruponam_supabase_anon_key';
 
+const DEFAULT_SUPABASE_URL = 'https://ummggndyxmwenknhhbsr.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbWdnbnR5eG13ZW5rbmhoYnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQwMjksImV4cCI6MjEwMTU5MDAyOX0.e0fkp2uUK6na-sjtIjUY56cIZMB26ipsKL-qtOSaq9U';
+
 export const getSupabaseCredentials = (): { url: string; key: string } => {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -12,8 +15,8 @@ export const getSupabaseCredentials = (): { url: string; key: string } => {
   const storedKey = localStorage.getItem(SUPABASE_ANON_KEY) || '';
 
   return {
-    url: storedUrl || envUrl,
-    key: storedKey || envKey,
+    url: storedUrl || envUrl || DEFAULT_SUPABASE_URL,
+    key: storedKey || envKey || DEFAULT_SUPABASE_ANON_KEY,
   };
 };
 
