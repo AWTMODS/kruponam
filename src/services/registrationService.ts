@@ -32,9 +32,9 @@ export interface Registration {
   reportedAt?: string;
 }
 
-const STORAGE_KEY = 'kruponam_registrations_v2';
+const STORAGE_KEY = 'kruponam_registrations_v3';
 const DELETED_KEY = 'kruponam_deleted_ids_v1';
-const DB_NAME = 'KruponamDB_v1';
+const DB_NAME = 'KruponamDB_v2';
 const STORE_NAME = 'registrations_store';
 
 export const getDeletedIds = (): Set<string> => {
