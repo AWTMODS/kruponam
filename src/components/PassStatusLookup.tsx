@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
-import { findRegistration, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
+import { findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { getSiteSettings } from '../services/siteSettingsService';
@@ -175,14 +175,18 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     }
   }, [upiSettings, ticketAmount]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    setIsSearching(true);
     setPaymentError(null);
-    const found = findRegistration(searchQuery);
+    const found = await findRegistrationAsync(searchQuery);
     setSearchResult(found);
     setHasSearched(true);
+    setIsSearching(false);
   };
 
   const handlePaymentScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,10 +300,15 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
         <button
           type="submit"
-          className="px-8 py-3.5 rounded-full bg-kerala-deep text-white font-bold text-xs uppercase tracking-wider hover:bg-kerala-emerald shadow-md transition-all flex items-center justify-center gap-2"
+          disabled={isSearching}
+          className="px-8 py-3.5 rounded-full bg-kerala-deep text-white font-bold text-xs uppercase tracking-wider hover:bg-kerala-emerald shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <Search className="w-4 h-4 text-gold-royal" />
-          <span>Track Pass Status</span>
+          {isSearching ? (
+            <RefreshCw className="w-4 h-4 text-gold-royal animate-spin" />
+          ) : (
+            <Search className="w-4 h-4 text-gold-royal" />
+          )}
+          <span>{isSearching ? 'Searching...' : 'Track Pass Status'}</span>
         </button>
       </form>
 

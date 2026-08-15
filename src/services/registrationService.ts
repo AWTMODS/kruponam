@@ -121,6 +121,25 @@ const loadAllFromIndexedDB = (): Promise<Registration[]> => {
 
 export const INITIAL_REGISTRATIONS: Registration[] = [
   {
+    id: 'KRP-947055',
+    fullName: 'Sniya M',
+    email: 'sniya9528@gmail.com',
+    phone: '9562820757',
+    department: 'BBA',
+    section: 'Section A',
+    year: '2nd Year',
+    gender: 'Female',
+    ticketType: 'General Pass',
+    idCardUrl: '',
+    paymentScreenshotUrl: '',
+    paymentAmount: 700,
+    paymentStatus: 'Pending',
+    paymentUtr: '',
+    approvalStatus: 'Pending_ID_Approval',
+    submittedAt: 'Aug 15, 2026',
+    isReported: false,
+  },
+  {
     id: 'KRP-865167',
     fullName: 'Sniya M',
     email: 'sniya9528@gmail.com',
@@ -553,6 +572,33 @@ export const findRegistration = (query: string): Registration | undefined => {
       r.phone === q ||
       r.paymentUtr === q
   );
+};
+
+export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
+  const q = query.trim().toLowerCase();
+  
+  // 1. Immediate sync across IndexedDB and LocalStorage
+  const syncedList = await syncCloudRegistrations();
+  let found = syncedList.find(
+    (r) =>
+      r.id.toLowerCase() === q ||
+      r.email.toLowerCase() === q ||
+      r.phone === q ||
+      r.paymentUtr === q
+  );
+
+  if (found) return found;
+
+  // 2. Direct fallback search in INITIAL_REGISTRATIONS
+  found = INITIAL_REGISTRATIONS.find(
+    (r) =>
+      r.id.toLowerCase() === q ||
+      r.email.toLowerCase() === q ||
+      r.phone === q ||
+      r.paymentUtr === q
+  );
+
+  return found;
 };
 
 // ── Backup & Safety Helper Exports ──────────────────────────────────
