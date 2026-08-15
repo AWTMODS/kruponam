@@ -443,6 +443,9 @@ export const approveIdCard = (id: string): Registration | null => {
     registrations[index].approvalStatus = 'ID_Approved';
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isFirebaseConfigured()) {
+      saveRegistrationToFirebase(registrations[index]);
+    }
     if (isSupabaseConfigured()) {
       saveRegistrationToSupabase(registrations[index]);
     }
@@ -476,6 +479,9 @@ export const submitPaymentForRegistration = async (
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isFirebaseConfigured()) {
+      saveRegistrationToFirebase(registrations[index]);
+    }
     if (isSupabaseConfigured()) {
       saveRegistrationToSupabase(registrations[index]);
     }
@@ -520,6 +526,9 @@ export const approveRegistration = (id: string): Registration | null => {
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isFirebaseConfigured()) {
+      saveRegistrationToFirebase(registrations[index]);
+    }
     if (isSupabaseConfigured()) {
       saveRegistrationToSupabase(registrations[index]);
     }
@@ -536,6 +545,9 @@ export const rejectRegistration = (id: string, reason: string): Registration | n
     registrations[index].rejectionReason = reason;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
     syncToIndexedDB(registrations[index]);
+    if (isFirebaseConfigured()) {
+      saveRegistrationToFirebase(registrations[index]);
+    }
     if (isSupabaseConfigured()) {
       saveRegistrationToSupabase(registrations[index]);
     }
@@ -603,6 +615,9 @@ export const markAsReported = (query: string): ScanResult => {
   registrations[index].reportedAt = nowString;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
   syncToIndexedDB(registrations[index]);
+  if (isFirebaseConfigured()) {
+    saveRegistrationToFirebase(registrations[index]);
+  }
   if (isSupabaseConfigured()) {
     saveRegistrationToSupabase(registrations[index]);
   }
