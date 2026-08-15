@@ -262,6 +262,15 @@ export const getRegistrations = (): Registration[] => {
   }
 };
 
+const STATUS_RANK: Record<string, number> = {
+  'Rejected': 0,
+  'Pending': 1,
+  'Pending_ID_Approval': 1,
+  'ID_Approved': 2,
+  'Payment_Pending': 3,
+  'Approved': 4,
+};
+
 export const syncCloudRegistrations = async (): Promise<Registration[]> => {
   const deletedIds = getDeletedIds();
   const localList = getRegistrations();
@@ -275,16 +284,34 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   });
 
+  const mergeCloudRecord = (r: Registration) => {
+    if (!r || !r.id || deletedIds.has(r.id)) return;
+    const existing = localMap.get(r.id);
+    if (!existing) {
+      localMap.set(r.id, r);
+    } else {
+      const existingRank = STATUS_RANK[existing.approvalStatus] || 1;
+      const incomingRank = STATUS_RANK[r.approvalStatus] || 1;
+
+      // Cloud record takes priority if it has a higher/equal status rank or updated data
+      if (incomingRank >= existingRank) {
+        localMap.set(r.id, {
+          ...existing,
+          ...r,
+          // Preserve payment screenshots/UTRs if present
+          paymentScreenshotUrl: r.paymentScreenshotUrl || existing.paymentScreenshotUrl,
+          paymentUtr: r.paymentUtr || existing.paymentUtr,
+        });
+      }
+    }
+  };
+
   // 1. Try fetching remote cloud records from Firebase
   if (isFirebaseConfigured()) {
     try {
       const fbRecords = await fetchRegistrationsFromFirebase();
       if (fbRecords && fbRecords.length > 0) {
-        fbRecords.forEach((r) => {
-          if (r && r.id && !deletedIds.has(r.id)) {
-            localMap.set(r.id, r);
-          }
-        });
+        fbRecords.forEach(mergeCloudRecord);
       }
     } catch (e) {
       console.warn('Firebase sync notice:', e);
@@ -296,12 +323,7 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     try {
       const cloudRecords = await fetchRegistrationsFromSupabase();
       if (cloudRecords && cloudRecords.length > 0) {
-        // Cloud records take priority if present & not deleted
-        cloudRecords.forEach((r) => {
-          if (r && r.id && !deletedIds.has(r.id)) {
-            localMap.set(r.id, r);
-          }
-        });
+        cloudRecords.forEach(mergeCloudRecord);
 
         // Push any local-only records to Supabase so they are not lost across devices
         localMap.forEach((localReg, id) => {
