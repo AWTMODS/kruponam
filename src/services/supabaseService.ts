@@ -162,6 +162,37 @@ export const fetchRegistrationsFromSupabase = async (): Promise<Registration[] |
   }
 };
 
+const compressBase64ForPostgres = (base64Str: string, maxWidth = 500, quality = 0.4): Promise<string> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !base64Str || !base64Str.startsWith('data:image')) {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(base64Str);
+    img.src = base64Str;
+  });
+};
+
 export const saveRegistrationToSupabase = async (reg: Registration): Promise<boolean> => {
   const client = getSupabaseClient();
   if (!client) return false;
@@ -193,15 +224,22 @@ export const saveRegistrationToSupabase = async (reg: Registration): Promise<boo
     const { error } = await client.from('registrations').upsert(rowData, { onConflict: 'id' });
     if (error) {
       console.warn('Supabase save error:', error.message);
-      // Fallback: If payload size failed due to large base64 strings, save text metadata with empty string image fallback so record is not lost
+      // Fallback: If payload size failed due to large base64 strings, compress base64 images down to ~30-40KB so photo is preserved in Supabase Postgres row
       if (
         (reg.idCardUrl && reg.idCardUrl.startsWith('data:image')) || 
         (reg.paymentScreenshotUrl && reg.paymentScreenshotUrl.startsWith('data:image'))
       ) {
+        const compressedId = (reg.idCardUrl && reg.idCardUrl.startsWith('data:image'))
+          ? await compressBase64ForPostgres(reg.idCardUrl)
+          : reg.idCardUrl;
+        const compressedPay = (reg.paymentScreenshotUrl && reg.paymentScreenshotUrl.startsWith('data:image'))
+          ? await compressBase64ForPostgres(reg.paymentScreenshotUrl)
+          : reg.paymentScreenshotUrl;
+
         const fallbackData = {
           ...rowData,
-          id_card_url: reg.idCardUrl.startsWith('data:image') ? '' : reg.idCardUrl,
-          payment_screenshot_url: (reg.paymentScreenshotUrl && reg.paymentScreenshotUrl.startsWith('data:image')) ? '' : reg.paymentScreenshotUrl,
+          id_card_url: compressedId,
+          payment_screenshot_url: compressedPay,
         };
         const { error: fallbackErr } = await client.from('registrations').upsert(fallbackData, { onConflict: 'id' });
         if (!fallbackErr) return true;
