@@ -210,6 +210,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     e.preventDefault();
     if (!editItem) return;
 
+    const now = new Date().toISOString();
     const updatedReg: Registration = {
       ...editItem,
       fullName: editName.trim(),
@@ -221,12 +222,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       approvalStatus: editStatus,
       paymentUtr: editUtr.trim(),
       rejectionReason: editRejectionReason.trim(),
+      updatedAt: now,
     };
+
+    // Update state immediately for instant smooth feedback
+    setRegistrations((prev) => prev.map((r) => (r.id === updatedReg.id ? updatedReg : r)));
+    if (inspectItem?.id === editItem.id) setInspectItem(updatedReg);
+    setEditItem(null);
 
     await saveRegistrationAsync(updatedReg);
     await loadData();
-    setEditItem(null);
-    if (inspectItem?.id === editItem.id) setInspectItem(updatedReg);
     addToast(`✅ Updated details for ${updatedReg.fullName} (${updatedReg.id})`, 'success');
   };
 

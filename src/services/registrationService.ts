@@ -34,6 +34,7 @@ export interface Registration {
   rejectionReason?: string;
   submittedAt: string;
   approvedAt?: string;
+  updatedAt?: string;
   isReported?: boolean;
   reportedAt?: string;
 }
@@ -290,18 +291,45 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     if (!existing) {
       localMap.set(r.id, r);
     } else {
-      const existingRank = STATUS_RANK[existing.approvalStatus] || 1;
-      const incomingRank = STATUS_RANK[r.approvalStatus] || 1;
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const incomingTime = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
 
-      // Cloud record takes priority if it has a higher/equal status rank or updated data
-      if (incomingRank >= existingRank) {
+      if (incomingTime > existingTime) {
+        // Cloud record is strictly newer
         localMap.set(r.id, {
           ...existing,
           ...r,
-          // Preserve payment screenshots/UTRs if present
           paymentScreenshotUrl: r.paymentScreenshotUrl || existing.paymentScreenshotUrl,
           paymentUtr: r.paymentUtr || existing.paymentUtr,
         });
+      } else if (existingTime > incomingTime) {
+        // Local record is strictly newer — preserve local edits!
+        localMap.set(r.id, {
+          ...r,
+          ...existing,
+          paymentScreenshotUrl: existing.paymentScreenshotUrl || r.paymentScreenshotUrl,
+          paymentUtr: existing.paymentUtr || r.paymentUtr,
+        });
+      } else {
+        // Timestamps equal or missing: prefer local changes so admin edits aren't wiped out
+        const existingRank = STATUS_RANK[existing.approvalStatus] || 1;
+        const incomingRank = STATUS_RANK[r.approvalStatus] || 1;
+
+        if (incomingRank > existingRank) {
+          localMap.set(r.id, {
+            ...existing,
+            ...r,
+            paymentScreenshotUrl: r.paymentScreenshotUrl || existing.paymentScreenshotUrl,
+            paymentUtr: r.paymentUtr || existing.paymentUtr,
+          });
+        } else {
+          localMap.set(r.id, {
+            ...r,
+            ...existing,
+            paymentScreenshotUrl: existing.paymentScreenshotUrl || r.paymentScreenshotUrl,
+            paymentUtr: existing.paymentUtr || r.paymentUtr,
+          });
+        }
       }
     }
   };
@@ -347,7 +375,10 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
 };
 
 export const saveRegistrationAsync = async (registration: Registration): Promise<Registration> => {
-  let finalReg = { ...registration };
+  let finalReg = { 
+    ...registration,
+    updatedAt: registration.updatedAt || new Date().toISOString()
+  };
 
   // 1. Save to Firebase Cloud Database if configured (Realtime Firestore)
   if (isFirebaseConfigured()) {
@@ -383,6 +414,9 @@ export const saveRegistrationAsync = async (registration: Registration): Promise
 export const saveRegistration = (registration: Registration): boolean => {
   try {
     unmarkIdAsDeleted(registration.id);
+    if (!registration.updatedAt) {
+      registration.updatedAt = new Date().toISOString();
+    }
     const registrations = getRegistrations();
     // Prevent duplicate entries
     const filtered = registrations.filter((r) => r.id !== registration.id);

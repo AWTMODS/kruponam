@@ -1,7 +1,12 @@
-import { Ticket, Calendar, MapPin, Sparkles, ArrowRight } from 'lucide-react';
+import React from 'react';
+import { Ticket, Calendar, MapPin, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { getAssetUrl } from '../utils/assetPath';
 
-export const Hero = () => {
+interface HeroProps {
+  onOpenLookup?: () => void;
+}
+
+export const Hero: React.FC<HeroProps> = ({ onOpenLookup }) => {
 
   return (
     <section id="home" className="relative pt-28 pb-16 lg:pt-36 lg:pb-28 overflow-hidden bg-cream-gradient">
@@ -68,7 +73,7 @@ export const Hero = () => {
             </div>
 
             {/* Primary & Secondary Call to Actions */}
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+            <div className="pt-4 flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-4">
               <a
                 href="#registration"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep rounded-full shadow-gold-glow hover:shadow-2xl transition-all duration-300 hover:scale-105 group"
@@ -76,6 +81,16 @@ export const Hero = () => {
                 <span>Register Free Pass</span>
                 <Ticket className="w-4 h-4 text-gold-royal group-hover:rotate-12 transition-transform" />
               </a>
+
+              {onOpenLookup && (
+                <button
+                  onClick={onOpenLookup}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-4 text-sm font-bold text-slate-800 bg-white/90 hover:bg-cream-soft border border-gold-royal/50 rounded-full shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group cursor-pointer"
+                >
+                  <span>Check Ticket Status</span>
+                  <ShieldCheck className="w-4 h-4 text-gold-royal group-hover:scale-110 transition-transform" />
+                </button>
+              )}
 
               <a
                 href="#programs"

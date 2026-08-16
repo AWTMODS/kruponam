@@ -110,8 +110,32 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
   if (!db) return false;
 
   try {
+    const cleanReg: Record<string, any> = {
+      id: reg.id,
+      fullName: reg.fullName || '',
+      email: reg.email || '',
+      phone: reg.phone || '',
+      department: reg.department || '',
+      section: reg.section || 'Section A',
+      year: reg.year || '1st Year',
+      gender: reg.gender || 'Other',
+      ticketType: reg.ticketType || 'General Pass',
+      idCardUrl: reg.idCardUrl || '',
+      paymentScreenshotUrl: reg.paymentScreenshotUrl || '',
+      paymentAmount: reg.paymentAmount || 700,
+      paymentStatus: reg.paymentStatus || 'Pending',
+      paymentUtr: reg.paymentUtr || '',
+      approvalStatus: reg.approvalStatus || 'Pending_ID_Approval',
+      rejectionReason: reg.rejectionReason || '',
+      submittedAt: reg.submittedAt || new Date().toLocaleDateString('en-US'),
+      approvedAt: reg.approvedAt || '',
+      updatedAt: reg.updatedAt || new Date().toISOString(),
+      isReported: Boolean(reg.isReported),
+      reportedAt: reg.reportedAt || '',
+    };
+
     const docRef = doc(db, 'registrations', reg.id);
-    await setDoc(docRef, { ...reg }, { merge: true });
+    await setDoc(docRef, cleanReg, { merge: true });
     return true;
   } catch (err) {
     console.error('Firebase save exception:', err);
@@ -127,7 +151,32 @@ export const fetchRegistrationsFromFirebase = async (): Promise<Registration[] |
     const querySnapshot = await getDocs(collection(db, 'registrations'));
     const list: Registration[] = [];
     querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Registration);
+      const data = doc.data();
+      if (data && data.id) {
+        list.push({
+          id: data.id,
+          fullName: data.fullName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          department: data.department || '',
+          section: data.section || 'Section A',
+          year: data.year || '1st Year',
+          gender: data.gender || 'Other',
+          ticketType: data.ticketType || 'General Pass',
+          idCardUrl: data.idCardUrl || '',
+          paymentScreenshotUrl: data.paymentScreenshotUrl || '',
+          paymentAmount: Number(data.paymentAmount || 700),
+          paymentStatus: data.paymentStatus || 'Pending',
+          paymentUtr: data.paymentUtr || '',
+          approvalStatus: data.approvalStatus || 'Pending_ID_Approval',
+          rejectionReason: data.rejectionReason || '',
+          submittedAt: data.submittedAt || '',
+          approvedAt: data.approvedAt || '',
+          updatedAt: data.updatedAt || '',
+          isReported: Boolean(data.isReported),
+          reportedAt: data.reportedAt || '',
+        });
+      }
     });
     return list;
   } catch (err) {
@@ -159,7 +208,32 @@ export const listenToFirebaseRegistrations = (
     const unsubscribe = onSnapshot(collection(db, 'registrations'), (snapshot) => {
       const list: Registration[] = [];
       snapshot.forEach((doc) => {
-        list.push(doc.data() as Registration);
+        const data = doc.data();
+        if (data && data.id) {
+          list.push({
+            id: data.id,
+            fullName: data.fullName || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            department: data.department || '',
+            section: data.section || 'Section A',
+            year: data.year || '1st Year',
+            gender: data.gender || 'Other',
+            ticketType: data.ticketType || 'General Pass',
+            idCardUrl: data.idCardUrl || '',
+            paymentScreenshotUrl: data.paymentScreenshotUrl || '',
+            paymentAmount: Number(data.paymentAmount || 700),
+            paymentStatus: data.paymentStatus || 'Pending',
+            paymentUtr: data.paymentUtr || '',
+            approvalStatus: data.approvalStatus || 'Pending_ID_Approval',
+            rejectionReason: data.rejectionReason || '',
+            submittedAt: data.submittedAt || '',
+            approvedAt: data.approvedAt || '',
+            updatedAt: data.updatedAt || '',
+            isReported: Boolean(data.isReported),
+            reportedAt: data.reportedAt || '',
+          });
+        }
       });
       onUpdate(list);
     });

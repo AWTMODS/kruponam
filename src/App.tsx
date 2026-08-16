@@ -105,7 +105,7 @@ export function App() {
           <Navbar onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
           
           <main>
-            <Hero />
+            <Hero onOpenLookup={() => setActiveView('lookup')} />
             <About />
             <Countdown />
             {showProgramsSchedule && <ProgramsTimeline />}
