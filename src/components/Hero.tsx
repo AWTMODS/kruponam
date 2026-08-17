@@ -78,7 +78,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenLookup }) => {
                 href="#registration"
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 text-sm font-bold text-white uppercase tracking-wider bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep rounded-full shadow-gold-glow hover:shadow-2xl transition-all duration-300 hover:scale-105 group"
               >
-                <span>Register Free Pass</span>
+                <span>Get Your Tickets</span>
                 <Ticket className="w-4 h-4 text-gold-royal group-hover:rotate-12 transition-transform" />
               </a>
 
