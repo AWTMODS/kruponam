@@ -478,20 +478,31 @@ export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
   return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr && r.id !== excludeId);
 };
 
-export const approveIdCard = (id: string): Registration | null => {
+export const approveIdCard = async (id: string): Promise<Registration | null> => {
   const registrations = getRegistrations();
   const index = registrations.findIndex((r) => r.id === id);
   if (index !== -1) {
-    registrations[index].approvalStatus = 'ID_Approved';
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-    syncToIndexedDB(registrations[index]);
+    const updatedRecord: Registration = {
+      ...registrations[index],
+      approvalStatus: 'ID_Approved',
+      updatedAt: new Date().toISOString(),
+    };
+    registrations[index] = updatedRecord;
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
+    syncToIndexedDB(updatedRecord);
+
     if (isFirebaseConfigured()) {
-      saveRegistrationToFirebase(registrations[index]);
+      await saveRegistrationToFirebase(updatedRecord);
     }
     if (isSupabaseConfigured()) {
-      saveRegistrationToSupabase(registrations[index]);
+      await saveRegistrationToSupabase(updatedRecord);
     }
-    return registrations[index];
+    return updatedRecord;
   }
   return null;
 };
@@ -514,20 +525,30 @@ export const submitPaymentForRegistration = async (
       }
     }
 
-    registrations[index].paymentUtr = utr;
-    registrations[index].paymentScreenshotUrl = finalPayUrl;
-    registrations[index].paymentStatus = 'Pending';
-    registrations[index].approvalStatus = 'Payment_Pending';
+    const updatedRecord: Registration = {
+      ...registrations[index],
+      paymentUtr: utr,
+      paymentScreenshotUrl: finalPayUrl,
+      paymentStatus: 'Pending',
+      approvalStatus: 'Payment_Pending',
+      updatedAt: new Date().toISOString(),
+    };
+    registrations[index] = updatedRecord;
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-    syncToIndexedDB(registrations[index]);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
+    syncToIndexedDB(updatedRecord);
+
     if (isFirebaseConfigured()) {
-      saveRegistrationToFirebase(registrations[index]);
+      await saveRegistrationToFirebase(updatedRecord);
     }
     if (isSupabaseConfigured()) {
-      saveRegistrationToSupabase(registrations[index]);
+      await saveRegistrationToSupabase(updatedRecord);
     }
-    return registrations[index];
+    return updatedRecord;
   }
   return null;
 };
@@ -538,7 +559,11 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
 
     const registrations = getRegistrations();
     const filtered = registrations.filter((r) => r.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
     
     deleteFromIndexedDB(id);
 
@@ -556,44 +581,67 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
   }
 };
 
-export const approveRegistration = (id: string): Registration | null => {
+export const approveRegistration = async (id: string): Promise<Registration | null> => {
   const registrations = getRegistrations();
   const index = registrations.findIndex((r) => r.id === id);
   if (index !== -1) {
-    registrations[index].approvalStatus = 'Approved';
-    registrations[index].approvedAt = new Date().toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-    syncToIndexedDB(registrations[index]);
+    const updatedRecord: Registration = {
+      ...registrations[index],
+      approvalStatus: 'Approved',
+      paymentStatus: 'Verified',
+      approvedAt: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    registrations[index] = updatedRecord;
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
+    syncToIndexedDB(updatedRecord);
+
     if (isFirebaseConfigured()) {
-      saveRegistrationToFirebase(registrations[index]);
+      await saveRegistrationToFirebase(updatedRecord);
     }
     if (isSupabaseConfigured()) {
-      saveRegistrationToSupabase(registrations[index]);
+      await saveRegistrationToSupabase(updatedRecord);
     }
-    return registrations[index];
+    return updatedRecord;
   }
   return null;
 };
 
-export const rejectRegistration = (id: string, reason: string): Registration | null => {
+export const rejectRegistration = async (id: string, reason: string): Promise<Registration | null> => {
   const registrations = getRegistrations();
   const index = registrations.findIndex((r) => r.id === id);
   if (index !== -1) {
-    registrations[index].approvalStatus = 'Rejected';
-    registrations[index].rejectionReason = reason;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-    syncToIndexedDB(registrations[index]);
+    const updatedRecord: Registration = {
+      ...registrations[index],
+      approvalStatus: 'Rejected',
+      rejectionReason: reason,
+      updatedAt: new Date().toISOString(),
+    };
+    registrations[index] = updatedRecord;
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
+    syncToIndexedDB(updatedRecord);
+
     if (isFirebaseConfigured()) {
-      saveRegistrationToFirebase(registrations[index]);
+      await saveRegistrationToFirebase(updatedRecord);
     }
     if (isSupabaseConfigured()) {
-      saveRegistrationToSupabase(registrations[index]);
+      await saveRegistrationToSupabase(updatedRecord);
     }
-    return registrations[index];
+    return updatedRecord;
   }
   return null;
 };

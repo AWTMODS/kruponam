@@ -310,8 +310,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleApprove = async (id: string) => {
-    const approved = approveRegistration(id);
-    loadData();
+    const approved = await approveRegistration(id);
+    await loadData();
     if (inspectItem?.id === id) setInspectItem(null);
 
     if (approved) {
@@ -331,9 +331,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
   };
 
-  const handleApproveIdCard = (id: string) => {
-    const res = approveIdCard(id);
-    loadData();
+  const handleApproveIdCard = async (id: string) => {
+    const res = await approveIdCard(id);
+    await loadData();
     if (inspectItem?.id === id) setInspectItem(null);
     if (res) {
       addToast(`✅ ${res.fullName}'s Student ID Card Approved! Payment QR code unlocked for student.`, 'success');
@@ -342,16 +342,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const handleConfirmDelete = async (id: string) => {
     await deleteRegistration(id);
-    loadData();
+    await loadData();
     setShowDeleteModal(null);
     if (inspectItem?.id === id) setInspectItem(null);
     addToast('🗑️ Registration request permanently deleted.', 'info');
   };
 
-  const handleConfirmReject = (id: string) => {
+  const handleConfirmReject = async (id: string) => {
     const reason = rejectionReasonInput.trim() || 'Uploaded Student ID or Payment UTR could not be verified.';
-    rejectRegistration(id, reason);
-    loadData();
+    await rejectRegistration(id, reason);
+    await loadData();
     setShowRejectModal(null);
     setRejectionReasonInput('');
     if (inspectItem?.id === id) setInspectItem(null);
