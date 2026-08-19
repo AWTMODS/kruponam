@@ -232,7 +232,9 @@ export const getRegistrations = (): Registration[] => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) {
     const initialFiltered = INITIAL_REGISTRATIONS.filter((r) => !deletedIds.has(r.id));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialFiltered));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialFiltered));
+    } catch (e) {}
     initialFiltered.forEach(syncToIndexedDB);
     return initialFiltered;
   }
@@ -251,7 +253,9 @@ export const getRegistrations = (): Registration[] => {
     });
 
     if (hasNewSeed) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      } catch (e) {}
     }
 
     return list.map((item: any) => ({
@@ -369,7 +373,11 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
   }
 
   const finalMerged = Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
+  } catch (e) {
+    console.warn('LocalStorage storage limit notice (using IndexedDB for storage):', e);
+  }
   finalMerged.forEach(syncToIndexedDB);
   return finalMerged;
 };
