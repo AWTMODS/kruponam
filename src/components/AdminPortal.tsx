@@ -310,6 +310,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleApprove = async (id: string) => {
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Approved', paymentStatus: 'Verified', updatedAt: new Date().toISOString() } : r))
+    );
     const approved = await approveRegistration(id);
     await loadData();
     if (inspectItem?.id === id) setInspectItem(null);
@@ -332,6 +335,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleApproveIdCard = async (id: string) => {
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'ID_Approved', updatedAt: new Date().toISOString() } : r))
+    );
     const res = await approveIdCard(id);
     await loadData();
     if (inspectItem?.id === id) setInspectItem(null);
@@ -341,6 +347,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleConfirmDelete = async (id: string) => {
+    setRegistrations((prev) => prev.filter((r) => r.id !== id));
     await deleteRegistration(id);
     await loadData();
     setShowDeleteModal(null);
@@ -350,6 +357,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const handleConfirmReject = async (id: string) => {
     const reason = rejectionReasonInput.trim() || 'Uploaded Student ID or Payment UTR could not be verified.';
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Rejected', rejectionReason: reason, updatedAt: new Date().toISOString() } : r))
+    );
     await rejectRegistration(id, reason);
     await loadData();
     setShowRejectModal(null);

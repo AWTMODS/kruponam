@@ -479,18 +479,20 @@ export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
 };
 
 export const approveIdCard = async (id: string): Promise<Registration | null> => {
-  const registrations = getRegistrations();
-  const index = registrations.findIndex((r) => r.id === id);
-  if (index !== -1) {
+  const allCurrent = await syncCloudRegistrations();
+  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (target) {
     const updatedRecord: Registration = {
-      ...registrations[index],
+      ...target,
       approvalStatus: 'ID_Approved',
       updatedAt: new Date().toISOString(),
     };
-    registrations[index] = updatedRecord;
+
+    const remaining = allCurrent.filter((r) => r.id !== target.id);
+    const newList = [updatedRecord, ...remaining];
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
     } catch (e) {
       console.warn('LocalStorage quota notice:', e);
     }
@@ -512,9 +514,9 @@ export const submitPaymentForRegistration = async (
   utr: string, 
   screenshotUrl: string
 ): Promise<Registration | null> => {
-  const registrations = getRegistrations();
-  const index = registrations.findIndex((r) => r.id === id);
-  if (index !== -1) {
+  const allCurrent = await syncCloudRegistrations();
+  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (target) {
     let finalPayUrl = screenshotUrl;
     if (isSupabaseConfigured() && screenshotUrl.startsWith('data:image')) {
       try {
@@ -526,17 +528,19 @@ export const submitPaymentForRegistration = async (
     }
 
     const updatedRecord: Registration = {
-      ...registrations[index],
+      ...target,
       paymentUtr: utr,
       paymentScreenshotUrl: finalPayUrl,
       paymentStatus: 'Pending',
       approvalStatus: 'Payment_Pending',
       updatedAt: new Date().toISOString(),
     };
-    registrations[index] = updatedRecord;
     
+    const remaining = allCurrent.filter((r) => r.id !== target.id);
+    const newList = [updatedRecord, ...remaining];
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
     } catch (e) {
       console.warn('LocalStorage quota notice:', e);
     }
@@ -582,11 +586,11 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
 };
 
 export const approveRegistration = async (id: string): Promise<Registration | null> => {
-  const registrations = getRegistrations();
-  const index = registrations.findIndex((r) => r.id === id);
-  if (index !== -1) {
+  const allCurrent = await syncCloudRegistrations();
+  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (target) {
     const updatedRecord: Registration = {
-      ...registrations[index],
+      ...target,
       approvalStatus: 'Approved',
       paymentStatus: 'Verified',
       approvedAt: new Date().toLocaleDateString('en-US', {
@@ -596,10 +600,12 @@ export const approveRegistration = async (id: string): Promise<Registration | nu
       }),
       updatedAt: new Date().toISOString(),
     };
-    registrations[index] = updatedRecord;
+
+    const remaining = allCurrent.filter((r) => r.id !== target.id);
+    const newList = [updatedRecord, ...remaining];
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
     } catch (e) {
       console.warn('LocalStorage quota notice:', e);
     }
@@ -617,19 +623,21 @@ export const approveRegistration = async (id: string): Promise<Registration | nu
 };
 
 export const rejectRegistration = async (id: string, reason: string): Promise<Registration | null> => {
-  const registrations = getRegistrations();
-  const index = registrations.findIndex((r) => r.id === id);
-  if (index !== -1) {
+  const allCurrent = await syncCloudRegistrations();
+  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (target) {
     const updatedRecord: Registration = {
-      ...registrations[index],
+      ...target,
       approvalStatus: 'Rejected',
       rejectionReason: reason,
       updatedAt: new Date().toISOString(),
     };
-    registrations[index] = updatedRecord;
+
+    const remaining = allCurrent.filter((r) => r.id !== target.id);
+    const newList = [updatedRecord, ...remaining];
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
     } catch (e) {
       console.warn('LocalStorage quota notice:', e);
     }
