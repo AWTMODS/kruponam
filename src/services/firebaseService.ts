@@ -150,30 +150,31 @@ export const fetchRegistrationsFromFirebase = async (): Promise<Registration[] |
   try {
     const querySnapshot = await getDocs(collection(db, 'registrations'));
     const list: Registration[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data && data.id) {
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      const docId = data?.id || docSnap.id;
+      if (data && docId) {
         list.push({
-          id: data.id,
-          fullName: data.fullName || '',
+          id: String(docId),
+          fullName: data.fullName || data.name || data.studentName || '',
           email: data.email || '',
-          phone: data.phone || '',
-          department: data.department || '',
+          phone: data.phone || data.mobile || data.phoneNumber || '',
+          department: data.department || data.dept || '',
           section: data.section || 'Section A',
           year: data.year || '1st Year',
           gender: data.gender || 'Other',
           ticketType: data.ticketType || 'General Pass',
-          idCardUrl: data.idCardUrl || '',
-          paymentScreenshotUrl: data.paymentScreenshotUrl || '',
+          idCardUrl: data.idCardUrl || data.idCard || '',
+          paymentScreenshotUrl: data.paymentScreenshotUrl || data.paymentScreenshot || '',
           paymentAmount: Number(data.paymentAmount || 700),
-          paymentStatus: data.paymentStatus || 'Pending',
-          paymentUtr: data.paymentUtr || '',
-          approvalStatus: data.approvalStatus || 'Pending_ID_Approval',
+          paymentStatus: data.paymentStatus || (data.status === 'Approved' ? 'Verified' : 'Pending'),
+          paymentUtr: data.paymentUtr || data.utr || '',
+          approvalStatus: data.approvalStatus || data.status || 'Pending_ID_Approval',
           rejectionReason: data.rejectionReason || '',
-          submittedAt: data.submittedAt || '',
+          submittedAt: data.submittedAt || data.createdAt || '',
           approvedAt: data.approvedAt || '',
           updatedAt: data.updatedAt || '',
-          isReported: Boolean(data.isReported),
+          isReported: Boolean(data.isReported || data.checkedIn),
           reportedAt: data.reportedAt || '',
         });
       }
@@ -207,30 +208,31 @@ export const listenToFirebaseRegistrations = (
   try {
     const unsubscribe = onSnapshot(collection(db, 'registrations'), (snapshot) => {
       const list: Registration[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data && data.id) {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const docId = data?.id || docSnap.id;
+        if (data && docId) {
           list.push({
-            id: data.id,
-            fullName: data.fullName || '',
+            id: String(docId),
+            fullName: data.fullName || data.name || data.studentName || '',
             email: data.email || '',
-            phone: data.phone || '',
-            department: data.department || '',
+            phone: data.phone || data.mobile || data.phoneNumber || '',
+            department: data.department || data.dept || '',
             section: data.section || 'Section A',
             year: data.year || '1st Year',
             gender: data.gender || 'Other',
             ticketType: data.ticketType || 'General Pass',
-            idCardUrl: data.idCardUrl || '',
-            paymentScreenshotUrl: data.paymentScreenshotUrl || '',
+            idCardUrl: data.idCardUrl || data.idCard || '',
+            paymentScreenshotUrl: data.paymentScreenshotUrl || data.paymentScreenshot || '',
             paymentAmount: Number(data.paymentAmount || 700),
-            paymentStatus: data.paymentStatus || 'Pending',
-            paymentUtr: data.paymentUtr || '',
-            approvalStatus: data.approvalStatus || 'Pending_ID_Approval',
+            paymentStatus: data.paymentStatus || (data.status === 'Approved' ? 'Verified' : 'Pending'),
+            paymentUtr: data.paymentUtr || data.utr || '',
+            approvalStatus: data.approvalStatus || data.status || 'Pending_ID_Approval',
             rejectionReason: data.rejectionReason || '',
-            submittedAt: data.submittedAt || '',
+            submittedAt: data.submittedAt || data.createdAt || '',
             approvedAt: data.approvedAt || '',
             updatedAt: data.updatedAt || '',
-            isReported: Boolean(data.isReported),
+            isReported: Boolean(data.isReported || data.checkedIn),
             reportedAt: data.reportedAt || '',
           });
         }
