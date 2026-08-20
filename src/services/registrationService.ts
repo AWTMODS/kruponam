@@ -718,12 +718,28 @@ export const markAsReported = (query: string): ScanResult => {
 
   const student = registrations[index];
 
-  // If application was explicitly REJECTED by Admin, block entry
+  // 1. If application was explicitly REJECTED by Admin, block entry
   if (student.approvalStatus === 'Rejected') {
     return {
       status: 'not_approved',
       registration: student,
       message: `ACCESS DENIED: Application for ${student.fullName} (${student.id}) was REJECTED by Admin. Reason: ${student.rejectionReason || 'Verification failed.'}`,
+    };
+  }
+
+  // 2. Check if student has submitted payment (UTR, Payment Screenshot, or Payment_Pending / Approved status)
+  const hasSubmittedPayment = !!(
+    (student.paymentUtr && student.paymentUtr.trim()) ||
+    (student.paymentScreenshotUrl && student.paymentScreenshotUrl.trim()) ||
+    student.approvalStatus === 'Approved' ||
+    student.approvalStatus === 'Payment_Pending'
+  );
+
+  if (!hasSubmittedPayment) {
+    return {
+      status: 'not_approved',
+      registration: student,
+      message: `ACCESS DENIED: ${student.fullName} (${student.id}) HAS NOT PAID the ₹700 pass fee (No UTR or Payment Screenshot submitted). Collect ₹700 fee at gate!`,
     };
   }
 
