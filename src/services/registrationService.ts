@@ -718,14 +718,16 @@ export const markAsReported = (query: string): ScanResult => {
 
   const student = registrations[index];
 
-  if (student.approvalStatus !== 'Approved') {
+  // If application was explicitly REJECTED by Admin, block entry
+  if (student.approvalStatus === 'Rejected') {
     return {
       status: 'not_approved',
       registration: student,
-      message: `ACCESS DENIED: Application for ${student.fullName} (${student.id}) is ${student.approvalStatus.toUpperCase()} by Admin. Cannot report unapproved pass!`,
+      message: `ACCESS DENIED: Application for ${student.fullName} (${student.id}) was REJECTED by Admin. Reason: ${student.rejectionReason || 'Verification failed.'}`,
     };
   }
 
+  // If pass was already checked-in at gate earlier
   if (student.isReported) {
     return {
       status: 'already_reported',
@@ -743,8 +745,20 @@ export const markAsReported = (query: string): ScanResult => {
     minute: '2-digit',
   });
 
+  // Automatically approve pass upon gate scan (if not already approved) & mark as Reported
+  registrations[index].approvalStatus = 'Approved';
+  registrations[index].paymentStatus = 'Verified';
+  if (!registrations[index].approvedAt) {
+    registrations[index].approvedAt = new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
   registrations[index].isReported = true;
   registrations[index].reportedAt = nowString;
+  registrations[index].updatedAt = new Date().toISOString();
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
   syncToIndexedDB(registrations[index]);
   if (isFirebaseConfigured()) {
@@ -758,7 +772,7 @@ export const markAsReported = (query: string): ScanResult => {
     status: 'success',
     registration: registrations[index],
     timestamp: nowString,
-    message: `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully MARKED AS REPORTED at Campus Gate! Onasadya Token Validated.`,
+    message: `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully APPROVED & MARKED AS REPORTED at Campus Gate! Onasadya Token Validated.`,
   };
 };
 
