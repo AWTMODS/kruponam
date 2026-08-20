@@ -665,14 +665,24 @@ export interface ScanResult {
 
 export const markAsReported = (query: string): ScanResult => {
   const registrations = getRegistrations();
-  const q = query.trim().toLowerCase();
+  let q = query.trim().toLowerCase();
   
+  // Extract token if code contains "TOKEN:KRP-xxxxxx" or formatted string
+  if (q.includes('token:')) {
+    const parts = q.split('|');
+    const tokenPart = parts.find((p) => p.startsWith('token:'));
+    if (tokenPart) {
+      q = tokenPart.replace('token:', '').trim();
+    }
+  }
+
   const index = registrations.findIndex(
     (r) =>
       r.id.toLowerCase() === q ||
       r.email.toLowerCase() === q ||
       r.phone === q ||
-      r.paymentUtr === q
+      r.paymentUtr === q ||
+      q.includes(r.id.toLowerCase())
   );
 
   if (index === -1) {

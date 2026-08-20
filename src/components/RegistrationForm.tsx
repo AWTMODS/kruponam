@@ -164,15 +164,9 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         return;
       }
 
-      if (isEmailAlreadyUsed(formData.email, existing.id)) {
-        setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
-        return;
-      }
-
-      if (isPhoneAlreadyUsed(formData.phone, existing.id)) {
-        setValidationError(`⚠️ The Phone Number "${formData.phone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
-        return;
-      }
+      // If existing registration is found and NOT rejected, block duplicate registration!
+      setValidationError(`⚠️ The Email Address "${formData.email}" or Phone Number "${formData.phone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
+      return;
     } else {
       if (isEmailAlreadyUsed(formData.email)) {
         setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { QrCode, X, RefreshCw, UserCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, RefreshCw, UserCheck, Camera, CameraOff, AlertCircle } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { markAsReported, getRegistrations, type ScanResult } from '../services/registrationService';
 import confetti from 'canvas-confetti';
 
@@ -13,12 +14,31 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  // Camera state
+  const [cameraActive, setCameraActive] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const lastScannedCodeRef = useRef<string>('');
+  const lastScanTimeRef = useRef<number>(0);
+
   const registrations = getRegistrations();
   const approvedList = registrations.filter((r) => r.approvalStatus === 'Approved');
 
   const handleProcessScan = (code: string) => {
     if (!code.trim()) return;
+
+    // Debounce duplicate camera scans within 2 seconds
+    const now = Date.now();
+    if (lastScannedCodeRef.current === code.trim() && now - lastScanTimeRef.current < 2000) {
+      return;
+    }
+    lastScannedCodeRef.current = code.trim();
+    lastScanTimeRef.current = now;
+
     setIsScanning(true);
+    setScanQuery(code);
 
     setTimeout(() => {
       setIsScanning(false);
@@ -37,12 +57,87 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
       if (onRefreshData) {
         onRefreshData();
       }
-    }, 600);
+    }, 400);
   };
+
+  // Initialize and lifecycle manage HTML5 camera scanner
+  useEffect(() => {
+    let isMounted = true;
+    const elementId = 'html5qr-code-full-region';
+
+    const startCamera = async () => {
+      try {
+        setCameraError(null);
+        if (scannerRef.current) {
+          try {
+            await scannerRef.current.stop();
+          } catch (_) {}
+        }
+
+        const html5QrCode = new Html5Qrcode(elementId);
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: facingMode },
+          {
+            fps: 10,
+            qrbox: { width: 240, height: 240 },
+            aspectRatio: 1.0,
+          },
+          (decodedText) => {
+            if (isMounted) {
+              handleProcessScan(decodedText);
+            }
+          },
+          () => {
+            // Ignore scan attempt errors (when frame doesn't contain QR)
+          }
+        );
+      } catch (err: any) {
+        if (isMounted) {
+          console.warn('Camera camera start notice:', err);
+          setCameraError(
+            'Live Camera access unavailable or permission denied. Ensure camera permissions are allowed in browser settings, or enter Token ID manually below.'
+          );
+          setCameraActive(false);
+        }
+      }
+    };
+
+    if (cameraActive) {
+      // Small timeout to guarantee DOM container exists
+      const timer = setTimeout(() => {
+        startCamera();
+      }, 200);
+      return () => {
+        clearTimeout(timer);
+        isMounted = false;
+        if (scannerRef.current) {
+          try {
+            if (scannerRef.current.isScanning) {
+              scannerRef.current.stop().catch(() => {});
+            }
+          } catch (_) {}
+        }
+      };
+    } else {
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            scannerRef.current.stop().catch(() => {});
+          }
+        } catch (_) {}
+      }
+    }
+  }, [cameraActive, facingMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleProcessScan(scanQuery);
+  };
+
+  const toggleCameraFacing = () => {
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
   return (
@@ -67,30 +162,85 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
               Campus Gate QR Code Scanner
             </h3>
             <p className="text-xs text-slate-400">
-              Scan student pass QR code to mark attendee as <span className="text-emerald-400 font-bold">Reported (Checked-In)</span>.
+              Point mobile camera at student pass QR code to mark attendee as <span className="text-emerald-400 font-bold">Reported (Checked-In)</span>.
             </p>
           </div>
         </div>
 
-        {/* Camera Viewfinder Simulation */}
-        <div className="relative rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-gold-royal/40 p-8 text-center space-y-4 mb-6">
+        {/* Live Camera Viewfinder Box */}
+        <div className="relative rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-gold-royal/40 p-4 text-center space-y-4 mb-6 min-h-[300px] flex flex-col justify-center items-center">
           
           {/* Animated Scanning Line */}
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold-royal to-transparent shadow-gold-glow animate-pulse" />
+          {cameraActive && !cameraError && (
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold-royal to-transparent shadow-gold-glow animate-pulse z-10 pointer-events-none" />
+          )}
 
-          <div className="w-32 h-32 mx-auto bg-slate-900 rounded-2xl p-4 border border-gold-royal/30 flex items-center justify-center text-gold-royal relative">
-            <QrCode className="w-full h-full text-gold-royal animate-pulse" />
-            <div className="absolute inset-0 border-2 border-gold-royal rounded-2xl animate-ping opacity-25" />
+          {/* HTML5 QR Camera Container */}
+          <div className={`w-full max-w-sm mx-auto rounded-2xl overflow-hidden bg-black relative border border-gold-royal/30 ${!cameraActive || cameraError ? 'hidden' : 'block'}`}>
+            <div id="html5qr-code-full-region" className="w-full h-full min-h-[260px]" />
           </div>
 
-          <p className="text-xs font-semibold text-slate-300">
-            Position Student Pass QR Code inside frame or enter Registration Token ID below
-          </p>
+          {/* Camera Disabled or Error Fallback UI */}
+          {(!cameraActive || cameraError) && (
+            <div className="py-6 space-y-3 px-4 max-w-md mx-auto">
+              <div className="w-16 h-16 mx-auto rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
+                <CameraOff className="w-8 h-8" />
+              </div>
+
+              {cameraError ? (
+                <div className="p-3 bg-amber-950/80 border border-amber-500/40 rounded-xl text-amber-200 text-xs font-medium flex items-start gap-2 text-left">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span>{cameraError}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 font-medium">
+                  Camera feed is currently turned off. Click below to re-enable camera scanning.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCameraError(null);
+                  setCameraActive(true);
+                }}
+                className="px-4 py-2 rounded-full bg-gold-royal text-slate-950 font-bold text-xs uppercase tracking-wider hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-md"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Turn On Camera Scanner</span>
+              </button>
+            </div>
+          )}
+
+          {/* Camera Controls Bar */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {cameraActive && !cameraError && (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleCameraFacing}
+                  className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-gold-royal" />
+                  <span>Switch Camera ({facingMode === 'environment' ? 'Back 📷' : 'Front 🤳'})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCameraActive(false)}
+                  className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-rose-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <CameraOff className="w-3.5 h-3.5" />
+                  <span>Turn Off Camera</span>
+                </button>
+              </>
+            )}
+          </div>
 
           {/* Quick Select Dropdown for Testing Approved Passes */}
-          <div className="pt-2 max-w-md mx-auto">
+          <div className="pt-2 max-w-md mx-auto w-full">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-gold-light mb-1">
-              ⚡ Quick Select Approved Pass (For Gate Testing)
+              ⚡ Quick Select Approved Pass (For Testing Without Camera)
             </label>
             <select
               onChange={(e) => {
