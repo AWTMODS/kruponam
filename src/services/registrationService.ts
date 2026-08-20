@@ -667,22 +667,39 @@ export const markAsReported = (query: string): ScanResult => {
   const registrations = getRegistrations();
   let q = query.trim().toLowerCase();
   
-  // Extract token if code contains "TOKEN:KRP-xxxxxx" or formatted string
-  if (q.includes('token:')) {
+  // Extract KRP token ID using Regex (e.g. handles "KRP -995318", "TOKEN : KRP-995318", etc.)
+  const krpMatch = query.match(/krp\s*[-_]?\s*(\d+)/i);
+  let targetId = '';
+  if (krpMatch) {
+    targetId = `KRP-${krpMatch[1]}`;
+  }
+
+  // Extract token if code contains "TOKEN:" keyword
+  if (!targetId && q.includes('token')) {
     const parts = q.split('|');
-    const tokenPart = parts.find((p) => p.startsWith('token:'));
+    const tokenPart = parts.find((p) => p.includes('token'));
     if (tokenPart) {
-      q = tokenPart.replace('token:', '').trim();
+      const splitColon = tokenPart.split(':');
+      if (splitColon.length > 1) {
+        q = splitColon[1].trim().toLowerCase();
+      }
     }
   }
 
+  const cleanQueryAlphaNum = q.replace(/[^a-z0-9]/g, '');
+
   const index = registrations.findIndex(
-    (r) =>
-      r.id.toLowerCase() === q ||
-      r.email.toLowerCase() === q ||
-      r.phone === q ||
-      r.paymentUtr === q ||
-      q.includes(r.id.toLowerCase())
+    (r) => {
+      const cleanIdAlphaNum = r.id.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return (
+        (targetId && r.id.toLowerCase() === targetId.toLowerCase()) ||
+        r.id.toLowerCase() === q ||
+        r.email.toLowerCase() === q ||
+        r.phone === q ||
+        r.paymentUtr === q ||
+        (cleanIdAlphaNum && cleanQueryAlphaNum.includes(cleanIdAlphaNum))
+      );
+    }
   );
 
   if (index === -1) {

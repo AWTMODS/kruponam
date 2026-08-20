@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, RefreshCw, UserCheck, Camera, CameraOff, AlertCircle } from 'lucide-react';
+import { X, RefreshCw, UserCheck, Camera, CameraOff, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { markAsReported, getRegistrations, type ScanResult } from '../services/registrationService';
+import { markAsReported, approveRegistration, getRegistrations, type ScanResult } from '../services/registrationService';
 import confetti from 'canvas-confetti';
 
 interface QrScannerProps {
@@ -367,6 +367,24 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                 <p className="text-xs text-rose-300 max-w-md mx-auto">
                   {scanResult.message}
                 </p>
+
+                {scanResult.status === 'not_approved' && scanResult.registration && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (scanResult.registration) {
+                          await approveRegistration(scanResult.registration.id);
+                          handleProcessScan(scanResult.registration.id);
+                        }
+                      }}
+                      className="px-5 py-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center gap-1.5 hover:scale-105 active:scale-95"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>⚡ Admin Override: Approve Pass & Grant Entry Now</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
