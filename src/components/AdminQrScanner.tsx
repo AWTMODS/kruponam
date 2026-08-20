@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, UserCheck, Camera, CameraOff, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { markAsReported, approveRegistration, getRegistrations, type ScanResult } from '../services/registrationService';
+import { markAsReported, markAsReportedAsync, approveRegistration, getRegistrations, type ScanResult } from '../services/registrationService';
 import confetti from 'canvas-confetti';
 
 interface QrScannerProps {
@@ -26,7 +26,7 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   const registrations = getRegistrations();
   const approvedList = registrations.filter((r) => r.approvalStatus === 'Approved');
 
-  const handleProcessScan = (code: string) => {
+  const handleProcessScan = async (code: string) => {
     if (!code.trim()) return;
 
     // Debounce duplicate camera scans within 2 seconds
@@ -40,24 +40,22 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
     setIsScanning(true);
     setScanQuery(code);
 
-    setTimeout(() => {
-      setIsScanning(false);
-      const res = markAsReported(code);
-      setScanResult(res);
+    const res = await markAsReportedAsync(code);
+    setIsScanning(false);
+    setScanResult(res);
 
-      if (res.status === 'success') {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#22C55E', '#D4AF37', '#FFFFFF'],
-        });
-      }
+    if (res.status === 'success') {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#22C55E', '#D4AF37', '#FFFFFF'],
+      });
+    }
 
-      if (onRefreshData) {
-        onRefreshData();
-      }
-    }, 400);
+    if (onRefreshData) {
+      onRefreshData();
+    }
   };
 
   // Initialize and lifecycle manage HTML5 camera scanner

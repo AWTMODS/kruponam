@@ -663,6 +663,13 @@ export interface ScanResult {
   timestamp?: string;
 }
 
+export const markAsReportedAsync = async (query: string): Promise<ScanResult> => {
+  try {
+    await syncCloudRegistrations();
+  } catch (_) {}
+  return markAsReported(query);
+};
+
 export const markAsReported = (query: string): ScanResult => {
   const registrations = getRegistrations();
   let q = query.trim().toLowerCase();
