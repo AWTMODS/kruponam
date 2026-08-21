@@ -456,6 +456,48 @@ export const saveRegistration = (registration: Registration): boolean => {
   }
 };
 
+export const normalizePhoneNumber = (phone: string): string => {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // 12 digits starting with country code 91 -> 10-digit national number
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+  // 11 digits starting with leading 0 -> 10-digit national number
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
+  // At least 10 digits -> last 10 digits
+  if (digits.length >= 10) {
+    return digits.slice(-10);
+  }
+  return digits;
+};
+
+export const isPhoneMatch = (phone1: string, phone2: string): boolean => {
+  if (!phone1 || !phone2) return false;
+  const p1 = phone1.trim().toLowerCase();
+  const p2 = phone2.trim().toLowerCase();
+
+  // Direct exact string equality
+  if (p1 === p2) return true;
+
+  const d1 = p1.replace(/\D/g, '');
+  const d2 = p2.replace(/\D/g, '');
+
+  if (!d1 || !d2) return false;
+  // Direct digit equality
+  if (d1 === d2) return true;
+
+  // Normalized 10-digit national number equality
+  const n1 = normalizePhoneNumber(p1);
+  const n2 = normalizePhoneNumber(p2);
+
+  return !!(n1 && n2 && n1 === n2);
+};
+
 export const isEmailAlreadyUsed = (email: string, excludeId?: string): boolean => {
   if (!email || !email.trim()) return false;
   const clean = email.trim().toLowerCase();
@@ -465,10 +507,8 @@ export const isEmailAlreadyUsed = (email: string, excludeId?: string): boolean =
 
 export const isPhoneAlreadyUsed = (phone: string, excludeId?: string): boolean => {
   if (!phone || !phone.trim()) return false;
-  const clean = phone.replace(/\D/g, ''); // strip non-digits
-  if (!clean) return false;
   const list = getRegistrations();
-  return list.some((r) => r.phone.replace(/\D/g, '') === clean && r.id !== excludeId);
+  return list.some((r) => isPhoneMatch(r.phone, phone) && r.id !== excludeId);
 };
 
 export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
@@ -702,7 +742,7 @@ export const markAsReported = (query: string): ScanResult => {
         (targetId && r.id.toLowerCase() === targetId.toLowerCase()) ||
         r.id.toLowerCase() === q ||
         r.email.toLowerCase() === q ||
-        r.phone === q ||
+        isPhoneMatch(r.phone, q) ||
         r.paymentUtr === q ||
         (cleanIdAlphaNum && cleanQueryAlphaNum.includes(cleanIdAlphaNum))
       );
@@ -799,7 +839,7 @@ export const findRegistration = (query: string): Registration | undefined => {
     (r) =>
       r.id.toLowerCase() === q ||
       r.email.toLowerCase() === q ||
-      r.phone === q ||
+      isPhoneMatch(r.phone, q) ||
       r.paymentUtr === q
   );
 };
@@ -813,7 +853,7 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     (r) =>
       r.id.toLowerCase() === q ||
       r.email.toLowerCase() === q ||
-      r.phone === q ||
+      isPhoneMatch(r.phone, q) ||
       r.paymentUtr === q
   );
 
@@ -824,7 +864,7 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     (r) =>
       r.id.toLowerCase() === q ||
       r.email.toLowerCase() === q ||
-      r.phone === q ||
+      isPhoneMatch(r.phone, q) ||
       r.paymentUtr === q
   );
 

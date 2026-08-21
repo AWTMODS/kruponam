@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, UserCheck, Camera, CameraOff, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { markAsReported, markAsReportedAsync, approveRegistration, saveRegistrationAsync, getRegistrations, type ScanResult } from '../services/registrationService';
+import { markAsReportedAsync, saveRegistrationAsync, getRegistrations, type ScanResult } from '../services/registrationService';
 import confetti from 'canvas-confetti';
 
 interface QrScannerProps {

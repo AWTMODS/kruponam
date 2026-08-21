@@ -291,7 +291,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           <input
             type="text"
             required
-            placeholder="e.g. anand.nair@example.com or KRP-849201"
+            placeholder="e.g. 9072428800, anand.nair@example.com, or KRP-849201"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-11 pr-4 py-3.5 rounded-full border border-gold-royal/40 bg-cream-soft text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 transition-all"

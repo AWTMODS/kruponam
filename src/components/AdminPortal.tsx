@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
-  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, type Registration, type ApprovalStatus 
+  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
@@ -516,6 +516,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       item.email.toLowerCase().includes(q) ||
       item.id.toLowerCase().includes(q) ||
       item.phone.toLowerCase().includes(q) ||
+      isPhoneMatch(item.phone, q) ||
       (item.paymentUtr && item.paymentUtr.toLowerCase().includes(q)) ||
       item.department.toLowerCase().includes(q) ||
       (item.section && item.section.toLowerCase().includes(q));
