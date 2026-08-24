@@ -6,6 +6,7 @@ import {
   isEmailAlreadyUsed, 
   isPhoneAlreadyUsed, 
   findRegistration,
+  generateUniqueRegistrationId,
   type Registration 
 } from '../services/registrationService';
 import { getSiteSettings } from '../services/siteSettingsService';
@@ -187,7 +188,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
     setIsSubmitting(true);
 
-    const randomId = 'KRP-' + Math.floor(100000 + Math.random() * 900000);
+    const randomId = generateUniqueRegistrationId();
     const draftReg: Registration = {
       id: randomId,
       ...formData,

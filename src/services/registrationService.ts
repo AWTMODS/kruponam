@@ -518,6 +518,17 @@ export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
   return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr && r.id !== excludeId);
 };
 
+export const generateUniqueRegistrationId = (): string => {
+  const registrations = getRegistrations();
+  const existingIds = new Set(registrations.map((r) => r.id.toUpperCase()));
+  let id = '';
+  do {
+    id = 'KRP-' + Math.floor(100000 + Math.random() * 900000);
+  } while (existingIds.has(id));
+  return id;
+};
+
+
 export const approveIdCard = async (id: string): Promise<Registration | null> => {
   const allCurrent = await syncCloudRegistrations();
   const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
