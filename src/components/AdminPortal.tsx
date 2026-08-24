@@ -2554,6 +2554,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <option value="BBA">Business Administration (BBA)</option>
                     <option value="B.Sc">Science (B.Sc)</option>
                     <option value="BA">Humanities & Arts (BA)</option>
+                    <option value="Pharmacy">Pharmacy (B.Pharm / D.Pharm)</option>
                     <option value="PG/MBA/MCA">Post Graduate (MBA / MCA)</option>
                   </select>
                 </div>
@@ -2830,6 +2831,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <option value="BBA">Business Administration (BBA)</option>
                     <option value="B.Sc">Science (B.Sc)</option>
                     <option value="BA">Humanities & Arts (BA)</option>
+                    <option value="Pharmacy">Pharmacy (B.Pharm / D.Pharm)</option>
                     <option value="PG/MBA/MCA">Post Graduate (MBA / MCA)</option>
                   </select>
                 </div>
