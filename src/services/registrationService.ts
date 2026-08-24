@@ -321,46 +321,29 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
         saveRegistrationToFirebase(reassigned).catch(() => {});
       }
     } else {
-      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
-      const incomingTime = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+      const existingRank = STATUS_RANK[existing.approvalStatus] || 0;
+      const incomingRank = STATUS_RANK[r.approvalStatus] || 0;
 
-      if (incomingTime > existingTime) {
-        // Cloud record is strictly newer
-        localMap.set(r.id, {
-          ...existing,
-          ...r,
-          paymentScreenshotUrl: r.paymentScreenshotUrl || existing.paymentScreenshotUrl,
-          paymentUtr: r.paymentUtr || existing.paymentUtr,
-        });
-      } else if (existingTime > incomingTime) {
-        // Local record is strictly newer — preserve local edits!
-        localMap.set(r.id, {
-          ...r,
-          ...existing,
-          paymentScreenshotUrl: existing.paymentScreenshotUrl || r.paymentScreenshotUrl,
-          paymentUtr: existing.paymentUtr || r.paymentUtr,
-        });
-      } else {
-        // Timestamps equal or missing: prefer local changes so admin edits aren't wiped out
-        const existingRank = STATUS_RANK[existing.approvalStatus] || 1;
-        const incomingRank = STATUS_RANK[r.approvalStatus] || 1;
+      // Cloud status always takes authority for Admin approval status and payment verification!
+      const preferCloudStatus = incomingRank >= existingRank || r.approvalStatus !== existing.approvalStatus;
 
-        if (incomingRank > existingRank) {
-          localMap.set(r.id, {
-            ...existing,
-            ...r,
-            paymentScreenshotUrl: r.paymentScreenshotUrl || existing.paymentScreenshotUrl,
-            paymentUtr: r.paymentUtr || existing.paymentUtr,
-          });
-        } else {
-          localMap.set(r.id, {
-            ...r,
-            ...existing,
-            paymentScreenshotUrl: existing.paymentScreenshotUrl || r.paymentScreenshotUrl,
-            paymentUtr: existing.paymentUtr || r.paymentUtr,
-          });
-        }
-      }
+      const mergedRecord: Registration = {
+        ...existing,
+        ...r,
+        // Keep heavier images if local has them and cloud is empty
+        idCardUrl: (r.idCardUrl && r.idCardUrl.length > 50) ? r.idCardUrl : (existing.idCardUrl || r.idCardUrl),
+        paymentScreenshotUrl: (r.paymentScreenshotUrl && r.paymentScreenshotUrl.length > 50) ? r.paymentScreenshotUrl : (existing.paymentScreenshotUrl || r.paymentScreenshotUrl),
+        paymentUtr: r.paymentUtr || existing.paymentUtr,
+        approvalStatus: preferCloudStatus ? r.approvalStatus : existing.approvalStatus,
+        paymentStatus: preferCloudStatus ? r.paymentStatus : existing.paymentStatus,
+        approvedAt: r.approvedAt || existing.approvedAt,
+        rejectionReason: r.rejectionReason || existing.rejectionReason,
+        isReported: r.isReported !== undefined ? r.isReported : existing.isReported,
+        reportedAt: r.reportedAt || existing.reportedAt,
+        updatedAt: new Date().toISOString()
+      };
+
+      localMap.set(r.id, mergedRecord);
     }
   };
 
@@ -893,35 +876,26 @@ export const findRegistration = (query: string): Registration | undefined => {
 export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
   const q = query.trim().toLowerCase();
   
-  // 1. FAST PATH: Immediate instant lookup in local memory/IndexedDB (0ms latency)
-  const localMatch = findRegistration(q);
-  if (localMatch) {
-    // Non-blocking background cloud sync
-    syncCloudRegistrations().catch(() => {});
-    return localMatch;
-  }
-
-  // 2. SLOW PATH: If not in local storage, sync with a 1.5s timeout race so users never wait indefinitely
+  let syncedList = getRegistrations();
   try {
-    const syncedList = await Promise.race([
+    syncedList = await Promise.race([
       syncCloudRegistrations(),
-      new Promise<Registration[]>((resolve) => setTimeout(() => resolve(getRegistrations()), 1500))
+      new Promise<Registration[]>((resolve) => setTimeout(() => resolve(getRegistrations()), 2000))
     ]);
-
-    let found = syncedList.find(
-      (r) =>
-        r.id.toLowerCase() === q ||
-        r.email.toLowerCase() === q ||
-        isPhoneMatch(r.phone, q) ||
-        r.paymentUtr === q
-    );
-
-    if (found) return found;
   } catch (e) {
     console.warn('Cloud search notice:', e);
   }
 
-  // 3. Fallback search in INITIAL_REGISTRATIONS
+  let found = syncedList.find(
+    (r) =>
+      r.id.toLowerCase() === q ||
+      r.email.toLowerCase() === q ||
+      isPhoneMatch(r.phone, q) ||
+      r.paymentUtr === q
+  );
+
+  if (found) return found;
+
   return INITIAL_REGISTRATIONS.find(
     (r) =>
       r.id.toLowerCase() === q ||

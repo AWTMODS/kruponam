@@ -189,26 +189,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     setIsSearching(true);
     setPaymentError(null);
 
-    // 1. Instant local search (0ms response time!)
+    // 1. Show instant cached match immediately (0ms) so user sees UI instantly
     const instantMatch = findRegistration(searchQuery);
     if (instantMatch) {
       setSearchResult(instantMatch);
       setHasSearched(true);
-      setIsSearching(false);
-
-      // 2. Non-blocking cloud update sync to catch live Admin status changes seamlessly
-      findRegistrationAsync(searchQuery).then((latest) => {
-        if (latest && (latest.approvalStatus !== instantMatch.approvalStatus || latest.paymentStatus !== instantMatch.paymentStatus)) {
-          setSearchResult(latest);
-        }
-      });
-      return;
     }
 
-    // 3. Fallback search if not found in local cache
-    const found = await findRegistrationAsync(searchQuery);
-    setSearchResult(found);
-    setHasSearched(true);
+    // 2. Fetch fresh live status from cloud DB (Firebase) and update UI seamlessly
+    const latest = await findRegistrationAsync(searchQuery);
+    if (latest) {
+      setSearchResult(latest);
+      setHasSearched(true);
+    }
     setIsSearching(false);
   };
 
