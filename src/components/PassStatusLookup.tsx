@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
-import { findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
+import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, syncCloudRegistrations, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { getSiteSettings } from '../services/siteSettingsService';
@@ -177,12 +177,35 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
   const [isSearching, setIsSearching] = useState(false);
 
+  // Trigger background cloud sync on mount so lookup data is always warm and up-to-date
+  useEffect(() => {
+    syncCloudRegistrations().catch(() => {});
+  }, []);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
 
     setIsSearching(true);
     setPaymentError(null);
+
+    // 1. Instant local search (0ms response time!)
+    const instantMatch = findRegistration(searchQuery);
+    if (instantMatch) {
+      setSearchResult(instantMatch);
+      setHasSearched(true);
+      setIsSearching(false);
+
+      // 2. Non-blocking cloud update sync to catch live Admin status changes seamlessly
+      findRegistrationAsync(searchQuery).then((latest) => {
+        if (latest && (latest.approvalStatus !== instantMatch.approvalStatus || latest.paymentStatus !== instantMatch.paymentStatus)) {
+          setSearchResult(latest);
+        }
+      });
+      return;
+    }
+
+    // 3. Fallback search if not found in local cache
     const found = await findRegistrationAsync(searchQuery);
     setSearchResult(found);
     setHasSearched(true);

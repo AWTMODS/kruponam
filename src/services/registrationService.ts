@@ -893,28 +893,42 @@ export const findRegistration = (query: string): Registration | undefined => {
 export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
   const q = query.trim().toLowerCase();
   
-  // 1. Immediate sync across IndexedDB and LocalStorage
-  const syncedList = await syncCloudRegistrations();
-  let found = syncedList.find(
+  // 1. FAST PATH: Immediate instant lookup in local memory/IndexedDB (0ms latency)
+  const localMatch = findRegistration(q);
+  if (localMatch) {
+    // Non-blocking background cloud sync
+    syncCloudRegistrations().catch(() => {});
+    return localMatch;
+  }
+
+  // 2. SLOW PATH: If not in local storage, sync with a 1.5s timeout race so users never wait indefinitely
+  try {
+    const syncedList = await Promise.race([
+      syncCloudRegistrations(),
+      new Promise<Registration[]>((resolve) => setTimeout(() => resolve(getRegistrations()), 1500))
+    ]);
+
+    let found = syncedList.find(
+      (r) =>
+        r.id.toLowerCase() === q ||
+        r.email.toLowerCase() === q ||
+        isPhoneMatch(r.phone, q) ||
+        r.paymentUtr === q
+    );
+
+    if (found) return found;
+  } catch (e) {
+    console.warn('Cloud search notice:', e);
+  }
+
+  // 3. Fallback search in INITIAL_REGISTRATIONS
+  return INITIAL_REGISTRATIONS.find(
     (r) =>
       r.id.toLowerCase() === q ||
       r.email.toLowerCase() === q ||
       isPhoneMatch(r.phone, q) ||
       r.paymentUtr === q
   );
-
-  if (found) return found;
-
-  // 2. Direct fallback search in INITIAL_REGISTRATIONS
-  found = INITIAL_REGISTRATIONS.find(
-    (r) =>
-      r.id.toLowerCase() === q ||
-      r.email.toLowerCase() === q ||
-      isPhoneMatch(r.phone, q) ||
-      r.paymentUtr === q
-  );
-
-  return found;
 };
 
 // ── Backup & Safety Helper Exports ──────────────────────────────────
