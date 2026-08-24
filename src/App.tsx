@@ -77,6 +77,9 @@ export function App() {
 
   const handleSelectTicketFromPasses = (passName: string) => {
     setSelectedPass(passName);
+  const handleOpenLookup = () => {
+    setActiveView('lookup');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   return (
@@ -89,35 +92,35 @@ export function App() {
         <AdminPortal onClose={handleCloseAdmin} />
       ) : activeView === 'lookup' ? (
         <div className="pt-24 min-h-screen">
-          <Navbar onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
+          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
           <div className="max-w-7xl mx-auto px-4">
             <PassStatusLookup onClose={() => setActiveView('main')} />
           </div>
-          <Footer onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
+          <Footer onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
         </div>
       ) : comingSoonMode ? (
         <ComingSoon
           onOpenAdmin={() => setActiveView('admin')}
-          onOpenLookup={() => setActiveView('lookup')}
+          onOpenLookup={handleOpenLookup}
         />
       ) : (
         <>
-          <Navbar onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
+          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
           
           <main>
-            <Hero onOpenLookup={() => setActiveView('lookup')} />
+            <Hero onOpenLookup={handleOpenLookup} />
             <About />
             <Countdown />
             {showProgramsSchedule && <ProgramsTimeline />}
             <TicketPasses onSelectTicket={handleSelectTicketFromPasses} />
             <RegistrationForm
               selectedPassFromParent={selectedPass}
-              onOpenLookup={() => setActiveView('lookup')}
+              onOpenLookup={handleOpenLookup}
             />
             <Contact />
           </main>
 
-          <Footer onOpenLookup={() => setActiveView('lookup')} onOpenAdmin={() => setActiveView('admin')} />
+          <Footer onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
         </>
       )}
     </div>

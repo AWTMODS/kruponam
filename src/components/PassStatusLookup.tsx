@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
 import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, syncCloudRegistrations, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
@@ -175,11 +175,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     }
   }, [upiSettings, ticketAmount]);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Trigger background cloud sync on mount so lookup data is always warm and up-to-date
+  // Auto-scroll page to top & focus search input field immediately on mount
   useEffect(() => {
     syncCloudRegistrations().catch(() => {});
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    setTimeout(() => {
+      if (searchInputRef.current) {
+        searchInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        searchInputRef.current.focus();
+      }
+    }, 150);
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -305,6 +313,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
+            ref={searchInputRef}
             type="text"
             required
             placeholder="e.g. 9072428800, anand.nair@example.com, or KRP-849201"
