@@ -285,7 +285,20 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
   const localMap = new Map<string, Registration>();
   [...idbList, ...localList].forEach((r) => {
     if (r && r.id && !deletedIds.has(r.id)) {
-      localMap.set(r.id, r);
+      const existing = localMap.get(r.id);
+      if (!existing) {
+        localMap.set(r.id, r);
+      } else if (!isSameStudent(existing, r)) {
+        let newId = generateUniqueRegistrationId();
+        while (localMap.has(newId)) {
+          newId = generateUniqueRegistrationId();
+        }
+        const reassigned = { ...r, id: newId };
+        localMap.set(newId, reassigned);
+        syncToIndexedDB(reassigned);
+      } else {
+        localMap.set(r.id, { ...existing, ...r });
+      }
     }
   });
 
@@ -294,6 +307,19 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     const existing = localMap.get(r.id);
     if (!existing) {
       localMap.set(r.id, r);
+    } else if (!isSameStudent(existing, r)) {
+      // ID Collision! Two different students were assigned the exact same ID (e.g. KRP-222792).
+      // Assign the incoming record a brand-new unique ID so neither student's data is corrupted!
+      let newId = generateUniqueRegistrationId();
+      while (localMap.has(newId)) {
+        newId = generateUniqueRegistrationId();
+      }
+      const reassigned = { ...r, id: newId };
+      localMap.set(newId, reassigned);
+      saveRegistrationToSupabase(reassigned).catch(() => {});
+      if (isFirebaseConfigured()) {
+        saveRegistrationToFirebase(reassigned).catch(() => {});
+      }
     } else {
       const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
       const incomingTime = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
@@ -496,6 +522,15 @@ export const isPhoneMatch = (phone1: string, phone2: string): boolean => {
   const n2 = normalizePhoneNumber(p2);
 
   return !!(n1 && n2 && n1 === n2);
+};
+
+export const isSameStudent = (r1: Registration, r2: Registration): boolean => {
+  if (!r1 || !r2) return false;
+  const e1 = r1.email ? r1.email.trim().toLowerCase() : '';
+  const e2 = r2.email ? r2.email.trim().toLowerCase() : '';
+  if (e1 && e2 && e1 === e2) return true;
+  if (r1.phone && r2.phone && isPhoneMatch(r1.phone, r2.phone)) return true;
+  return false;
 };
 
 export const isEmailAlreadyUsed = (email: string, excludeId?: string): boolean => {

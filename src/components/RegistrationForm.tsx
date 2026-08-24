@@ -138,8 +138,20 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     const existing = findRegistration(formData.email) || findRegistration(formData.phone);
 
     if (existing) {
-      // If previous application was Rejected, allow student to update and resubmit!
-      if (existing.approvalStatus === 'Rejected') {
+      const existingNameClean = existing.fullName.trim().toLowerCase();
+      const formNameClean = formData.fullName.trim().toLowerCase();
+
+      // Detect if existing record was corrupted by an ID collision with a completely different student
+      const firstWordExisting = existingNameClean.split(' ')[0] || '';
+      const firstWordForm = formNameClean.split(' ')[0] || '';
+      const isCorruptedCollision = firstWordExisting.length >= 3 && firstWordForm.length >= 3 &&
+                                    !existingNameClean.includes(firstWordForm) &&
+                                    !formNameClean.includes(firstWordExisting);
+
+      if (isCorruptedCollision) {
+        // ID collision detected between different students (e.g. Ashin vs Abhishek)!
+        // Do not block registration — continue to create a fresh, clean registration with a new unique ID!
+      } else if (existing.approvalStatus === 'Rejected') {
         setIsSubmitting(true);
         const updatedReg: Registration = {
           ...existing,
@@ -163,11 +175,11 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
           colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
         });
         return;
+      } else {
+        // If existing registration is found and valid, block duplicate registration!
+        setValidationError(`⚠️ The Email Address "${formData.email}" or Phone Number "${formData.phone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
+        return;
       }
-
-      // If existing registration is found and NOT rejected, block duplicate registration!
-      setValidationError(`⚠️ The Email Address "${formData.email}" or Phone Number "${formData.phone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
-      return;
     } else {
       if (isEmailAlreadyUsed(formData.email)) {
         setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
