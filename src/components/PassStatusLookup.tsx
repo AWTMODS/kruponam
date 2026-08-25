@@ -196,21 +196,21 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
     setIsSearching(true);
     setPaymentError(null);
+    setHasSearched(true);
 
     // 1. Show instant cached match immediately (0ms) so user sees UI instantly
     const instantMatch = findRegistration(searchQuery);
-    if (instantMatch) {
-      setSearchResult(instantMatch);
-      setHasSearched(true);
-    }
+    setSearchResult(instantMatch || null);
 
-    // 2. Fetch fresh live status from cloud DB (Firebase) and update UI seamlessly
-    const latest = await findRegistrationAsync(searchQuery);
-    if (latest) {
-      setSearchResult(latest);
-      setHasSearched(true);
+    // 2. Fetch fresh live status from cloud DB (Firebase & Supabase)
+    try {
+      const latest = await findRegistrationAsync(searchQuery);
+      setSearchResult(latest || instantMatch || null);
+    } catch (err) {
+      console.warn('Live lookup search notice:', err);
+    } finally {
+      setIsSearching(false);
     }
-    setIsSearching(false);
   };
 
   const handlePaymentScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

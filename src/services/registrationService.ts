@@ -932,50 +932,59 @@ export const markAsReported = (query: string): ScanResult => {
   };
 };
 
+const matchRecord = (r: Registration, q: string): boolean => {
+  if (!r || !q) return false;
+  const cleanQ = q.trim().toLowerCase();
+  const qAlphaNum = cleanQ.replace(/[^a-z0-9]/g, '');
+
+  const rId = r.id ? r.id.trim().toLowerCase() : '';
+  const rIdAlphaNum = rId.replace(/[^a-z0-9]/g, '');
+  const rEmail = r.email ? r.email.trim().toLowerCase() : '';
+  const rName = r.fullName ? r.fullName.trim().toLowerCase() : '';
+  const rUtr = r.paymentUtr ? r.paymentUtr.trim().toLowerCase() : '';
+
+  // 1. ID Match (e.g. KRP-531657, krp531657, 531657)
+  if (rId && (rId === cleanQ || (qAlphaNum.length >= 4 && rIdAlphaNum.includes(qAlphaNum)))) return true;
+
+  // 2. Email Match
+  if (rEmail && (rEmail === cleanQ || rEmail.includes(cleanQ))) return true;
+
+  // 3. Name Match (e.g. "Ashin", "Ashin Gopi", "Sniya")
+  if (rName && (rName === cleanQ || rName.includes(cleanQ) || cleanQ.includes(rName))) return true;
+
+  // 4. Phone Match
+  if (r.phone && isPhoneMatch(r.phone, cleanQ)) return true;
+
+  // 5. Payment UTR Match
+  if (rUtr && (rUtr === cleanQ || (qAlphaNum.length >= 6 && rUtr.replace(/[^a-z0-9]/g, '').includes(qAlphaNum)))) return true;
+
+  return false;
+};
+
 export const findRegistration = (query: string): Registration | undefined => {
   if (!query || !query.trim()) return undefined;
   const registrations = getRegistrations();
-  const q = query.trim().toLowerCase();
-  return registrations.find(
-    (r) =>
-      (r.id && r.id.trim().toLowerCase() === q) ||
-      (r.email && r.email.trim().toLowerCase() === q) ||
-      isPhoneMatch(r.phone, q) ||
-      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
-  );
+  return registrations.find((r) => matchRecord(r, query));
 };
 
 export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
   if (!query || !query.trim()) return undefined;
   const q = query.trim().toLowerCase();
   
-  let syncedList = getRegistrations();
+  const localList = getRegistrations();
+  const localMatch = localList.find((r) => matchRecord(r, q));
+
   try {
-    syncedList = await Promise.race([
-      syncCloudRegistrations(),
-      new Promise<Registration[]>((resolve) => setTimeout(() => resolve(getRegistrations()), 2000))
-    ]);
+    const cloudList = await syncCloudRegistrations();
+    const cloudMatch = cloudList.find((r) => matchRecord(r, q));
+    if (cloudMatch) return cloudMatch;
   } catch (e) {
     console.warn('Cloud search notice:', e);
   }
 
-  let found = syncedList.find(
-    (r) =>
-      (r.id && r.id.trim().toLowerCase() === q) ||
-      (r.email && r.email.trim().toLowerCase() === q) ||
-      isPhoneMatch(r.phone, q) ||
-      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
-  );
+  if (localMatch) return localMatch;
 
-  if (found) return found;
-
-  return INITIAL_REGISTRATIONS.find(
-    (r) =>
-      (r.id && r.id.trim().toLowerCase() === q) ||
-      (r.email && r.email.trim().toLowerCase() === q) ||
-      isPhoneMatch(r.phone, q) ||
-      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
-  );
+  return INITIAL_REGISTRATIONS.find((r) => matchRecord(r, q));
 };
 
 // ── Backup & Safety Helper Exports ──────────────────────────────────
