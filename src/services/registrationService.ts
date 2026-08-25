@@ -327,6 +327,14 @@ export const deduplicateRegistrations = (list: Registration[]): Registration[] =
       const duplicates = group.slice(1);
 
       duplicates.forEach((dup) => {
+        const dupRank = STATUS_RANK[dup.approvalStatus] || 0;
+        const primaryRank = STATUS_RANK[primary.approvalStatus] || 0;
+        if (dupRank > primaryRank) {
+          primary.approvalStatus = dup.approvalStatus;
+          primary.paymentStatus = dup.paymentStatus;
+          if (dup.approvedAt) primary.approvedAt = dup.approvedAt;
+        }
+
         if (!primary.idCardUrl && dup.idCardUrl) primary.idCardUrl = dup.idCardUrl;
         if (!primary.paymentScreenshotUrl && dup.paymentScreenshotUrl) primary.paymentScreenshotUrl = dup.paymentScreenshotUrl;
         if (!primary.paymentUtr && dup.paymentUtr) primary.paymentUtr = dup.paymentUtr;
@@ -386,7 +394,8 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
       const existingRank = STATUS_RANK[existing.approvalStatus] || 0;
       const incomingRank = STATUS_RANK[r.approvalStatus] || 0;
 
-      const preferCloudStatus = incomingRank >= existingRank || r.approvalStatus !== existing.approvalStatus;
+      // Higher approval status rank always wins! Never allow stale cloud data to downgrade an approved status.
+      const preferCloudStatus = incomingRank > existingRank || (incomingRank === existingRank && (r.updatedAt || '') >= (existing.updatedAt || ''));
 
       const mergedRecord: Registration = {
         ...existing,
