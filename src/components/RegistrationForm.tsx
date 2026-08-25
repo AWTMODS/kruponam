@@ -139,93 +139,99 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     const cleanEmail = formData.email.trim();
     const cleanPhone = formData.phone.trim();
 
-    // Check if user already exists by Email or Phone in local storage OR live cloud database
-    const existingLocal = findRegistration(cleanEmail) || findRegistration(cleanPhone);
-    const existingCloud = existingLocal ? null : ((await findRegistrationAsync(cleanEmail)) || (await findRegistrationAsync(cleanPhone)));
-    const existing = existingLocal || existingCloud;
+    try {
+      // Check if user already exists by Email or Phone in local storage OR live cloud database
+      const existingLocal = findRegistration(cleanEmail) || findRegistration(cleanPhone);
+      let existingCloud: Registration | undefined = undefined;
+      if (!existingLocal) {
+        try {
+          existingCloud = (await findRegistrationAsync(cleanEmail)) || (await findRegistrationAsync(cleanPhone));
+        } catch (cloudErr) {
+          console.warn('Cloud duplicate check notice (continuing with local check):', cloudErr);
+        }
+      }
+      const existing = existingLocal || existingCloud;
 
-    if (existing) {
-      if (existing.approvalStatus === 'Rejected') {
-        setIsSubmitting(true);
-        const updatedReg: Registration = {
-          ...existing,
-          ...formData,
-          fullName: formData.fullName.trim(),
-          email: cleanEmail,
-          phone: cleanPhone,
-          idCardUrl: idCardPreview || existing.idCardUrl,
-          approvalStatus: 'Pending_ID_Approval',
-          rejectionReason: undefined,
-          submittedAt: new Date().toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          }),
-        };
-        const savedReg = await saveRegistrationAsync(updatedReg);
-        setIsSubmitting(false);
-        setSubmittedRegistration(savedReg);
-        confetti({
-          particleCount: 100,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
-        });
-        return;
+      if (existing) {
+        if (existing.approvalStatus === 'Rejected') {
+          setIsSubmitting(true);
+          const updatedReg: Registration = {
+            ...existing,
+            ...formData,
+            fullName: formData.fullName.trim(),
+            email: cleanEmail,
+            phone: cleanPhone,
+            idCardUrl: idCardPreview || existing.idCardUrl,
+            approvalStatus: 'Pending_ID_Approval',
+            rejectionReason: undefined,
+            submittedAt: new Date().toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+          };
+          const savedReg = await saveRegistrationAsync(updatedReg);
+          setSubmittedRegistration(savedReg);
+          confetti({
+            particleCount: 100,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
+          });
+          return;
+        } else {
+          // If existing registration is found, block duplicate registration!
+          setValidationError(`⚠️ The Email Address "${cleanEmail}" or Phone Number "${cleanPhone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
+          return;
+        }
       } else {
-        // If existing registration is found, block duplicate registration!
-        setValidationError(`⚠️ The Email Address "${cleanEmail}" or Phone Number "${cleanPhone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
-        return;
-      }
-    } else {
-      if (isEmailAlreadyUsed(cleanEmail)) {
-        setValidationError(`⚠️ The Email Address "${cleanEmail}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
-        return;
+        if (isEmailAlreadyUsed(cleanEmail)) {
+          setValidationError(`⚠️ The Email Address "${cleanEmail}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+          return;
+        }
+
+        if (isPhoneAlreadyUsed(cleanPhone)) {
+          setValidationError(`⚠️ The Phone Number "${cleanPhone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+          return;
+        }
       }
 
-      if (isPhoneAlreadyUsed(cleanPhone)) {
-        setValidationError(`⚠️ The Phone Number "${cleanPhone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
-        return;
-      }
+      setIsSubmitting(true);
+
+      const randomId = generateUniqueRegistrationId();
+      const draftReg: Registration = {
+        id: randomId,
+        ...formData,
+        idCardUrl: idCardPreview,
+        paymentScreenshotUrl: '',
+        paymentAmount: ticketAmount,
+        paymentStatus: 'Pending',
+        paymentUtr: '',
+        approvalStatus: 'Pending_ID_Approval',
+        submittedAt: new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+      };
+
+      // Save to database & cloud storage async
+      const savedReg = await saveRegistrationAsync(draftReg);
+
+      setSubmittedRegistration(savedReg);
+
+      confetti({
+        particleCount: 100,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
+      });
+    } catch (err) {
+      console.error('Registration submit error:', err);
+      setValidationError('An unexpected error occurred while submitting. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // 2. ID Card Upload Requirement
-    if (!idCardPreview) {
-      setValidationError('Please upload a clear scanned copy or photo of your College Student ID Card.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const randomId = generateUniqueRegistrationId();
-    const draftReg: Registration = {
-      id: randomId,
-      ...formData,
-      idCardUrl: idCardPreview,
-      paymentScreenshotUrl: '',
-      paymentAmount: ticketAmount,
-      paymentStatus: 'Pending',
-      paymentUtr: '',
-      approvalStatus: 'Pending_ID_Approval',
-      submittedAt: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-    };
-
-    // Save to database & cloud storage async
-    const savedReg = await saveRegistrationAsync(draftReg);
-
-    setIsSubmitting(false);
-    setSubmittedRegistration(savedReg);
-
-    confetti({
-      particleCount: 100,
-      spread: 80,
-      origin: { y: 0.6 },
-      colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
-    });
   };
 
   return (
