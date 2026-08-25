@@ -198,9 +198,13 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     setPaymentError(null);
     setHasSearched(true);
 
-    // 1. Show instant cached match immediately (0ms) so user sees UI instantly
+    // 1. Show instant cached match immediately if available
     const instantMatch = findRegistration(searchQuery);
-    setSearchResult(instantMatch || null);
+    if (instantMatch) {
+      setSearchResult(instantMatch);
+    } else {
+      setSearchResult(undefined);
+    }
 
     // 2. Fetch fresh live status from cloud DB (Firebase & Supabase)
     try {
@@ -208,6 +212,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       setSearchResult(latest || instantMatch || null);
     } catch (err) {
       console.warn('Live lookup search notice:', err);
+      if (!instantMatch) setSearchResult(null);
     } finally {
       setIsSearching(false);
     }
@@ -340,8 +345,17 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       {/* Result Display */}
       {hasSearched && (
         <div className="animate-fadeIn">
-          {searchResult === undefined || searchResult === null ? (
-            /* Not Found State */
+          {isSearching && !searchResult ? (
+            /* Searching Spinner State Card */
+            <div className="p-8 bg-amber-50/70 border border-amber-200 rounded-2xl text-center space-y-3 shadow-sm">
+              <RefreshCw className="w-8 h-8 mx-auto text-amber-600 animate-spin" />
+              <h4 className="font-serif font-bold text-lg text-amber-950">Searching Cloud Database...</h4>
+              <p className="text-xs text-amber-700 max-w-md mx-auto">
+                Checking live pass registrations in Kruponam event system for "{searchQuery}".
+              </p>
+            </div>
+          ) : searchResult === null ? (
+            /* Not Found State (Only shown after search completes) */
             <div className="p-8 bg-amber-50/80 border border-amber-200 rounded-2xl text-center space-y-2">
               <div className="w-12 h-12 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-600 font-bold text-xl">
                 🔎
@@ -351,7 +365,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 We couldn't find any registration matching "{searchQuery}". Please check your details or complete a new registration.
               </p>
             </div>
-          ) : searchResult.approvalStatus === 'Approved' ? (
+          ) : searchResult?.approvalStatus === 'Approved' ? (
             /* APPROVED PASS STATE */
             <div className="space-y-4">
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
@@ -560,7 +574,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </div>
               )}
             </div>
-          ) : searchResult.approvalStatus === 'ID_Approved' ? (
+          ) : searchResult?.approvalStatus === 'ID_Approved' ? (
             /* STAGE 2 UNLOCKED: ID APPROVED -> PAY ₹700 & UPLOAD SCREENSHOT */
             <div className="space-y-6">
               <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-center font-bold text-sm space-y-1 shadow-sm">
@@ -704,7 +718,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 </button>
               </form>
             </div>
-          ) : searchResult.approvalStatus === 'Payment_Pending' ? (
+          ) : searchResult?.approvalStatus === 'Payment_Pending' ? (
             /* PAYMENT PENDING REVIEW */
             <div className="p-8 bg-amber-50/90 border-2 border-amber-300 rounded-3xl text-center space-y-4 shadow-md">
               <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 font-bold text-2xl animate-pulse">
@@ -720,14 +734,14 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </h4>
 
               <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your ₹{searchResult.paymentAmount || ticketAmount} payment screenshot & UTR (<span className="font-mono font-bold">{searchResult.paymentUtr}</span>) have been received. Admin is verifying the payment receipt to issue your official QR pass.
+                Hello <span className="font-bold text-amber-900">{searchResult?.fullName}</span>, your ₹{searchResult?.paymentAmount || ticketAmount} payment screenshot & UTR (<span className="font-mono font-bold">{searchResult?.paymentUtr}</span>) have been received. Admin is verifying the payment receipt to issue your official QR pass.
               </p>
 
               <div className="pt-2 text-xs text-amber-800 font-semibold">
                 ⏱️ Estimated Verification: 1-2 Hours • Check back soon!
               </div>
             </div>
-          ) : searchResult.approvalStatus === 'Pending_ID_Approval' || searchResult.approvalStatus === 'Pending' ? (
+          ) : searchResult?.approvalStatus === 'Pending_ID_Approval' || searchResult?.approvalStatus === 'Pending' ? (
             /* STAGE 1 PENDING ID REVIEW */
             <div className="p-8 bg-amber-50/90 border-2 border-amber-300 rounded-3xl text-center space-y-4 shadow-md">
               <div className="w-16 h-16 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-700 font-bold text-2xl animate-pulse">
@@ -743,7 +757,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </h4>
 
               <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Hello <span className="font-bold text-amber-900">{searchResult.fullName}</span>, your student details and Student ID Card photo have been received. The admin committee is verifying your Student ID Card.
+                Hello <span className="font-bold text-amber-900">{searchResult?.fullName}</span>, your student details and Student ID Card photo have been received. The admin committee is verifying your Student ID Card.
               </p>
 
               <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl text-xs text-amber-950 font-medium">
@@ -768,7 +782,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                 <div className="bg-white p-4 rounded-2xl border border-rose-200 text-xs text-rose-900 font-medium max-w-md mx-auto text-left space-y-1">
                   <span className="font-bold block text-rose-950">Reason provided by Admin:</span>
-                  <p className="text-slate-800 italic">"{searchResult.rejectionReason || 'Uploaded ID Card or Payment UTR could not be verified.'}"</p>
+                  <p className="text-slate-800 italic">"{searchResult?.rejectionReason || 'Uploaded ID Card or Payment UTR could not be verified.'}"</p>
                 </div>
 
                 <p className="text-slate-600 text-xs font-medium">
