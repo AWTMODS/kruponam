@@ -515,28 +515,47 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const approvalRate = totalApps > 0 ? Math.round((approvedApps / totalApps) * 100) : 0;
   const gateRate = approvedApps > 0 ? Math.round((reportedApps / approvedApps) * 100) : 0;
 
-  const filteredRegistrations = registrations.filter((item) => {
-    let matchesFilter = true;
-    if (statusFilter === 'Reported') {
-      matchesFilter = !!item.isReported;
-    } else if (statusFilter === 'Pending_ID_Approval') {
-      matchesFilter = item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending';
-    } else if (statusFilter !== 'all') {
-      matchesFilter = item.approvalStatus === statusFilter;
-    }
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return matchesFilter;
-    const matchesQuery =
-      item.fullName.toLowerCase().includes(q) ||
-      item.email.toLowerCase().includes(q) ||
-      item.id.toLowerCase().includes(q) ||
-      item.phone.toLowerCase().includes(q) ||
-      isPhoneMatch(item.phone, q) ||
-      (item.paymentUtr && item.paymentUtr.toLowerCase().includes(q)) ||
-      item.department.toLowerCase().includes(q) ||
-      (item.section && item.section.toLowerCase().includes(q));
-    return matchesFilter && matchesQuery;
-  });
+  const STATUS_PRIORITY: Record<string, number> = {
+    'Pending_ID_Approval': 1,
+    'Pending': 1,
+    'Payment_Pending': 2,
+    'ID_Approved': 3,
+    'Approved': 4,
+    'Rejected': 5,
+  };
+
+  const filteredRegistrations = registrations
+    .filter((item) => {
+      let matchesFilter = true;
+      if (statusFilter === 'Reported') {
+        matchesFilter = !!item.isReported;
+      } else if (statusFilter === 'Pending_ID_Approval') {
+        matchesFilter = item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending';
+      } else if (statusFilter !== 'all') {
+        matchesFilter = item.approvalStatus === statusFilter;
+      }
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return matchesFilter;
+      const matchesQuery =
+        item.fullName.toLowerCase().includes(q) ||
+        item.email.toLowerCase().includes(q) ||
+        item.id.toLowerCase().includes(q) ||
+        item.phone.toLowerCase().includes(q) ||
+        isPhoneMatch(item.phone, q) ||
+        (item.paymentUtr && item.paymentUtr.toLowerCase().includes(q)) ||
+        item.department.toLowerCase().includes(q) ||
+        (item.section && item.section.toLowerCase().includes(q));
+      return matchesFilter && matchesQuery;
+    })
+    .sort((a, b) => {
+      const pA = STATUS_PRIORITY[a.approvalStatus] ?? 99;
+      const pB = STATUS_PRIORITY[b.approvalStatus] ?? 99;
+      if (pA !== pB) return pA - pB;
+
+      const timeA = a.updatedAt || a.submittedAt || '';
+      const timeB = b.updatedAt || b.submittedAt || '';
+      return timeB.localeCompare(timeA);
+    });
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-3 sm:p-6 lg:p-8 font-sans relative overflow-x-hidden">
@@ -1087,6 +1106,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <tr className="bg-slate-950 text-slate-400 font-extrabold uppercase tracking-wider border-b border-slate-800 text-[11px]">
                       <th className="p-4">Reg ID</th>
                       <th className="p-4">Student Info</th>
+                      <th className="p-4">Submitted Date & Time</th>
                       <th className="p-4">Dept & Section</th>
                       <th className="p-4">Files / Verification</th>
                       <th className="p-4">Payment UTR</th>
@@ -1098,7 +1118,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
                     {filteredRegistrations.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-12 text-center text-slate-500 font-medium">
+                        <td colSpan={9} className="p-12 text-center text-slate-500 font-medium">
                           <div className="max-w-xs mx-auto space-y-2">
                             <Filter className="w-8 h-8 mx-auto text-slate-600" />
                             <p className="text-sm font-bold text-slate-400">No matching registrations found</p>
@@ -1131,6 +1151,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                                   <span>{item.phone}</span>
                                 </p>
                               </div>
+                            </div>
+                          </td>
+
+                          {/* Date & Time */}
+                          <td className="p-4">
+                            <div className="space-y-1">
+                              <span className="text-slate-200 font-bold text-xs flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                {item.submittedAt || 'N/A'}
+                              </span>
+                              {item.updatedAt && (
+                                <span className="text-[10px] text-slate-400 block font-mono">
+                                  Updated: {new Date(item.updatedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -2302,6 +2337,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 ['Academic Year', inspectItem.year],
                 ['Email Address', inspectItem.email],
                 ['Contact Phone', inspectItem.phone],
+                ['Submission Date & Time', inspectItem.submittedAt || 'N/A'],
+                ['Last Updated / Approval', inspectItem.updatedAt ? new Date(inspectItem.updatedAt).toLocaleString('en-US') : (inspectItem.approvedAt || 'N/A')],
                 ['₹700 Payment UTR', inspectItem.paymentUtr],
                 ['Pass Tier', inspectItem.ticketType],
                 ['Gate Gate Check-In', inspectItem.isReported ? `✓ Reported (${inspectItem.reportedAt || 'Yes'})` : 'Not Reported Yet'],
