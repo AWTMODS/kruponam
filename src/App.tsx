@@ -77,6 +77,8 @@ export function App() {
 
   const handleSelectTicketFromPasses = (passName: string) => {
     setSelectedPass(passName);
+  };
+
   const handleOpenLookup = () => {
     setActiveView('lookup');
     window.scrollTo({ top: 0, behavior: 'instant' });

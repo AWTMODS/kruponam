@@ -276,6 +276,89 @@ const STATUS_RANK: Record<string, number> = {
   'Approved': 4,
 };
 
+export const deduplicateRegistrations = (list: Registration[]): Registration[] => {
+  const deletedIds = getDeletedIds();
+  const validList = list.filter((r) => r && r.id && !deletedIds.has(r.id));
+
+  // Map to store primary record by email / phone
+  const studentGroups: Map<string, Registration[]> = new Map();
+
+  validList.forEach((r) => {
+    const cleanEmail = r.email ? r.email.trim().toLowerCase() : '';
+    const cleanPhone = r.phone ? normalizePhoneNumber(r.phone) : '';
+    
+    // Group key prioritizing email then normalized phone
+    const key = cleanEmail ? `email_${cleanEmail}` : (cleanPhone ? `phone_${cleanPhone}` : `id_${r.id}`);
+
+    if (!studentGroups.has(key)) {
+      studentGroups.set(key, []);
+    }
+    studentGroups.get(key)!.push(r);
+  });
+
+  const mergedList: Registration[] = [];
+  const idsToRemove: string[] = [];
+
+  studentGroups.forEach((group) => {
+    if (group.length === 1) {
+      mergedList.push(group[0]);
+    } else {
+      // Sort group to select the primary record (prioritizes KRP-531657, best status, has UTR/ID, latest)
+      group.sort((a, b) => {
+        if (a.id.toUpperCase() === 'KRP-531657') return -1;
+        if (b.id.toUpperCase() === 'KRP-531657') return 1;
+
+        const rankA = STATUS_RANK[a.approvalStatus] || 0;
+        const rankB = STATUS_RANK[b.approvalStatus] || 0;
+        if (rankA !== rankB) return rankB - rankA;
+
+        const hasUtrA = (a.paymentUtr && a.paymentUtr.trim()) ? 1 : 0;
+        const hasUtrB = (b.paymentUtr && b.paymentUtr.trim()) ? 1 : 0;
+        if (hasUtrA !== hasUtrB) return hasUtrB - hasUtrA;
+
+        const hasIdCardA = (a.idCardUrl && a.idCardUrl.length > 50) ? 1 : 0;
+        const hasIdCardB = (b.idCardUrl && b.idCardUrl.length > 50) ? 1 : 0;
+        if (hasIdCardA !== hasIdCardB) return hasIdCardB - hasIdCardA;
+
+        return (b.updatedAt || b.submittedAt || '').localeCompare(a.updatedAt || a.submittedAt || '');
+      });
+
+      const primary = { ...group[0] };
+      const duplicates = group.slice(1);
+
+      duplicates.forEach((dup) => {
+        if (!primary.idCardUrl && dup.idCardUrl) primary.idCardUrl = dup.idCardUrl;
+        if (!primary.paymentScreenshotUrl && dup.paymentScreenshotUrl) primary.paymentScreenshotUrl = dup.paymentScreenshotUrl;
+        if (!primary.paymentUtr && dup.paymentUtr) primary.paymentUtr = dup.paymentUtr;
+        if (!primary.rejectionReason && dup.rejectionReason) primary.rejectionReason = dup.rejectionReason;
+        if (dup.isReported) {
+          primary.isReported = true;
+          primary.reportedAt = dup.reportedAt || primary.reportedAt;
+        }
+        idsToRemove.push(dup.id);
+      });
+
+      mergedList.push(primary);
+    }
+  });
+
+  // Purge duplicate IDs from local & cloud storage
+  if (idsToRemove.length > 0) {
+    idsToRemove.forEach((id) => {
+      markIdAsDeleted(id);
+      deleteFromIndexedDB(id);
+      if (isFirebaseConfigured()) {
+        deleteRegistrationFromFirebase(id).catch(() => {});
+      }
+      if (isSupabaseConfigured()) {
+        deleteRegistrationFromSupabase(id).catch(() => {});
+      }
+    });
+  }
+
+  return mergedList;
+};
+
 export const syncCloudRegistrations = async (): Promise<Registration[]> => {
   const deletedIds = getDeletedIds();
   const localList = getRegistrations();
@@ -288,14 +371,6 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
       const existing = localMap.get(r.id);
       if (!existing) {
         localMap.set(r.id, r);
-      } else if (!isSameStudent(existing, r)) {
-        let newId = generateUniqueRegistrationId();
-        while (localMap.has(newId)) {
-          newId = generateUniqueRegistrationId();
-        }
-        const reassigned = { ...r, id: newId };
-        localMap.set(newId, reassigned);
-        syncToIndexedDB(reassigned);
       } else {
         localMap.set(r.id, { ...existing, ...r });
       }
@@ -307,30 +382,15 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     const existing = localMap.get(r.id);
     if (!existing) {
       localMap.set(r.id, r);
-    } else if (!isSameStudent(existing, r)) {
-      // ID Collision! Two different students were assigned the exact same ID (e.g. KRP-222792).
-      // Assign the incoming record a brand-new unique ID so neither student's data is corrupted!
-      let newId = generateUniqueRegistrationId();
-      while (localMap.has(newId)) {
-        newId = generateUniqueRegistrationId();
-      }
-      const reassigned = { ...r, id: newId };
-      localMap.set(newId, reassigned);
-      saveRegistrationToSupabase(reassigned).catch(() => {});
-      if (isFirebaseConfigured()) {
-        saveRegistrationToFirebase(reassigned).catch(() => {});
-      }
     } else {
       const existingRank = STATUS_RANK[existing.approvalStatus] || 0;
       const incomingRank = STATUS_RANK[r.approvalStatus] || 0;
 
-      // Cloud status always takes authority for Admin approval status and payment verification!
       const preferCloudStatus = incomingRank >= existingRank || r.approvalStatus !== existing.approvalStatus;
 
       const mergedRecord: Registration = {
         ...existing,
         ...r,
-        // Keep heavier images if local has them and cloud is empty
         idCardUrl: (r.idCardUrl && r.idCardUrl.length > 50) ? r.idCardUrl : (existing.idCardUrl || r.idCardUrl),
         paymentScreenshotUrl: (r.paymentScreenshotUrl && r.paymentScreenshotUrl.length > 50) ? r.paymentScreenshotUrl : (existing.paymentScreenshotUrl || r.paymentScreenshotUrl),
         paymentUtr: r.paymentUtr || existing.paymentUtr,
@@ -381,7 +441,9 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   }
 
-  const finalMerged = Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
+  const rawMerged = Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));
+  const finalMerged = deduplicateRegistrations(rawMerged);
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(finalMerged));
   } catch (e) {

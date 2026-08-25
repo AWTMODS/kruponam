@@ -126,6 +126,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setValidationError(null);
 
     // ID Card Upload Requirement
@@ -134,24 +135,11 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       return;
     }
 
-    // Check if user already exists
+    // Check if user already exists by Email or Phone
     const existing = findRegistration(formData.email) || findRegistration(formData.phone);
 
     if (existing) {
-      const existingNameClean = existing.fullName.trim().toLowerCase();
-      const formNameClean = formData.fullName.trim().toLowerCase();
-
-      // Detect if existing record was corrupted by an ID collision with a completely different student
-      const firstWordExisting = existingNameClean.split(' ')[0] || '';
-      const firstWordForm = formNameClean.split(' ')[0] || '';
-      const isCorruptedCollision = firstWordExisting.length >= 3 && firstWordForm.length >= 3 &&
-                                    !existingNameClean.includes(firstWordForm) &&
-                                    !formNameClean.includes(firstWordExisting);
-
-      if (isCorruptedCollision) {
-        // ID collision detected between different students (e.g. Ashin vs Abhishek)!
-        // Do not block registration — continue to create a fresh, clean registration with a new unique ID!
-      } else if (existing.approvalStatus === 'Rejected') {
+      if (existing.approvalStatus === 'Rejected') {
         setIsSubmitting(true);
         const updatedReg: Registration = {
           ...existing,
@@ -176,7 +164,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         });
         return;
       } else {
-        // If existing registration is found and valid, block duplicate registration!
+        // If existing registration is found, block duplicate registration!
         setValidationError(`⚠️ The Email Address "${formData.email}" or Phone Number "${formData.phone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
         return;
       }

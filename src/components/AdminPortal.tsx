@@ -6,7 +6,7 @@ import {
   Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame
 } from 'lucide-react';
 import { 
-  syncCloudRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
+  syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
   exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
@@ -179,6 +179,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       });
     }
     setTimeout(() => setIsRefreshing(false), 300);
+  };
+
+  const handleCleanDuplicates = async () => {
+    setIsRefreshing(true);
+    const countBefore = registrations.length;
+    const synced = await syncCloudRegistrations();
+    const cleaned = deduplicateRegistrations(synced);
+    setRegistrations(cleaned);
+    setIsRefreshing(false);
+    const removedCount = countBefore - cleaned.length;
+    if (removedCount > 0) {
+      addToast(`🧹 Removed ${removedCount} duplicate entries! Ashin ticket set to KRP-531657.`, 'success');
+    } else {
+      addToast(`✨ All registrations are clean! Ashin ticket set to KRP-531657.`, 'info');
+    }
   };
 
   // Manual Add / Restore Registration State
@@ -656,6 +671,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" />
                 <span className="hidden sm:inline">CSV</span>
+              </button>
+
+              <button
+                onClick={handleCleanDuplicates}
+                title="Deduplicate & Remove Duplicate Tickets (Keep KRP-531657 for Ashin)"
+                className="px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-rose-500/40 text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Clean Duplicates</span>
               </button>
 
               <button
