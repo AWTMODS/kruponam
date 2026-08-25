@@ -6,6 +6,7 @@ import {
   isEmailAlreadyUsed, 
   isPhoneAlreadyUsed, 
   findRegistration,
+  findRegistrationAsync,
   generateUniqueRegistrationId,
   type Registration 
 } from '../services/registrationService';
@@ -135,8 +136,13 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       return;
     }
 
-    // Check if user already exists by Email or Phone
-    const existing = findRegistration(formData.email) || findRegistration(formData.phone);
+    const cleanEmail = formData.email.trim();
+    const cleanPhone = formData.phone.trim();
+
+    // Check if user already exists by Email or Phone in local storage OR live cloud database
+    const existingLocal = findRegistration(cleanEmail) || findRegistration(cleanPhone);
+    const existingCloud = existingLocal ? null : ((await findRegistrationAsync(cleanEmail)) || (await findRegistrationAsync(cleanPhone)));
+    const existing = existingLocal || existingCloud;
 
     if (existing) {
       if (existing.approvalStatus === 'Rejected') {
@@ -144,6 +150,9 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         const updatedReg: Registration = {
           ...existing,
           ...formData,
+          fullName: formData.fullName.trim(),
+          email: cleanEmail,
+          phone: cleanPhone,
           idCardUrl: idCardPreview || existing.idCardUrl,
           approvalStatus: 'Pending_ID_Approval',
           rejectionReason: undefined,
@@ -165,17 +174,17 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         return;
       } else {
         // If existing registration is found, block duplicate registration!
-        setValidationError(`⚠️ The Email Address "${formData.email}" or Phone Number "${formData.phone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
+        setValidationError(`⚠️ The Email Address "${cleanEmail}" or Phone Number "${cleanPhone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
         return;
       }
     } else {
-      if (isEmailAlreadyUsed(formData.email)) {
-        setValidationError(`⚠️ The Email Address "${formData.email}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+      if (isEmailAlreadyUsed(cleanEmail)) {
+        setValidationError(`⚠️ The Email Address "${cleanEmail}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
         return;
       }
 
-      if (isPhoneAlreadyUsed(formData.phone)) {
-        setValidationError(`⚠️ The Phone Number "${formData.phone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
+      if (isPhoneAlreadyUsed(cleanPhone)) {
+        setValidationError(`⚠️ The Phone Number "${cleanPhone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
         return;
       }
     }

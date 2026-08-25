@@ -924,18 +924,20 @@ export const markAsReported = (query: string): ScanResult => {
 };
 
 export const findRegistration = (query: string): Registration | undefined => {
+  if (!query || !query.trim()) return undefined;
   const registrations = getRegistrations();
   const q = query.trim().toLowerCase();
   return registrations.find(
     (r) =>
-      r.id.toLowerCase() === q ||
-      r.email.toLowerCase() === q ||
+      (r.id && r.id.trim().toLowerCase() === q) ||
+      (r.email && r.email.trim().toLowerCase() === q) ||
       isPhoneMatch(r.phone, q) ||
-      r.paymentUtr === q
+      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
   );
 };
 
 export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
+  if (!query || !query.trim()) return undefined;
   const q = query.trim().toLowerCase();
   
   let syncedList = getRegistrations();
@@ -950,20 +952,20 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
 
   let found = syncedList.find(
     (r) =>
-      r.id.toLowerCase() === q ||
-      r.email.toLowerCase() === q ||
+      (r.id && r.id.trim().toLowerCase() === q) ||
+      (r.email && r.email.trim().toLowerCase() === q) ||
       isPhoneMatch(r.phone, q) ||
-      r.paymentUtr === q
+      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
   );
 
   if (found) return found;
 
   return INITIAL_REGISTRATIONS.find(
     (r) =>
-      r.id.toLowerCase() === q ||
-      r.email.toLowerCase() === q ||
+      (r.id && r.id.trim().toLowerCase() === q) ||
+      (r.email && r.email.trim().toLowerCase() === q) ||
       isPhoneMatch(r.phone, q) ||
-      r.paymentUtr === q
+      (r.paymentUtr && r.paymentUtr.trim().toLowerCase() === q)
   );
 };
 
