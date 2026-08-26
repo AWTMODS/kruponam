@@ -631,27 +631,38 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
   };
 
+  // ── Helper to identify any VIP record ────────────────────────────────────
+  const isVipRecord = (r: Registration): boolean => {
+    return (
+      r.approvalStatus === 'VIP_Pending' ||
+      r.approvalStatus === 'VIP' ||
+      r.ticketType === 'VIP Pass' ||
+      r.paymentUtr === 'VIP_COMPLIMENTARY' ||
+      r.paymentUtr === 'VIP'
+    );
+  };
+
   // ── VIP and Normal Metrics Segregation ──────────────────────────────────
-  const normalRegistrations = registrations.filter((r) => r.approvalStatus !== 'VIP_Pending');
+  const normalRegistrations = registrations.filter((r) => !isVipRecord(r));
   const totalApps = normalRegistrations.length;
   const pendingIdApps = normalRegistrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
   const idApprovedApps = normalRegistrations.filter((r) => r.approvalStatus === 'ID_Approved').length;
   const paymentPendingApps = normalRegistrations.filter((r) => r.approvalStatus === 'Payment_Pending').length;
-  const approvedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Approved').length;
-  const rejectedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Rejected').length;
-  const reportedApps = normalRegistrations.filter((r) => r.isReported && r.approvalStatus !== 'VIP_Pending').length;
+  const approvedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Approved' && !isVipRecord(r)).length;
+  const rejectedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Rejected' && !isVipRecord(r)).length;
+  const reportedApps = normalRegistrations.filter((r) => r.isReported && !isVipRecord(r)).length;
   
   // Revenue only calculates verified student paid passes (₹0 VIP passes contribute ₹0)
   const totalRevenue = normalRegistrations
-    .filter((r) => r.approvalStatus === 'Approved' && r.ticketType !== 'VIP Pass' && (r.paymentAmount === undefined || r.paymentAmount > 0))
+    .filter((r) => r.approvalStatus === 'Approved' && !isVipRecord(r) && (r.paymentAmount === undefined || r.paymentAmount > 0))
     .reduce((sum, r) => sum + (r.paymentAmount !== undefined ? r.paymentAmount : 700), 0);
   
   const approvalRate = totalApps > 0 ? Math.round((approvedApps / totalApps) * 100) : 0;
   const gateRate = approvedApps > 0 ? Math.round((reportedApps / approvedApps) * 100) : 0;
 
   // VIP Metrics
-  const vipOfficialCount = registrations.filter((r) => r.approvalStatus === 'VIP').length;
-  const vipPendingCount = registrations.filter((r) => r.approvalStatus === 'VIP_Pending').length;
+  const vipOfficialCount = registrations.filter((r) => r.approvalStatus === 'VIP' && isVipRecord(r)).length;
+  const vipPendingCount = registrations.filter((r) => r.approvalStatus === 'VIP_Pending' || (isVipRecord(r) && r.approvalStatus !== 'VIP')).length;
   const totalVipGuests = vipOfficialCount + vipPendingCount;
 
   const STATUS_PRIORITY: Record<string, number> = {
@@ -669,7 +680,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     .filter((item) => {
       // 1. VIP Specific Filter Tabs
       if (statusFilter === 'VIP_SECTION') {
-        return item.approvalStatus === 'VIP' || item.approvalStatus === 'VIP_Pending' || item.ticketType === 'VIP Pass';
+        return isVipRecord(item);
       }
       if (statusFilter === 'VIP_Pending') {
         return item.approvalStatus === 'VIP_Pending';
@@ -678,8 +689,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         return item.approvalStatus === 'VIP';
       }
 
-      // 2. Hide VIP_Pending passes from normal listings and normal status filters
-      if (item.approvalStatus === 'VIP_Pending') {
+      // 2. Hide ALL VIP passes from normal listings and normal status filters
+      if (isVipRecord(item)) {
         return false;
       }
 
