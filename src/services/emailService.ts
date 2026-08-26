@@ -62,7 +62,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   📅 OFFICIAL EVENT DATE: FRIDAY, 11 SEPTEMBER 2026 (8:00 AM)
                 </p>
                 <p style="margin:6px 0 0;font-size:12px;color:#78350F;line-height:1.6;">
-                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at Krupanidhi Degree College. Your digital event pass below is active, validated, and scanner-ready for campus gate entry!
+                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at <strong>PSR Convention Centre, Bengaluru</strong>. Your digital event pass below is active, validated, and scanner-ready for venue entry!
                 </p>
               </div>
 
@@ -73,7 +73,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                 Your registration for <strong>Kruponam 2026</strong> has been reviewed and 
                 <strong style="color:#0D472B;">officially approved</strong> by the Krupanidhi Event Committee.
                 Your updated digital event pass and payment invoice are attached below.
-                Please carry this pass (digital or printed) to the campus gate for entry.
+                Please carry this pass (digital or printed) to the venue entrance for entry.
               </p>
             </td>
           </tr>
@@ -101,7 +101,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Payment UTR / Ref', (!registration.paymentUtr || registration.paymentUtr === 'VIP_COMPLIMENTARY' || registration.paymentUtr === 'VIP') ? 'UPI-VERIFIED-700' : registration.paymentUtr],
                   ['Payment Status', '✅ Verified & Confirmed'],
                   ['Event Date', '11 September 2026, 8:00 AM onwards'],
-                  ['Venue', 'Krupanidhi Degree College, Bengaluru'],
+                  ['Venue', 'PSR Convention Centre, Bengaluru'],
                   ['Approved On', registration.approvedAt || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })],
                 ].map(([label, value], i) => `
                   <tr style="background:${i % 2 === 0 ? '#FFFFFF' : '#FAFAF5'};">
@@ -165,7 +165,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                         : `<div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;color:#0D472B;font-size:11px;font-weight:700;">QR Code<br/>${registration.id}</div>`
                       }
                     </div>
-                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;">SCAN AT CAMPUS GATE</p>
+                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;">SCAN AT VENUE GATE</p>
                   </td>
                 </tr>
                 <!-- Ticket Footer -->
@@ -184,7 +184,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
           <tr>
             <td style="padding:0 40px 24px;">
               <p style="font-size:12px;color:#777;line-height:1.7;margin:0;">
-                📌 <strong>Important:</strong> Please carry this pass (digital screenshot or print) at the campus gate on event day. 
+                📌 <strong>Important:</strong> Please carry this pass (digital screenshot or print) at the venue entrance on event day. 
                 Your QR code will be scanned by the event coordinators for entry and Onasadya feast token validation.
               </p>
               <p style="font-size:12px;color:#777;margin:8px 0 0;">
