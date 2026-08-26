@@ -1457,13 +1457,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                               )}
 
                               {/* Reject Button */}
-                              {item.approvalStatus !== 'Rejected' && (
+                              {item.approvalStatus !== 'Rejected' && item.approvalStatus !== 'VIP' && (
                                 <button
                                   onClick={() => setShowRejectModal(item.id)}
                                   className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-700 font-bold text-xs transition-all"
                                   title="Reject request"
                                 >
                                   Reject
+                                </button>
+                              )}
+
+                              {/* Convert to VIP Button (for existing student registrations) */}
+                              {item.approvalStatus !== 'VIP' && item.approvalStatus !== 'VIP_Pending' && (
+                                <button
+                                  onClick={() => {
+                                    setVipFullName(item.fullName);
+                                    setVipEmail(item.email);
+                                    setVipPhone(item.phone);
+                                    setVipDepartment(item.department || 'VIP Guest');
+                                    setVipSection(item.section || 'Honored Guest');
+                                    setVipYear(item.year || 'Faculty/VIP');
+                                    setShowVipModal(true);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-amber-950/80 text-amber-300 border border-amber-500/30 hover:border-gold-royal font-bold text-xs transition-all flex items-center gap-1 shrink-0 shadow-sm"
+                                  title="Convert / Upgrade this student to VIP Pass"
+                                >
+                                  <Crown className="w-3.5 h-3.5 text-gold-royal" />
+                                  <span>Make VIP</span>
                                 </button>
                               )}
 
