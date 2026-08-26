@@ -56,14 +56,23 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
 
           <!-- Greeting -->
           <tr>
-            <td style="padding:32px 40px 8px;">
+            <td style="padding:28px 40px 8px;">
+              <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px 18px;margin-bottom:18px;">
+                <p style="margin:0;font-size:13px;font-weight:800;color:#92400E;letter-spacing:0.5px;">
+                  📅 OFFICIAL EVENT DATE: FRIDAY, 11 SEPTEMBER 2026 (8:00 AM)
+                </p>
+                <p style="margin:6px 0 0;font-size:12px;color:#78350F;line-height:1.6;">
+                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at Krupanidhi Degree College. Your digital event pass below is active, validated, and scanner-ready for campus gate entry!
+                </p>
+              </div>
+
               <p style="font-size:15px;color:#2D4A3E;margin:0;">
                 Dear <strong>${registration.fullName}</strong>,
               </p>
               <p style="font-size:13px;color:#555;line-height:1.7;margin:12px 0 0;">
                 Your registration for <strong>Kruponam 2026</strong> has been reviewed and 
                 <strong style="color:#0D472B;">officially approved</strong> by the Krupanidhi Event Committee.
-                Your digital event pass and payment invoice are attached below.
+                Your updated digital event pass and payment invoice are attached below.
                 Please carry this pass (digital or printed) to the campus gate for entry.
               </p>
             </td>
@@ -262,7 +271,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         body: JSON.stringify({
           from: cfg.resendFromEmail || 'Kruponam 2026 Pass <pass@lifestack.in>',
           to: [registration.email],
-          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
+          subject: `🎟️ Kruponam 2026 Official Pass [Sep 11, 2026] & Invoice (${registration.id})`,
           html: html,
         }),
       });
@@ -301,7 +310,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         body: JSON.stringify({
           sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
           to: [{ email: registration.email, name: registration.fullName }],
-          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
+          subject: `🎟️ Kruponam 2026 Official Pass [Sep 11, 2026] & Invoice (${registration.id})`,
           htmlContent: html,
         }),
       });
