@@ -171,8 +171,8 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   }, []);
 
   useEffect(() => {
-    if (searchResult && searchResult.approvalStatus === 'Approved') {
-      generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr}`).then((url) => {
+    if (searchResult && (searchResult.approvalStatus === 'Approved' || searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending')) {
+      generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr || 'VIP'}`).then((url) => {
         setQrCodeUrl(url);
       });
     } else {
@@ -380,12 +380,20 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 We couldn't find any registration matching "{searchQuery}". Please check your details or complete a new registration.
               </p>
             </div>
-          ) : searchResult?.approvalStatus === 'Approved' ? (
-            /* APPROVED PASS STATE */
+          ) : (searchResult?.approvalStatus === 'Approved' || searchResult?.approvalStatus === 'VIP' || searchResult?.approvalStatus === 'VIP_Pending') ? (
+            /* APPROVED PASS STATE (INCLUDING VIP PASSES) */
             <div className="space-y-4">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+              <div className={`p-4 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 ${
+                searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
+                  ? 'bg-amber-500/20 border border-gold-royal text-gold-dark'
+                  : 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+              }`}>
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Pass Approved by Admin! ₹{searchResult.paymentAmount || ticketAmount} Payment & Student ID Verified.</span>
+                <span>
+                  {searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
+                    ? '👑 Official VIP Pass Confirmed! Complimentary Access & Onasadya Token Included.'
+                    : `Pass Approved by Admin! ₹${searchResult.paymentAmount || ticketAmount} Payment & Student ID Verified.`}
+                </span>
               </div>
 
               {/* Gate Reported Banner */}
@@ -503,7 +511,11 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
                         }`}>Payment Status</p>
-                        <p className="font-semibold text-emerald-400 font-mono">✓ ₹{searchResult.paymentAmount || ticketAmount} Paid ({searchResult.paymentUtr})</p>
+                        <p className="font-semibold text-emerald-400 font-mono">
+                          {searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
+                            ? '👑 VIP Pass (Complimentary)'
+                            : `✓ ₹${searchResult.paymentAmount || ticketAmount} Paid (${searchResult.paymentUtr})`}
+                        </p>
                       </div>
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${

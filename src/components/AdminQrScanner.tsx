@@ -24,7 +24,7 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   const lastScanTimeRef = useRef<number>(0);
 
   const registrations = getRegistrations();
-  const approvedList = registrations.filter((r) => r.approvalStatus === 'Approved');
+  const approvedList = registrations.filter((r) => r.approvalStatus === 'Approved' || r.approvalStatus === 'VIP' || r.approvalStatus === 'VIP_Pending');
 
   const handleProcessScan = async (code: string) => {
     if (!code.trim()) return;
@@ -310,7 +310,11 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                 <div className="grid grid-cols-2 gap-3 text-xs bg-slate-900/80 p-3 rounded-xl border border-emerald-800/60 max-w-md mx-auto text-left">
                   <div>
                     <span className="text-slate-400 uppercase font-bold block text-[10px]">Payment Verification</span>
-                    <span className="text-emerald-400 font-bold">✓ ₹700 Paid ({scanResult.registration?.paymentUtr})</span>
+                    <span className="text-emerald-400 font-bold">
+                      {scanResult.registration?.approvalStatus === 'VIP' || scanResult.registration?.approvalStatus === 'VIP_Pending' || scanResult.registration?.ticketType === 'VIP Pass'
+                        ? '👑 VIP Pass (Complimentary)'
+                        : `✓ ₹${scanResult.registration?.paymentAmount || 700} Paid (${scanResult.registration?.paymentUtr || 'Verified'})`}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-400 uppercase font-bold block text-[10px]">Onasadya Token</span>

@@ -3,11 +3,11 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown
 } from 'lucide-react';
 import { 
   syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
-  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, type Registration, type ApprovalStatus 
+  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
@@ -36,13 +36,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [loginError, setLoginError] = useState('');
 
   const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Reported'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Reported' | 'VIP_SECTION' | 'VIP' | 'VIP_Pending'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectItem, setInspectItem] = useState<Registration | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<Registration | null>(null);
   const [showScannerModal, setShowScannerModal] = useState(false);
+
+  // VIP Pass Issue Modal State
+  const [showVipModal, setShowVipModal] = useState(false);
+  const [vipFullName, setVipFullName] = useState('');
+  const [vipEmail, setVipEmail] = useState('');
+  const [vipPhone, setVipPhone] = useState('');
+  const [vipDepartment, setVipDepartment] = useState('VIP Guest');
+  const [vipSection, setVipSection] = useState('Honored Guest');
+  const [vipYear, setVipYear] = useState('Faculty/VIP');
+  const [vipIsPending, setVipIsPending] = useState(true);
+  const [vipSubmitting, setVipSubmitting] = useState(false);
+  const [convertingId, setConvertingId] = useState<string | null>(null);
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
@@ -510,18 +523,87 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const totalApps = registrations.length;
-  const pendingIdApps = registrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
-  const idApprovedApps = registrations.filter((r) => r.approvalStatus === 'ID_Approved').length;
-  const paymentPendingApps = registrations.filter((r) => r.approvalStatus === 'Payment_Pending').length;
-  const approvedApps = registrations.filter((r) => r.approvalStatus === 'Approved').length;
-  const rejectedApps = registrations.filter((r) => r.approvalStatus === 'Rejected').length;
-  const reportedApps = registrations.filter((r) => r.isReported).length;
-  const totalRevenue = approvedApps * 700;
+  // VIP Pass Issue Submission
+  const handleIssueVipSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vipFullName.trim() || !vipEmail.trim()) {
+      addToast('Please enter VIP Guest name and email address.', 'error');
+      return;
+    }
+    setVipSubmitting(true);
+    try {
+      const newVip = await issueVipPass({
+        fullName: vipFullName.trim(),
+        email: vipEmail.trim(),
+        phone: vipPhone.trim(),
+        department: vipDepartment.trim() || 'VIP Guest',
+        section: vipSection.trim() || 'Honored Guest',
+        year: vipYear.trim() || 'Faculty/VIP',
+        isVipPending: vipIsPending,
+      });
+      await loadData();
+      setVipSubmitting(false);
+      setShowVipModal(false);
+      setVipFullName('');
+      setVipEmail('');
+      setVipPhone('');
+      setVipDepartment('VIP Guest');
+      setVipSection('Honored Guest');
+      setVipYear('Faculty/VIP');
+      setVipIsPending(true);
+      addToast(
+        vipIsPending
+          ? `👑 VIP Pending pass issued for ${newVip.fullName} (${newVip.id})! Pass is active & scanner-ready, excluded from counts.`
+          : `👑 Official VIP pass issued for ${newVip.fullName} (${newVip.id})!`,
+        'success'
+      );
+    } catch (err: any) {
+      setVipSubmitting(false);
+      addToast('Failed to issue VIP pass: ' + (err.message || 'Unknown error'), 'error');
+    }
+  };
+
+  const handleConvertVip = async (id: string, name: string) => {
+    setConvertingId(id);
+    try {
+      const res = await convertToOfficialVip(id);
+      await loadData();
+      setConvertingId(null);
+      if (res) {
+        addToast(`🎉 ${name} has been officially converted to VIP and will now appear in the VIP dashboard!`, 'success');
+      }
+    } catch (err: any) {
+      setConvertingId(null);
+      addToast('Failed to convert to VIP: ' + (err.message || 'Unknown error'), 'error');
+    }
+  };
+
+  // ── VIP and Normal Metrics Segregation ──────────────────────────────────
+  const normalRegistrations = registrations.filter((r) => r.approvalStatus !== 'VIP_Pending');
+  const totalApps = normalRegistrations.length;
+  const pendingIdApps = normalRegistrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
+  const idApprovedApps = normalRegistrations.filter((r) => r.approvalStatus === 'ID_Approved').length;
+  const paymentPendingApps = normalRegistrations.filter((r) => r.approvalStatus === 'Payment_Pending').length;
+  const approvedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Approved').length;
+  const rejectedApps = normalRegistrations.filter((r) => r.approvalStatus === 'Rejected').length;
+  const reportedApps = normalRegistrations.filter((r) => r.isReported && r.approvalStatus !== 'VIP_Pending').length;
+  
+  // Revenue only calculates verified student paid passes (₹0 VIP passes contribute ₹0)
+  const totalRevenue = normalRegistrations
+    .filter((r) => r.approvalStatus === 'Approved' && r.ticketType !== 'VIP Pass' && (r.paymentAmount === undefined || r.paymentAmount > 0))
+    .reduce((sum, r) => sum + (r.paymentAmount !== undefined ? r.paymentAmount : 700), 0);
+  
   const approvalRate = totalApps > 0 ? Math.round((approvedApps / totalApps) * 100) : 0;
   const gateRate = approvedApps > 0 ? Math.round((reportedApps / approvedApps) * 100) : 0;
 
+  // VIP Metrics
+  const vipOfficialCount = registrations.filter((r) => r.approvalStatus === 'VIP').length;
+  const vipPendingCount = registrations.filter((r) => r.approvalStatus === 'VIP_Pending').length;
+  const totalVipGuests = vipOfficialCount + vipPendingCount;
+
   const STATUS_PRIORITY: Record<string, number> = {
+    'VIP': 0,
+    'VIP_Pending': 0,
     'Pending_ID_Approval': 1,
     'Pending': 1,
     'Payment_Pending': 2,
@@ -532,6 +614,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const filteredRegistrations = registrations
     .filter((item) => {
+      // 1. VIP Specific Filter Tabs
+      if (statusFilter === 'VIP_SECTION') {
+        return item.approvalStatus === 'VIP' || item.approvalStatus === 'VIP_Pending' || item.ticketType === 'VIP Pass';
+      }
+      if (statusFilter === 'VIP_Pending') {
+        return item.approvalStatus === 'VIP_Pending';
+      }
+      if (statusFilter === 'VIP') {
+        return item.approvalStatus === 'VIP';
+      }
+
+      // 2. Hide VIP_Pending passes from normal listings and normal status filters
+      if (item.approvalStatus === 'VIP_Pending') {
+        return false;
+      }
+
       let matchesFilter = true;
       if (statusFilter === 'Reported') {
         matchesFilter = !!item.isReported;
@@ -646,21 +744,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {isAuthenticated && (
             <>
               <button
+                onClick={() => setShowVipModal(true)}
+                title="Issue VIP or Complimentary Pass (Scanner-Ready, Excluded from Counts until Converted)"
+                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Crown className="w-3.5 h-3.5 text-slate-950" />
+                <span>Issue VIP Pass</span>
+              </button>
+
+              <button
                 onClick={() => setShowEmailDirectoryModal(true)}
                 title="View All Registered Student Email Addresses"
                 className="px-3.5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-blue-500/40 text-blue-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
               >
                 <Mail className="w-3.5 h-3.5 text-blue-400" />
                 <span>Email Directory ({registrations.length})</span>
-              </button>
-
-              <button
-                onClick={() => setShowAddModal(true)}
-                title="Manually Add or Restore Missing Student Registration ID (e.g. KRP-865167)"
-                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-gold-royal to-amber-500 hover:from-gold-light hover:to-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add / Restore ID</span>
               </button>
 
               <button
@@ -1061,6 +1159,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     { id: 'Approved', label: 'Approved Passes', count: approvedApps, color: 'emerald' },
                     { id: 'Reported', label: 'Checked-In at Gate', count: reportedApps, color: 'cyan' },
                     { id: 'Rejected', label: 'Rejected', count: rejectedApps, color: 'rose' },
+                    { 
+                      id: 'VIP_SECTION', 
+                      label: '👑 VIP & Guests', 
+                      count: vipPendingCount > 0 ? `${vipOfficialCount} (+${vipPendingCount} pend)` : totalVipGuests,
+                      isVip: true,
+                    },
                   ].map((tab) => {
                     const isSelected = statusFilter === tab.id;
                     return (
@@ -1069,13 +1173,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                         onClick={() => setStatusFilter(tab.id as any)}
                         className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                           isSelected
-                            ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-black shadow-md'
+                            ? 'bg-gradient-to-r from-gold-royal via-amber-400 to-amber-500 text-slate-950 font-black shadow-gold-glow'
+                            : tab.isVip
+                            ? 'bg-amber-950/50 text-amber-300 hover:bg-amber-900/60 border border-amber-500/50'
                             : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
                         }`}
                       >
                         <span>{tab.label}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                          isSelected ? 'bg-slate-950/40 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400'
+                          isSelected
+                            ? 'bg-slate-950/40 text-slate-950 font-bold'
+                            : tab.isVip
+                            ? 'bg-amber-900/90 text-amber-200 font-bold'
+                            : 'bg-slate-900 text-slate-400'
                         }`}>
                           {tab.count}
                         </span>
@@ -1199,9 +1309,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                             </button>
                           </td>
 
-                          {/* ₹700 Payment UTR */}
+                          {/* ₹700 Payment UTR / VIP Status */}
                           <td className="p-4 font-mono">
-                            {item.paymentUtr ? (
+                            {item.approvalStatus === 'VIP' || item.approvalStatus === 'VIP_Pending' || item.ticketType === 'VIP Pass' ? (
+                              <span className="text-amber-400 font-bold flex items-center gap-1 font-sans">
+                                <Crown className="w-3.5 h-3.5 text-gold-royal" /> VIP (₹0 Fee)
+                              </span>
+                            ) : item.paymentUtr ? (
                               <>
                                 <span className="text-emerald-400 font-bold flex items-center gap-1">
                                   <Check className="w-3.5 h-3.5" /> ₹700 Paid
@@ -1219,6 +1333,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
                           {/* Approval Status */}
                           <td className="p-4">
+                            {item.approvalStatus === 'VIP_Pending' && (
+                              <div className="space-y-1">
+                                <span className="px-3 py-1 rounded-full bg-purple-950/90 text-purple-300 border border-purple-800/80 font-bold text-[11px] inline-flex items-center gap-1">
+                                  <Crown className="w-3 h-3 text-purple-400" /> VIP Pending
+                                </span>
+                                <span className="text-[10px] text-purple-400/80 block font-sans">
+                                  Excluded from Counts
+                                </span>
+                              </div>
+                            )}
+                            {item.approvalStatus === 'VIP' && (
+                              <span className="px-3 py-1 rounded-full bg-amber-950/90 text-gold-light border border-gold-royal font-bold text-[11px] inline-flex items-center gap-1 shadow-gold-glow">
+                                <Crown className="w-3 h-3 text-gold-royal" /> Official VIP
+                              </span>
+                            )}
                             {item.approvalStatus === 'Approved' && (
                               <div>
                                 <span className="px-3 py-1 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-800 font-bold text-[11px] inline-flex items-center gap-1">
@@ -1266,7 +1395,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                                   {item.reportedAt}
                                 </span>
                               </div>
-                            ) : item.approvalStatus === 'Approved' ? (
+                            ) : (item.approvalStatus === 'Approved' || item.approvalStatus === 'VIP' || item.approvalStatus === 'VIP_Pending') ? (
                               <button
                                 onClick={() => handleMarkReportedDirect(item.id)}
                                 className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500 hover:text-slate-950 font-bold text-[10px] transition-all"
@@ -1281,6 +1410,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                           {/* Action Buttons */}
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
+                              {/* VIP Pending: Convert to Official VIP Button */}
+                              {item.approvalStatus === 'VIP_Pending' && (
+                                <button
+                                  onClick={() => handleConvertVip(item.id, item.fullName)}
+                                  disabled={convertingId === item.id}
+                                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-gold-royal hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs transition-all shadow-gold-glow flex items-center gap-1.5 shrink-0"
+                                  title="Convert to Official VIP and display openly in VIP dashboard"
+                                >
+                                  {convertingId === item.id ? (
+                                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Crown className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Convert to VIP</span>
+                                </button>
+                              )}
+
                               {/* Stage 1: Approve ID Card Button */}
                               {(item.approvalStatus === 'Pending_ID_Approval' || item.approvalStatus === 'Pending') && (
                                 <button
@@ -2963,6 +3109,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     <option value="ID_Approved">ID Approved (Pay Pending)</option>
                     <option value="Payment_Pending">Payment Submitted</option>
                     <option value="Approved">Approved & Active</option>
+                    <option value="VIP_Pending">👑 VIP Pending (Hidden from counts)</option>
+                    <option value="VIP">👑 Official VIP</option>
                     <option value="Rejected">Rejected</option>
                   </select>
                 </div>
@@ -3014,6 +3162,175 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Issue VIP / Complimentary Pass Modal ───────────────────────── */}
+      {showVipModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-8 border-2 border-gold-royal shadow-2xl space-y-6 animate-fadeIn max-h-[90vh] overflow-y-auto relative">
+            
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-gold-royal text-slate-950 flex items-center justify-center font-bold shadow-gold-glow">
+                  <Crown className="w-5 h-5 text-slate-950" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl font-bold text-white">Issue VIP / Guest Pass</h3>
+                  <p className="text-xs text-slate-400">Generate a 100% scanner-ready complimentary VIP ticket</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVipModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleIssueVipSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                  VIP Guest Full Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dr. Rajesh Kumar / VIP Guest"
+                  value={vipFullName}
+                  onChange={(e) => setVipFullName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="vip@example.com"
+                    value={vipEmail}
+                    onChange={(e) => setVipEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="9876543210"
+                    value={vipPhone}
+                    onChange={(e) => setVipPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Department / Organization
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="VIP Guest / Chief Guest"
+                    value={vipDepartment}
+                    onChange={(e) => setVipDepartment(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                    Designation / Title
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Honored Guest / Special Invitee"
+                    value={vipSection}
+                    onChange={(e) => setVipSection(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal"
+                  />
+                </div>
+              </div>
+
+              {/* VIP Status Mode Selector */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-gold-royal/30 space-y-3">
+                <label className="block text-[11px] font-extrabold uppercase tracking-wider text-gold-light">
+                  Visibility & Inclusion Mode
+                </label>
+                
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-gold-royal/50 cursor-pointer transition-all">
+                    <input
+                      type="radio"
+                      name="vipMode"
+                      checked={vipIsPending === true}
+                      onChange={() => setVipIsPending(true)}
+                      className="mt-0.5 text-amber-500 focus:ring-gold-royal"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-white flex items-center gap-1.5">
+                        <span>VIP Pending (Hidden from counts & listings)</span>
+                        <span className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 text-[10px] font-mono font-bold">Recommended</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        QR Ticket works 100% for scanning at gate. Excluded from normal dashboard user listings and total registration counts until you click "Convert to VIP".
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-gold-royal/50 cursor-pointer transition-all">
+                    <input
+                      type="radio"
+                      name="vipMode"
+                      checked={vipIsPending === false}
+                      onChange={() => setVipIsPending(false)}
+                      className="mt-0.5 text-amber-500 focus:ring-gold-royal"
+                    />
+                    <div className="text-xs">
+                      <p className="font-bold text-white flex items-center gap-1.5">
+                        <span>Official VIP (Visible in VIP listings)</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Stored with official VIP status and visible directly in the VIP admin tab.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowVipModal(false)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={vipSubmitting}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-gold-royal text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-90 shadow-gold-glow flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {vipSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Crown className="w-4 h-4" />
+                  )}
+                  <span>Generate VIP Pass</span>
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       )}

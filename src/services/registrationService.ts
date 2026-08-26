@@ -13,7 +13,7 @@ import {
   deleteRegistrationFromFirebase,
 } from './firebaseService';
 
-export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending';
+export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending' | 'VIP_Pending' | 'VIP';
 
 export interface Registration {
   id: string;
@@ -716,6 +716,125 @@ export const submitPaymentForRegistration = async (
   return null;
 };
 
+export const issueVipPass = async (params: {
+  fullName: string;
+  email: string;
+  phone: string;
+  department?: string;
+  section?: string;
+  year?: string;
+  isVipPending?: boolean;
+}): Promise<Registration> => {
+  const allCurrent = await syncCloudRegistrations();
+  const cleanEmail = params.email.trim().toLowerCase();
+  
+  // Check if existing record exists with this email
+  const existing = allCurrent.find((r) => r.email && r.email.trim().toLowerCase() === cleanEmail);
+  
+  const nowFormatted = new Date().toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const isPending = params.isVipPending !== false;
+  const status: ApprovalStatus = isPending ? 'VIP_Pending' : 'VIP';
+
+  let vipRecord: Registration;
+
+  if (existing) {
+    vipRecord = {
+      ...existing,
+      fullName: params.fullName.trim() || existing.fullName,
+      phone: params.phone.trim() || existing.phone,
+      department: params.department?.trim() || existing.department || 'VIP Guest',
+      section: params.section?.trim() || existing.section || 'Honored Guest',
+      year: params.year?.trim() || existing.year || 'VIP/Guest',
+      ticketType: 'VIP Pass',
+      paymentAmount: 0,
+      paymentStatus: 'Verified',
+      paymentUtr: 'VIP_COMPLIMENTARY',
+      approvalStatus: status,
+      approvedAt: existing.approvedAt || nowFormatted,
+      updatedAt: new Date().toISOString(),
+    };
+  } else {
+    const id = generateUniqueRegistrationId();
+    vipRecord = {
+      id,
+      fullName: params.fullName.trim(),
+      email: params.email.trim(),
+      phone: params.phone.trim(),
+      department: (params.department || 'VIP Guest').trim(),
+      section: (params.section || 'Honored Guest').trim(),
+      year: (params.year || 'Faculty/VIP').trim(),
+      gender: 'Other',
+      ticketType: 'VIP Pass',
+      idCardUrl: getAssetUrl('images/hero_poster.jpg'),
+      paymentAmount: 0,
+      paymentStatus: 'Verified',
+      paymentUtr: 'VIP_COMPLIMENTARY',
+      approvalStatus: status,
+      submittedAt: nowFormatted,
+      approvedAt: nowFormatted,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  const remaining = allCurrent.filter((r) => r.id !== vipRecord.id);
+  const newList = [vipRecord, ...remaining];
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+  } catch (e) {
+    console.warn('LocalStorage quota notice:', e);
+  }
+  syncToIndexedDB(vipRecord);
+
+  if (isFirebaseConfigured()) {
+    await saveRegistrationToFirebase(vipRecord);
+  }
+  if (isSupabaseConfigured()) {
+    await saveRegistrationToSupabase(vipRecord);
+  }
+
+  return vipRecord;
+};
+
+export const convertToOfficialVip = async (id: string): Promise<Registration | null> => {
+  const allCurrent = await syncCloudRegistrations();
+  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (target) {
+    const updatedRecord: Registration = {
+      ...target,
+      approvalStatus: 'VIP',
+      ticketType: 'VIP Pass',
+      paymentAmount: 0,
+      paymentStatus: 'Verified',
+      updatedAt: new Date().toISOString(),
+    };
+
+    const remaining = allCurrent.filter((r) => r.id !== target.id);
+    const newList = [updatedRecord, ...remaining];
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
+    } catch (e) {
+      console.warn('LocalStorage quota notice:', e);
+    }
+    syncToIndexedDB(updatedRecord);
+
+    if (isFirebaseConfigured()) {
+      await saveRegistrationToFirebase(updatedRecord);
+    }
+    if (isSupabaseConfigured()) {
+      await saveRegistrationToSupabase(updatedRecord);
+    }
+    return updatedRecord;
+  }
+  return null;
+};
+
 export const deleteRegistration = async (id: string): Promise<boolean> => {
   try {
     markIdAsDeleted(id);
@@ -886,8 +1005,10 @@ export const markAsReported = (query: string): ScanResult => {
     };
   }
 
-  // 2. Check if student has submitted payment (UTR, Payment Screenshot, or Payment_Pending / Approved status)
-  const hasSubmittedPayment = !!(
+  const isVip = student.approvalStatus === 'VIP_Pending' || student.approvalStatus === 'VIP' || student.ticketType === 'VIP Pass';
+
+  // 2. Check if student has submitted payment (UTR, Payment Screenshot, or Payment_Pending / Approved / VIP status)
+  const hasSubmittedPayment = isVip || !!(
     (student.paymentUtr && student.paymentUtr.trim()) ||
     (student.paymentScreenshotUrl && student.paymentScreenshotUrl.trim()) ||
     student.approvalStatus === 'Approved' ||
@@ -898,7 +1019,7 @@ export const markAsReported = (query: string): ScanResult => {
     return {
       status: 'not_approved',
       registration: student,
-      message: `ACCESS DENIED: ${student.fullName} (${student.id}) HAS NOT PAID the ₹700 pass fee (No UTR or Payment Screenshot submitted). Collect ₹700 fee at gate!`,
+      message: `ACCESS DENIED: ${student.fullName} (${student.id}) HAS NOT PAID the pass fee (No UTR or Payment Screenshot submitted). Collect fee at gate!`,
     };
   }
 
@@ -908,7 +1029,7 @@ export const markAsReported = (query: string): ScanResult => {
       status: 'already_reported',
       registration: student,
       timestamp: student.reportedAt,
-      message: `DUPLICATE SCAN ALERT: ${student.fullName} (${student.id}) ALREADY REPORTED at gate on ${student.reportedAt || 'earlier today'}.`,
+      message: `DUPLICATE SCAN ALERT: ${isVip ? '👑 VIP ' : ''}${student.fullName} (${student.id}) ALREADY REPORTED at gate on ${student.reportedAt || 'earlier today'}.`,
     };
   }
 
@@ -920,8 +1041,10 @@ export const markAsReported = (query: string): ScanResult => {
     minute: '2-digit',
   });
 
-  // Automatically approve pass upon gate scan (if not already approved) & mark as Reported
-  registrations[index].approvalStatus = 'Approved';
+  // Automatically approve pass upon gate scan (if not already approved/VIP) & mark as Reported
+  if (!isVip) {
+    registrations[index].approvalStatus = 'Approved';
+  }
   registrations[index].paymentStatus = 'Verified';
   if (!registrations[index].approvedAt) {
     registrations[index].approvedAt = new Date().toLocaleDateString('en-US', {
@@ -947,7 +1070,9 @@ export const markAsReported = (query: string): ScanResult => {
     status: 'success',
     registration: registrations[index],
     timestamp: nowString,
-    message: `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully APPROVED & MARKED AS REPORTED at Campus Gate! Onasadya Token Validated.`,
+    message: isVip
+      ? `ENTRY GRANTED: 👑 VIP Guest ${student.fullName} (${student.id}) successfully VALIDATED & MARKED AS REPORTED at Campus Gate! VIP Entry & Onasadya Token Validated.`
+      : `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully APPROVED & MARKED AS REPORTED at Campus Gate! Onasadya Token Validated.`,
   };
 };
 
