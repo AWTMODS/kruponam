@@ -163,7 +163,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
         setUpiSettings({
           upiId: liveSlot.upiId,
           merchantName: liveSlot.merchantName,
-          qrImageDataUrl: liveSlot.qrImageDataUrl,
+          qrImageDataUrl: null, // QR generated client-side from upiId
           amount: getSiteSettings().ticketAmount,
         });
       }

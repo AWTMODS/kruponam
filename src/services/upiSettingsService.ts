@@ -7,13 +7,14 @@ import { getSiteSettings } from './siteSettingsService';
 import { saveUpiSettingsToFirebase } from './firebaseService';
 
 // Push current active slot to Firestore so all student devices sync instantly
+// Note: qrImageDataUrl is intentionally excluded — base64 images can exceed
+// Firestore's 1MB document limit. QR is generated client-side from upiId.
 const pushActiveSlotToFirebase = (settings: MultiUpiSettings) => {
   const active = settings.slots[settings.activeSlotIndex] || settings.slots[0];
   if (!active) return;
   saveUpiSettingsToFirebase({
     upiId: active.upiId || '',
     merchantName: active.merchantName || '',
-    qrImageDataUrl: active.qrImageDataUrl || null,
     activeSlotIndex: settings.activeSlotIndex,
     updatedAt: new Date().toISOString(),
   }).catch(() => {});

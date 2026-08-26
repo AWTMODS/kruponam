@@ -253,7 +253,6 @@ export const listenToFirebaseRegistrations = (
 export const saveUpiSettingsToFirebase = async (payload: {
   upiId: string;
   merchantName: string;
-  qrImageDataUrl: string | null;
   activeSlotIndex: number;
   updatedAt: string;
 }): Promise<boolean> => {
@@ -271,7 +270,6 @@ export const saveUpiSettingsToFirebase = async (payload: {
 export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
   upiId: string;
   merchantName: string;
-  qrImageDataUrl: string | null;
 } | null> => {
   const db = getFirebaseDb();
   if (!db) return null;
@@ -283,7 +281,6 @@ export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
       return {
         upiId: d.upiId || '',
         merchantName: d.merchantName || '',
-        qrImageDataUrl: d.qrImageDataUrl || null,
       };
     }
     return null;
