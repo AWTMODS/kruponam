@@ -962,20 +962,30 @@ const matchRecord = (r: Registration, q: string): boolean => {
   const rName = r.fullName ? r.fullName.trim().toLowerCase() : '';
   const rUtr = r.paymentUtr ? r.paymentUtr.trim().toLowerCase() : '';
 
-  // 1. ID Match (e.g. KRP-531657, krp531657, 531657)
+  // 1. If query is an email (contains '@'), ONLY do exact email matching
+  if (cleanQ.includes('@')) {
+    return rEmail === cleanQ;
+  }
+
+  // 2. ID Match (e.g. KRP-531657, krp531657, 531657)
   if (rId && (rId === cleanQ || (qAlphaNum.length >= 4 && rIdAlphaNum.includes(qAlphaNum)))) return true;
 
-  // 2. Email Match
-  if (rEmail && (rEmail === cleanQ || rEmail.includes(cleanQ))) return true;
-
-  // 3. Name Match (e.g. "Ashin", "Ashin Gopi", "Sniya")
-  if (rName && (rName === cleanQ || rName.includes(cleanQ) || cleanQ.includes(rName))) return true;
+  // 3. Email Match without domain (e.g. username before @)
+  if (rEmail && rEmail.split('@')[0] === cleanQ) return true;
 
   // 4. Phone Match
   if (r.phone && isPhoneMatch(r.phone, cleanQ)) return true;
 
-  // 5. Payment UTR Match
+  // 5. Payment UTR Match (minimum 6 characters)
   if (rUtr && (rUtr === cleanQ || (qAlphaNum.length >= 6 && rUtr.replace(/[^a-z0-9]/g, '').includes(qAlphaNum)))) return true;
+
+  // 6. Name Match (only for pure text names, e.g. "Albin", "Ashin Gopi", "Sniya")
+  if (rName && cleanQ.length >= 3) {
+    const nameWords = rName.split(/\s+/);
+    if (rName === cleanQ || rName.startsWith(cleanQ) || nameWords.some(w => w === cleanQ)) {
+      return true;
+    }
+  }
 
   return false;
 };
