@@ -56,6 +56,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [vipSubmitting, setVipSubmitting] = useState(false);
   const [convertingId, setConvertingId] = useState<string | null>(null);
 
+  // Secret 5-Tap VIP Easter Egg Unlock State
+  const [isVipUnlocked, setIsVipUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('kruponam_vip_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [secretTapCount, setSecretTapCount] = useState(0);
+  const [showSecretKeyModal, setShowSecretKeyModal] = useState(false);
+  const [secretKeyInput, setSecretKeyInput] = useState('');
+
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
@@ -578,6 +590,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
   };
 
+  // Secret 5-Tap VIP Easter Egg Triggers
+  const handleSecretTap = () => {
+    if (isVipUnlocked) {
+      addToast('👑 VIP section is already unlocked!', 'info');
+      return;
+    }
+    const newCount = secretTapCount + 1;
+    setSecretTapCount(newCount);
+    if (newCount >= 5) {
+      setSecretTapCount(0);
+      setShowSecretKeyModal(true);
+    }
+  };
+
+  const handleSecretKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (secretKeyInput.trim().toUpperCase() === 'WHO') {
+      setIsVipUnlocked(true);
+      try {
+        sessionStorage.setItem('kruponam_vip_unlocked', 'true');
+      } catch {}
+      setShowSecretKeyModal(false);
+      setSecretKeyInput('');
+      addToast('🔓 Secret Key Verified: VIP Management section unlocked!', 'success');
+    } else {
+      addToast('❌ Invalid Secret Key', 'error');
+      setSecretKeyInput('');
+    }
+  };
+
   // ── VIP and Normal Metrics Segregation ──────────────────────────────────
   const normalRegistrations = registrations.filter((r) => r.approvalStatus !== 'VIP_Pending');
   const totalApps = normalRegistrations.length;
@@ -705,7 +747,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between pb-6 border-b border-slate-800/80 mb-8 gap-4">
         <div className="flex items-center gap-3.5">
           <div className="relative group">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-royal via-amber-400 to-gold-dark text-slate-950 flex items-center justify-center font-extrabold text-2xl shadow-gold-glow transition-transform group-hover:scale-105">
+            <div
+              onClick={handleSecretTap}
+              className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-royal via-amber-400 to-gold-dark text-slate-950 flex items-center justify-center font-extrabold text-2xl shadow-gold-glow transition-transform group-hover:scale-105 cursor-pointer select-none active:scale-95"
+              title="Kruponam 2026"
+            >
               👑
             </div>
             <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-950" title="System Online" />
@@ -715,7 +761,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               <h1 className="font-serif text-2xl font-bold text-white tracking-wide">
                 KRUPONAM 2026
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-wider">
+              <span
+                onClick={handleSecretTap}
+                className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-wider cursor-pointer select-none hover:bg-amber-500/25 active:scale-95 transition-all"
+                title="Admin Command Center"
+              >
                 Admin Panel
               </span>
             </div>
@@ -743,14 +793,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
           {isAuthenticated && (
             <>
-              <button
-                onClick={() => setShowVipModal(true)}
-                title="Issue VIP or Complimentary Pass (Scanner-Ready, Excluded from Counts until Converted)"
-                className="px-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Crown className="w-3.5 h-3.5 text-slate-950" />
-                <span>Issue VIP Pass</span>
-              </button>
+              {isVipUnlocked && (
+                <button
+                  onClick={() => setShowVipModal(true)}
+                  title="Issue VIP or Complimentary Pass (Scanner-Ready, Excluded from Counts until Converted)"
+                  className="px-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] animate-fadeIn"
+                >
+                  <Crown className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Issue VIP Pass</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setShowEmailDirectoryModal(true)}
@@ -1159,12 +1211,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     { id: 'Approved', label: 'Approved Passes', count: approvedApps, color: 'emerald' },
                     { id: 'Reported', label: 'Checked-In at Gate', count: reportedApps, color: 'cyan' },
                     { id: 'Rejected', label: 'Rejected', count: rejectedApps, color: 'rose' },
-                    { 
-                      id: 'VIP_SECTION', 
-                      label: '👑 VIP & Guests', 
-                      count: vipPendingCount > 0 ? `${vipOfficialCount} (+${vipPendingCount} pend)` : totalVipGuests,
-                      isVip: true,
-                    },
+                    ...(isVipUnlocked
+                      ? [
+                          {
+                            id: 'VIP_SECTION',
+                            label: '👑 VIP & Guests',
+                            count: vipPendingCount > 0 ? `${vipOfficialCount} (+${vipPendingCount} pend)` : totalVipGuests,
+                            isVip: true,
+                          },
+                        ]
+                      : []),
                   ].map((tab) => {
                     const isSelected = statusFilter === tab.id;
                     return (
@@ -1411,7 +1467,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {/* VIP Pending: Convert to Official VIP Button */}
-                              {item.approvalStatus === 'VIP_Pending' && (
+                              {isVipUnlocked && item.approvalStatus === 'VIP_Pending' && (
                                 <button
                                   onClick={() => handleConvertVip(item.id, item.fullName)}
                                   disabled={convertingId === item.id}
@@ -1468,7 +1524,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                               )}
 
                               {/* Convert to VIP Button (for existing student registrations) */}
-                              {item.approvalStatus !== 'VIP' && item.approvalStatus !== 'VIP_Pending' && (
+                              {isVipUnlocked && item.approvalStatus !== 'VIP' && item.approvalStatus !== 'VIP_Pending' && (
                                 <button
                                   onClick={() => {
                                     setVipFullName(item.fullName);
@@ -3350,7 +3406,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
 
+      {/* ── Secret VIP Key Verification Modal ──────────────────────────── */}
+      {showSecretKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-sm w-full p-6 sm:p-8 border-2 border-gold-royal/80 shadow-2xl space-y-5 animate-fadeIn text-center relative">
+            <button
+              onClick={() => {
+                setShowSecretKeyModal(false);
+                setSecretKeyInput('');
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500 to-gold-royal text-slate-950 flex items-center justify-center font-extrabold text-2xl shadow-gold-glow">
+              🔒
+            </div>
+
+            <div>
+              <h3 className="font-serif text-lg font-bold text-white">Security Verification</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Enter the authorization key to access VIP pass management.
+              </p>
+            </div>
+
+            <form onSubmit={handleSecretKeySubmit} className="space-y-4">
+              <input
+                type="password"
+                autoFocus
+                required
+                placeholder="Enter secret key..."
+                value={secretKeyInput}
+                onChange={(e) => setSecretKeyInput(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-center font-mono text-base tracking-widest text-amber-400 outline-none focus:border-gold-royal focus:ring-1 focus:ring-gold-royal placeholder:text-slate-600 placeholder:tracking-normal placeholder:font-sans placeholder:text-xs"
+              />
+
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSecretKeyModal(false);
+                    setSecretKeyInput('');
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-gold-royal text-slate-950 font-black text-xs uppercase tracking-wider hover:opacity-90 shadow-gold-glow"
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
