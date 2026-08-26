@@ -591,9 +591,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   // Secret 5-Tap VIP Easter Egg Triggers
+  const handleLockVip = () => {
+    setIsVipUnlocked(false);
+    if (statusFilter === 'VIP_SECTION' || statusFilter === 'VIP' || statusFilter === 'VIP_Pending') {
+      setStatusFilter('all');
+    }
+    try {
+      sessionStorage.removeItem('kruponam_vip_unlocked');
+    } catch {}
+    addToast('🔒 VIP management section is now hidden and locked.', 'info');
+  };
+
   const handleSecretTap = () => {
     if (isVipUnlocked) {
-      addToast('👑 VIP section is already unlocked!', 'info');
+      handleLockVip();
       return;
     }
     const newCount = secretTapCount + 1;
@@ -794,14 +805,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
           {isAuthenticated && (
             <>
               {isVipUnlocked && (
-                <button
-                  onClick={() => setShowVipModal(true)}
-                  title="Issue VIP or Complimentary Pass (Scanner-Ready, Excluded from Counts until Converted)"
-                  className="px-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] animate-fadeIn"
-                >
-                  <Crown className="w-3.5 h-3.5 text-slate-950" />
-                  <span>Issue VIP Pass</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowVipModal(true)}
+                    title="Issue VIP or Complimentary Pass (Scanner-Ready, Excluded from Counts until Converted)"
+                    className="px-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] animate-fadeIn"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Issue VIP Pass</span>
+                  </button>
+
+                  <button
+                    onClick={handleLockVip}
+                    title="Lock & Hide VIP Section Again"
+                    className="px-3 py-2 rounded-full bg-slate-900 hover:bg-amber-950/60 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm animate-fadeIn"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Hide VIP</span>
+                  </button>
+                </>
               )}
 
               <button
