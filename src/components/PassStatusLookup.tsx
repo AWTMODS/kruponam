@@ -543,7 +543,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 <div className={`pt-4 border-t border-dashed flex flex-wrap items-center justify-between gap-3 text-xs ${
                   ticketTheme === 'dark' ? 'border-slate-800 text-slate-400' : 'border-gold-royal/40 text-slate-500'
                 }`}>
-                  <span>📍 PSR Convention Centre • Sep 4, 2026</span>
+                  <span>📍 PSR Convention Centre • Sep 11, 2026</span>
                   <span>Approved: {searchResult.approvedAt || searchResult.submittedAt}</span>
                 </div>
               </div>
