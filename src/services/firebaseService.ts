@@ -5,6 +5,7 @@ import {
   doc, 
   setDoc, 
   getDocs, 
+  getDoc,
   onSnapshot, 
   deleteDoc, 
   Firestore 
@@ -274,7 +275,6 @@ export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
   const db = getFirebaseDb();
   if (!db) return null;
   try {
-    const { getDoc } = await import('firebase/firestore');
     const snap = await getDoc(doc(db, 'settings', 'upi'));
     if (snap.exists()) {
       const d = snap.data();
