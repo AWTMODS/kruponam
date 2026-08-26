@@ -3,6 +3,7 @@ import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, Ref
 import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, syncCloudRegistrations, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
+import { fetchActiveUpiSlotFromFirebase } from '../services/firebaseService';
 import { getSiteSettings } from '../services/siteSettingsService';
 
 interface LookupProps {
@@ -152,8 +153,22 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     setResubmitSuccessNotice('🎉 Your application & Student ID Card have been resubmitted successfully! Admin will re-verify your ID Card shortly.');
   };
 
-  const [upiSettings] = useState(getUpiSettings());
+  const [upiSettings, setUpiSettings] = useState(getUpiSettings());
   const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string>('');
+
+  // Fetch live active UPI slot from Firebase so students always get the latest QR
+  useEffect(() => {
+    fetchActiveUpiSlotFromFirebase().then((liveSlot) => {
+      if (liveSlot && liveSlot.upiId) {
+        setUpiSettings({
+          upiId: liveSlot.upiId,
+          merchantName: liveSlot.merchantName,
+          qrImageDataUrl: liveSlot.qrImageDataUrl,
+          amount: getSiteSettings().ticketAmount,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (searchResult && searchResult.approvalStatus === 'Approved') {

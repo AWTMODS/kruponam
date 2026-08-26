@@ -245,3 +245,50 @@ export const listenToFirebaseRegistrations = (
     return null;
   }
 };
+
+// ── UPI Settings Sync ─────────────────────────────────────────────────────────
+// Saves the currently active UPI slot to Firestore so all student devices
+// always show the latest QR/UPI ID without needing a redeployment.
+
+export const saveUpiSettingsToFirebase = async (payload: {
+  upiId: string;
+  merchantName: string;
+  qrImageDataUrl: string | null;
+  activeSlotIndex: number;
+  updatedAt: string;
+}): Promise<boolean> => {
+  const db = getFirebaseDb();
+  if (!db) return false;
+  try {
+    await setDoc(doc(db, 'settings', 'upi'), payload, { merge: true });
+    return true;
+  } catch (err) {
+    console.warn('Firebase UPI settings save notice:', err);
+    return false;
+  }
+};
+
+export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
+  upiId: string;
+  merchantName: string;
+  qrImageDataUrl: string | null;
+} | null> => {
+  const db = getFirebaseDb();
+  if (!db) return null;
+  try {
+    const { getDoc } = await import('firebase/firestore');
+    const snap = await getDoc(doc(db, 'settings', 'upi'));
+    if (snap.exists()) {
+      const d = snap.data();
+      return {
+        upiId: d.upiId || '',
+        merchantName: d.merchantName || '',
+        qrImageDataUrl: d.qrImageDataUrl || null,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn('Firebase UPI settings fetch notice:', err);
+    return null;
+  }
+};

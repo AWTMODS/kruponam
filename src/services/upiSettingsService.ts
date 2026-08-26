@@ -4,6 +4,20 @@
 // Students always see the currently active slot's UPI ID & QR code.
 
 import { getSiteSettings } from './siteSettingsService';
+import { saveUpiSettingsToFirebase } from './firebaseService';
+
+// Push current active slot to Firestore so all student devices sync instantly
+const pushActiveSlotToFirebase = (settings: MultiUpiSettings) => {
+  const active = settings.slots[settings.activeSlotIndex] || settings.slots[0];
+  if (!active) return;
+  saveUpiSettingsToFirebase({
+    upiId: active.upiId || '',
+    merchantName: active.merchantName || '',
+    qrImageDataUrl: active.qrImageDataUrl || null,
+    activeSlotIndex: settings.activeSlotIndex,
+    updatedAt: new Date().toISOString(),
+  }).catch(() => {});
+};
 
 const STORAGE_KEY = 'kruponam_multi_upi_settings_v2';
 
@@ -59,6 +73,7 @@ export const getMultiUpiSettings = (): MultiUpiSettings => {
 
 export const saveMultiUpiSettings = (settings: MultiUpiSettings): MultiUpiSettings => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  pushActiveSlotToFirebase(settings);
   return settings;
 };
 
