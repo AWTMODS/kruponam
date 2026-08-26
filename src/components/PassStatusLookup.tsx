@@ -383,16 +383,10 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           ) : (searchResult?.approvalStatus === 'Approved' || searchResult?.approvalStatus === 'VIP' || searchResult?.approvalStatus === 'VIP_Pending') ? (
             /* APPROVED PASS STATE (INCLUDING VIP PASSES) */
             <div className="space-y-4">
-              <div className={`p-4 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 ${
-                searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
-                  ? 'bg-amber-500/20 border border-gold-royal text-gold-dark'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-900'
-              }`}>
+              <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                 <span>
-                  {searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
-                    ? '👑 Official VIP Pass Confirmed! Complimentary Access & Onasadya Token Included.'
-                    : `Pass Approved by Admin! ₹${searchResult.paymentAmount || ticketAmount} Payment & Student ID Verified.`}
+                  Pass Approved by Admin! ₹700 Payment & Student ID Verified.
                 </span>
               </div>
 
@@ -469,7 +463,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                   <div className="text-right">
                     <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-xs font-black uppercase tracking-wider shadow-sm">
-                      {searchResult.ticketType}
+                      {searchResult.ticketType === 'VIP Pass' ? 'Student Pass' : (searchResult.ticketType || 'Student Pass')}
                     </span>
                     <p className={`text-[11px] font-mono mt-1 ${
                       ticketTheme === 'dark' ? 'text-amber-400' : 'text-slate-500'
@@ -512,9 +506,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
                         }`}>Payment Status</p>
                         <p className="font-semibold text-emerald-400 font-mono">
-                          {searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending' || searchResult.ticketType === 'VIP Pass'
-                            ? '👑 VIP Pass (Complimentary)'
-                            : `✓ ₹${searchResult.paymentAmount || ticketAmount} Paid (${searchResult.paymentUtr})`}
+                          ✓ ₹700 Paid ({(!searchResult.paymentUtr || searchResult.paymentUtr === 'VIP_COMPLIMENTARY' || searchResult.paymentUtr === 'VIP') ? 'Verified' : searchResult.paymentUtr})
                         </p>
                       </div>
                       <div>
