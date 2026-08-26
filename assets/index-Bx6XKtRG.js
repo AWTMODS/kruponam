@@ -138,7 +138,7 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
                   📅 OFFICIAL EVENT DATE: FRIDAY, 11 SEPTEMBER 2026 (8:00 AM)
                 </p>
                 <p style="margin:6px 0 0;font-size:12px;color:#78350F;line-height:1.6;">
-                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at Krupanidhi Degree College. Your digital event pass below is active, validated, and scanner-ready for campus gate entry!
+                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at <strong>PSR Convention Centre, Bengaluru</strong>. Your digital event pass below is active, validated, and scanner-ready for venue entry!
                 </p>
               </div>
 
@@ -149,7 +149,7 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
                 Your registration for <strong>Kruponam 2026</strong> has been reviewed and 
                 <strong style="color:#0D472B;">officially approved</strong> by the Krupanidhi Event Committee.
                 Your updated digital event pass and payment invoice are attached below.
-                Please carry this pass (digital or printed) to the campus gate for entry.
+                Please carry this pass (digital or printed) to the venue entrance for entry.
               </p>
             </td>
           </tr>
@@ -167,7 +167,7 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
                     <span style="float:right;color:#a8d5b5;font-size:11px;">Ref: ${e.id}</span>
                   </td>
                 </tr>
-                ${[[`Student Name`,e.fullName],[`Email Address`,e.email],[`Phone Number`,e.phone],[`Department & Section`,`${e.department} — ${e.section||`Section A`} (${e.year})`],[`Pass Type`,e.ticketType===`VIP Pass`?`Student Pass`:e.ticketType||`Student Pass`],[`Amount Paid`,`₹700.00`],[`Payment UTR / Ref`,!e.paymentUtr||e.paymentUtr===`VIP_COMPLIMENTARY`||e.paymentUtr===`VIP`?`UPI-VERIFIED-700`:e.paymentUtr],[`Payment Status`,`✅ Verified & Confirmed`],[`Event Date`,`11 September 2026, 8:00 AM onwards`],[`Venue`,`Krupanidhi Degree College, Bengaluru`],[`Approved On`,e.approvedAt||new Date().toLocaleDateString(`en-US`,{month:`short`,day:`numeric`,year:`numeric`})]].map(([e,t],n)=>`
+                ${[[`Student Name`,e.fullName],[`Email Address`,e.email],[`Phone Number`,e.phone],[`Department & Section`,`${e.department} — ${e.section||`Section A`} (${e.year})`],[`Pass Type`,e.ticketType===`VIP Pass`?`Student Pass`:e.ticketType||`Student Pass`],[`Amount Paid`,`₹700.00`],[`Payment UTR / Ref`,!e.paymentUtr||e.paymentUtr===`VIP_COMPLIMENTARY`||e.paymentUtr===`VIP`?`UPI-VERIFIED-700`:e.paymentUtr],[`Payment Status`,`✅ Verified & Confirmed`],[`Event Date`,`11 September 2026, 8:00 AM onwards`],[`Venue`,`PSR Convention Centre, Bengaluru`],[`Approved On`,e.approvedAt||new Date().toLocaleDateString(`en-US`,{month:`short`,day:`numeric`,year:`numeric`})]].map(([e,t],n)=>`
                   <tr style="background:${n%2==0?`#FFFFFF`:`#FAFAF5`};">
                     <td style="padding:10px 20px;color:#555;font-weight:600;width:40%;border-bottom:1px solid #F0EBD8;">
                       ${e}
@@ -226,7 +226,7 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
                     <div style="background:#FFFBF0;border-radius:12px;padding:8px;display:inline-block;border:2px solid #D4AF37;">
                       ${t?`<img src="${t}" width="130" height="130" alt="QR Code" style="display:block;border-radius:6px;" />`:`<div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;color:#0D472B;font-size:11px;font-weight:700;">QR Code<br/>${e.id}</div>`}
                     </div>
-                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;">SCAN AT CAMPUS GATE</p>
+                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;">SCAN AT VENUE GATE</p>
                   </td>
                 </tr>
                 <!-- Ticket Footer -->
@@ -245,7 +245,7 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
           <tr>
             <td style="padding:0 40px 24px;">
               <p style="font-size:12px;color:#777;line-height:1.7;margin:0;">
-                📌 <strong>Important:</strong> Please carry this pass (digital screenshot or print) at the campus gate on event day. 
+                📌 <strong>Important:</strong> Please carry this pass (digital screenshot or print) at the venue entrance on event day. 
                 Your QR code will be scanned by the event coordinators for entry and Onasadya feast token validation.
               </p>
               <p style="font-size:12px;color:#777;margin:8px 0 0;">
