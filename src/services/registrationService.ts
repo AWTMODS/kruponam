@@ -422,6 +422,25 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
       const fbRecords = await fetchRegistrationsFromFirebase();
       if (fbRecords && fbRecords.length > 0) {
         fbRecords.forEach(mergeCloudRecord);
+
+        // Push any local-only records to Firebase so they are not lost across devices
+        const fbIds = new Set(fbRecords.map((r) => r.id));
+        localMap.forEach((localReg, id) => {
+          if (!fbIds.has(id) && !deletedIds.has(id)) {
+            saveRegistrationToFirebase(localReg).catch((err) =>
+              console.warn('Background sync to Firebase failed for local record:', id, err)
+            );
+          }
+        });
+      } else {
+        // Firestore collection is empty — push all local records up
+        localMap.forEach((localReg, id) => {
+          if (!deletedIds.has(id)) {
+            saveRegistrationToFirebase(localReg).catch((err) =>
+              console.warn('Background sync to Firebase failed for local record:', id, err)
+            );
+          }
+        });
       }
     } catch (e) {
       console.warn('Firebase sync notice:', e);
