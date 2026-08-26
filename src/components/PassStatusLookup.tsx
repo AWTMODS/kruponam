@@ -207,27 +207,21 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const q = searchQuery.trim();
+    if (!q) return;
 
     setIsSearching(true);
     setPaymentError(null);
     setHasSearched(true);
+    setSearchResult(undefined); // Reset immediately so previous user is never shown while loading
 
-    // 1. Show instant cached match immediately if available
-    const instantMatch = findRegistration(searchQuery);
-    if (instantMatch) {
-      setSearchResult(instantMatch);
-    } else {
-      setSearchResult(undefined);
-    }
-
-    // 2. Fetch fresh live status from cloud DB (Firebase & Supabase)
     try {
-      const latest = await findRegistrationAsync(searchQuery);
-      setSearchResult(latest || instantMatch || null);
+      const latest = await findRegistrationAsync(q);
+      setSearchResult(latest || null);
     } catch (err) {
       console.warn('Live lookup search notice:', err);
-      if (!instantMatch) setSearchResult(null);
+      const instantMatch = findRegistration(q);
+      setSearchResult(instantMatch || null);
     } finally {
       setIsSearching(false);
     }
@@ -360,16 +354,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       {/* Result Display */}
       {hasSearched && (
         <div className="animate-fadeIn">
-          {isSearching && !searchResult ? (
+          {isSearching ? (
             /* Searching Spinner State Card */
-            <div className="p-8 bg-amber-50/70 border border-amber-200 rounded-2xl text-center space-y-3 shadow-sm">
+            <div className="p-8 bg-amber-50/80 border border-amber-200 rounded-2xl text-center space-y-3 shadow-sm animate-pulse">
               <RefreshCw className="w-8 h-8 mx-auto text-amber-600 animate-spin" />
-              <h4 className="font-serif font-bold text-lg text-amber-950">Searching Cloud Database...</h4>
+              <h4 className="font-serif font-bold text-lg text-amber-950">Searching Live Database...</h4>
               <p className="text-xs text-amber-700 max-w-md mx-auto">
-                Checking live pass registrations in Kruponam event system for "{searchQuery}".
+                Checking live registrations in Kruponam system for <span className="font-bold font-mono">"{searchQuery}"</span>.
               </p>
             </div>
-          ) : searchResult === null ? (
+          ) : searchResult === null || !searchResult ? (
             /* Not Found State (Only shown after search completes) */
             <div className="p-8 bg-amber-50/80 border border-amber-200 rounded-2xl text-center space-y-2">
               <div className="w-12 h-12 rounded-full bg-amber-100 mx-auto flex items-center justify-center text-amber-600 font-bold text-xl">
@@ -380,7 +374,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 We couldn't find any registration matching "{searchQuery}". Please check your details or complete a new registration.
               </p>
             </div>
-          ) : (searchResult?.approvalStatus === 'Approved' || searchResult?.approvalStatus === 'VIP' || searchResult?.approvalStatus === 'VIP_Pending') ? (
+          ) : (searchResult.approvalStatus === 'Approved' || searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending') ? (
             /* APPROVED PASS STATE (INCLUDING VIP PASSES) */
             <div className="space-y-4">
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
