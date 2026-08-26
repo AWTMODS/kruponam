@@ -247,10 +247,9 @@ Total Duration: ${c-l}ms`),X.resolve({didRun:!0,sequenceNumbersCollected:r,targe
               <p style="font-size:12px;color:#777;line-height:1.7;margin:0;">
                 📌 <strong>Important:</strong> Please carry this pass (digital screenshot or print) at the venue entrance on event day. 
                 Your QR code will be scanned by the event coordinators for entry and Onasadya feast token validation.
-              </p>
               <p style="font-size:12px;color:#777;margin:8px 0 0;">
-                For any queries, contact us at 
-                <a href="mailto:kruponam2026@krupanidhi.edu.in" style="color:#0D472B;font-weight:700;">kruponam2026@krupanidhi.edu.in</a>
+                For any queries, contact coordinator: 
+                <a href="tel:+919072428800" style="color:#0D472B;font-weight:700;text-decoration:none;">📞 +91 9072428800</a>
               </p>
             </td>
           </tr>
