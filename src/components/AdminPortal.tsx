@@ -13,7 +13,7 @@ import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
 import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, testSupabaseConnection, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConfigured, testFirebaseConnection } from '../services/firebaseService';
-import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
+import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, setActiveSlotManually, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
 import { getLiveActiveCount } from '../services/livePresenceService';
 import { AdminQrScanner } from './AdminQrScanner';
@@ -416,6 +416,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     resetSlotCount(id);
     refreshMultiUpi();
     addToast('🔄 Payment count reset to 0 for this slot.', 'info');
+  };
+
+  const handleSetActiveSlot = (id: string, label: string) => {
+    const updated = setActiveSlotManually(id);
+    setMultiUpi(updated);
+    addToast(`✅ "${label}" is now the active payment slot!`, 'success');
   };
 
   const handleQrImageUpload = (slotId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1442,6 +1448,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 shrink-0">
+                          {!isActive && (
+                            <button
+                              onClick={() => handleSetActiveSlot(slot.id, slot.label)}
+                              title="Set as active payment slot"
+                              className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-black uppercase tracking-wider transition-all border border-emerald-600 shadow-sm"
+                            >
+                              ⚡ Set Active
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleResetSlotCount(slot.id)}
                             title="Reset payment count to 0"

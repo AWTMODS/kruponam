@@ -144,6 +144,17 @@ export const resetSlotCount = (id: string): MultiUpiSettings => {
   return updateUpiSlot(id, { paymentCount: 0 });
 };
 
+// ── Manually force-activate a specific slot (overrides auto-rotation) ─────────
+export const setActiveSlotManually = (id: string): MultiUpiSettings => {
+  const settings = getMultiUpiSettings();
+  const idx = settings.slots.findIndex((s) => s.id === id);
+  if (idx !== -1) {
+    settings.activeSlotIndex = idx;
+    saveMultiUpiSettings(settings);
+  }
+  return settings;
+};
+
 // ── Legacy compat shim (RegistrationForm still imports getUpiSettings) ────────
 export const getUpiSettings = () => {
   const slot = getActiveUpiSlot();
