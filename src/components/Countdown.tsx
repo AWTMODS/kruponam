@@ -85,7 +85,7 @@ export const Countdown: React.FC = () => {
               The Celebration Has Begun!
             </h3>
             <p className="text-cream-warm text-base max-w-md mx-auto">
-              Welcome to Kruponam 2026 at Krupanidhi Degree College! Join us at the main quadrangle for Onasadya feast, Chenda Melam, and Thiruvathira.
+              Welcome to Kruponam 2026 at PSR Convention Centre! Join us for Onasadya feast, Chenda Melam, and Thiruvathira.
             </p>
 
             <div className="pt-2 flex flex-wrap justify-center gap-3">

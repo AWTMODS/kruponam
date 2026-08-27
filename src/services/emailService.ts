@@ -49,7 +49,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                 ✅ &nbsp;Your Pass Has Been <span style="color:#0D472B;">APPROVED!</span>
               </p>
               <p style="margin:6px 0 0;font-size:13px;color:#388E3C;">
-                Welcome to Onam 2026 at Krupanidhi Degree College!
+                Welcome to Kruponam 2026 at PSR Convention Centre!
               </p>
             </td>
           </tr>
