@@ -3,10 +3,8 @@ import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles,
 import confetti from 'canvas-confetti';
 import { 
   saveRegistrationAsync, 
-  isEmailAlreadyUsed, 
-  isPhoneAlreadyUsed, 
-  findRegistration,
-  findRegistrationAsync,
+  findStudentByExactEmailOrPhone,
+  findStudentByExactEmailOrPhoneAsync,
   generateUniqueRegistrationId,
   type Registration 
 } from '../services/registrationService';
@@ -136,16 +134,16 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       return;
     }
 
-    const cleanEmail = formData.email.trim();
+    const cleanEmail = formData.email.trim().toLowerCase();
     const cleanPhone = formData.phone.trim();
 
     try {
-      // Check if user already exists by Email or Phone in local storage OR live cloud database
-      const existingLocal = findRegistration(cleanEmail) || findRegistration(cleanPhone);
+      // Check if user already exists by EXACT Email or EXACT Phone in local storage OR live cloud database
+      const existingLocal = findStudentByExactEmailOrPhone(cleanEmail, cleanPhone);
       let existingCloud: Registration | undefined = undefined;
       if (!existingLocal) {
         try {
-          existingCloud = (await findRegistrationAsync(cleanEmail)) || (await findRegistrationAsync(cleanPhone));
+          existingCloud = await findStudentByExactEmailOrPhoneAsync(cleanEmail, cleanPhone);
         } catch (cloudErr) {
           console.warn('Cloud duplicate check notice (continuing with local check):', cloudErr);
         }
@@ -182,16 +180,6 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         } else {
           // If existing registration is found, block duplicate registration!
           setValidationError(`⚠️ The Email Address "${cleanEmail}" or Phone Number "${cleanPhone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
-          return;
-        }
-      } else {
-        if (isEmailAlreadyUsed(cleanEmail)) {
-          setValidationError(`⚠️ The Email Address "${cleanEmail}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
-          return;
-        }
-
-        if (isPhoneAlreadyUsed(cleanPhone)) {
-          setValidationError(`⚠️ The Phone Number "${cleanPhone}" is already registered. If your application is pending review, use "Check Pass Status" to track your approval.`);
           return;
         }
       }

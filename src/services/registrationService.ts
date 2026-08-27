@@ -610,13 +610,43 @@ export const isEmailAlreadyUsed = (email: string, excludeId?: string): boolean =
   if (!email || !email.trim()) return false;
   const clean = email.trim().toLowerCase();
   const list = getRegistrations();
-  return list.some((r) => r.email.trim().toLowerCase() === clean && r.id !== excludeId);
+  return list.some((r) => r.email && r.email.trim().toLowerCase() === clean && r.id !== excludeId);
 };
 
 export const isPhoneAlreadyUsed = (phone: string, excludeId?: string): boolean => {
   if (!phone || !phone.trim()) return false;
   const list = getRegistrations();
-  return list.some((r) => isPhoneMatch(r.phone, phone) && r.id !== excludeId);
+  return list.some((r) => r.phone && isPhoneMatch(r.phone, phone) && r.id !== excludeId);
+};
+
+export const findStudentByExactEmailOrPhone = (email: string, phone: string): Registration | undefined => {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const cleanPhone = phone ? phone.trim() : '';
+  if (!cleanEmail && !cleanPhone) return undefined;
+  const list = getRegistrations();
+  return list.find((r) => {
+    if (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) return true;
+    if (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone)) return true;
+    return false;
+  });
+};
+
+export const findStudentByExactEmailOrPhoneAsync = async (email: string, phone: string): Promise<Registration | undefined> => {
+  const local = findStudentByExactEmailOrPhone(email, phone);
+  if (local) return local;
+  try {
+    const cloudList = await syncCloudRegistrations();
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    const cleanPhone = phone ? phone.trim() : '';
+    if (!cleanEmail && !cleanPhone) return undefined;
+    return cloudList.find((r) => {
+      if (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) return true;
+      if (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone)) return true;
+      return false;
+    });
+  } catch {
+    return undefined;
+  }
 };
 
 export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
