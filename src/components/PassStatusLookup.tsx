@@ -1,73 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle } from 'lucide-react';
+import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, syncCloudRegistrations, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { fetchActiveUpiSlotFromFirebase } from '../services/firebaseService';
 import { getSiteSettings } from '../services/siteSettingsService';
+import { compressImageToDataUrl } from '../utils/imageCompressor';
 
 interface LookupProps {
   onClose?: () => void;
 }
-
-const compressImageToDataUrl = (
-  file: File, 
-  maxSizeBytes = 500 * 1024, 
-  initialMaxWidth = 1000, 
-  initialQuality = 0.75
-): Promise<string> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        let canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        let maxWidth = initialMaxWidth;
-        let quality = initialQuality;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(event.target?.result as string);
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-        // Guarantee output size <= 500 KB
-        let attempts = 0;
-        while (dataUrl.length * 0.75 > maxSizeBytes && attempts < 8) {
-          attempts++;
-          quality -= 0.1;
-          if (quality < 0.3) {
-            maxWidth = Math.round(maxWidth * 0.75);
-            width = Math.round(width * 0.75);
-            height = Math.round(height * 0.75);
-            canvas.width = Math.max(width, 100);
-            canvas.height = Math.max(height, 100);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            quality = 0.6;
-          }
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-        }
-
-        resolve(dataUrl);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-};
 
 export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
@@ -96,6 +38,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [paymentUtr, setPaymentUtr] = useState('');
   const [paymentScreenshotFile, setPaymentScreenshotFile] = useState<File | null>(null);
   const [paymentScreenshotPreview, setPaymentScreenshotPreview] = useState<string | null>(null);
+  const [isProcessingPaymentScreenshot, setIsProcessingPaymentScreenshot] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
@@ -104,6 +47,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [resubmitName, setResubmitName] = useState('');
   const [reuploadIdFile, setReuploadIdFile] = useState<File | null>(null);
   const [reuploadIdPreview, setReuploadIdPreview] = useState<string | null>(null);
+  const [isProcessingReuploadId, setIsProcessingReuploadId] = useState(false);
   const [isResubmitting, setIsResubmitting] = useState(false);
   const [resubmitSuccessNotice, setResubmitSuccessNotice] = useState<string | null>(null);
 
@@ -117,8 +61,25 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     const file = e.target.files?.[0];
     if (file) {
       setReuploadIdFile(file);
-      const compressed = await compressImageToDataUrl(file);
-      setReuploadIdPreview(compressed);
+      setIsProcessingReuploadId(true);
+      setPaymentError(null);
+      try {
+        const compressed = await compressImageToDataUrl(file, {
+          maxSizeBytes: 600 * 1024,
+          initialMaxWidth: 1200,
+          initialQuality: 0.8,
+          timeoutMs: 8000,
+        });
+        if (compressed) {
+          setReuploadIdPreview(compressed);
+        } else {
+          setPaymentError('Could not process this image format. Please select another JPG/PNG photo.');
+        }
+      } catch {
+        setPaymentError('Error reading ID card photo. Please try again.');
+      } finally {
+        setIsProcessingReuploadId(false);
+      }
     }
   };
 
@@ -231,9 +192,25 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     const file = e.target.files?.[0];
     if (file) {
       setPaymentScreenshotFile(file);
-      const compressed = await compressImageToDataUrl(file);
-      setPaymentScreenshotPreview(compressed);
+      setIsProcessingPaymentScreenshot(true);
       setPaymentError(null);
+      try {
+        const compressed = await compressImageToDataUrl(file, {
+          maxSizeBytes: 600 * 1024,
+          initialMaxWidth: 1200,
+          initialQuality: 0.8,
+          timeoutMs: 8000,
+        });
+        if (compressed) {
+          setPaymentScreenshotPreview(compressed);
+        } else {
+          setPaymentError('Could not process this screenshot format. Please select another JPG/PNG image.');
+        }
+      } catch {
+        setPaymentError('Error reading payment screenshot. Please try again.');
+      } finally {
+        setIsProcessingPaymentScreenshot(false);
+      }
     }
   };
 
@@ -677,20 +654,29 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     Upload Payment Screenshot (Showing UTR Number) *
                   </label>
 
-                  <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-5 bg-white text-center hover:bg-amber-50/50 transition-all relative">
+                  <div className={`border-2 border-dashed rounded-2xl p-5 bg-white text-center transition-all relative ${
+                    paymentScreenshotPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
+                  }`}>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
                       onChange={handlePaymentScreenshotUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      disabled={isProcessingPaymentScreenshot || isSubmittingPayment}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                     />
 
-                    {paymentScreenshotPreview ? (
+                    {isProcessingPaymentScreenshot ? (
+                      <div className="py-4 space-y-2 animate-pulse">
+                        <Loader2 className="w-8 h-8 mx-auto text-gold-royal animate-spin" />
+                        <p className="text-xs font-bold text-slate-800">Optimizing Payment Receipt Photo...</p>
+                        <p className="text-[11px] text-slate-500">Please wait a moment</p>
+                      </div>
+                    ) : paymentScreenshotPreview ? (
                       <div className="space-y-2">
                         <img
                           src={paymentScreenshotPreview}
                           alt="Payment Receipt Preview"
-                          className="max-h-44 mx-auto rounded-xl shadow-md border border-gold-royal/40 object-contain"
+                          className="max-h-44 mx-auto rounded-xl shadow-md border border-emerald-500/40 object-contain bg-white"
                         />
                         <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -714,13 +700,18 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                 <button
                   type="submit"
-                  disabled={isSubmittingPayment}
-                  className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
+                  disabled={isSubmittingPayment || isProcessingPaymentScreenshot}
+                  className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl cursor-pointer"
                 >
                   {isSubmittingPayment ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
                       <span>Submitting Payment & UTR to Admin...</span>
+                    </>
+                  ) : isProcessingPaymentScreenshot ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-gold-royal" />
+                      <span>Processing Payment Screenshot...</span>
                     </>
                   ) : (
                     <>
@@ -840,20 +831,29 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     </p>
                   </div>
 
-                  <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-6 bg-white text-center hover:bg-amber-50/50 transition-all relative">
+                  <div className={`border-2 border-dashed rounded-2xl p-6 bg-white text-center transition-all relative ${
+                    reuploadIdPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
+                  }`}>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
                       onChange={handleReuploadIdCard}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      disabled={isProcessingReuploadId || isResubmitting}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                     />
 
-                    {reuploadIdPreview ? (
+                    {isProcessingReuploadId ? (
+                      <div className="space-y-3 py-4 animate-pulse">
+                        <Loader2 className="w-8 h-8 mx-auto text-gold-royal animate-spin" />
+                        <p className="text-sm font-bold text-slate-800">Optimizing ID Card Photo...</p>
+                        <p className="text-xs text-slate-500">Please wait a moment</p>
+                      </div>
+                    ) : reuploadIdPreview ? (
                       <div className="space-y-3">
                         <img
                           src={reuploadIdPreview}
                           alt="New Student ID Preview"
-                          className="max-h-48 mx-auto rounded-xl shadow-md border border-gold-royal/30 object-contain"
+                          className="max-h-48 mx-auto rounded-xl shadow-md border border-emerald-500/40 object-contain bg-white"
                         />
                         <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -876,13 +876,18 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                   <button
                     type="submit"
-                    disabled={isResubmitting || !reuploadIdPreview}
-                    className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
+                    disabled={isResubmitting || isProcessingReuploadId}
+                    className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl cursor-pointer"
                   >
                     {isResubmitting ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
                         <span>Resubmitting Application to Admin...</span>
+                      </>
+                    ) : isProcessingReuploadId ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-gold-royal" />
+                        <span>Processing ID Card Image...</span>
                       </>
                     ) : (
                       <>

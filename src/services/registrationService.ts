@@ -487,34 +487,50 @@ export const saveRegistrationAsync = async (registration: Registration): Promise
     updatedAt: registration.updatedAt || new Date().toISOString()
   };
 
-  // 1. Save to Firebase Cloud Database if configured (Realtime Firestore)
-  if (isFirebaseConfigured()) {
-    try {
-      await saveRegistrationToFirebase(finalReg);
-    } catch (e) {
-      console.warn('Firebase cloud upload notice:', e);
-    }
-  }
+  // 1. Immediately save locally in LocalStorage & IndexedDB to prevent any data loss
+  saveRegistration(finalReg);
 
-  // 2. Upload ID Card & Payment Screenshot to Free Supabase Storage if configured
+  // 2. Upload ID Card & Payment Screenshot to Supabase Storage if configured
   if (isSupabaseConfigured()) {
     try {
       if (finalReg.idCardUrl && finalReg.idCardUrl.startsWith('data:image')) {
-        const uploadedIdUrl = await uploadImageToSupabase(finalReg.idCardUrl, `idcard_${finalReg.id}`);
-        if (uploadedIdUrl) finalReg.idCardUrl = uploadedIdUrl;
+        const uploadedIdUrl = await Promise.race([
+          uploadImageToSupabase(finalReg.idCardUrl, `idcard_${finalReg.id}`),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+        ]);
+        if (uploadedIdUrl) {
+          finalReg.idCardUrl = uploadedIdUrl;
+          saveRegistration(finalReg);
+        }
       }
       if (finalReg.paymentScreenshotUrl && finalReg.paymentScreenshotUrl.startsWith('data:image')) {
-        const uploadedPayUrl = await uploadImageToSupabase(finalReg.paymentScreenshotUrl, `pay_${finalReg.id}`);
-        if (uploadedPayUrl) finalReg.paymentScreenshotUrl = uploadedPayUrl;
+        const uploadedPayUrl = await Promise.race([
+          uploadImageToSupabase(finalReg.paymentScreenshotUrl, `pay_${finalReg.id}`),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+        ]);
+        if (uploadedPayUrl) {
+          finalReg.paymentScreenshotUrl = uploadedPayUrl;
+          saveRegistration(finalReg);
+        }
       }
-      await saveRegistrationToSupabase(finalReg);
+      saveRegistrationToSupabase(finalReg).catch((err) => console.warn('Supabase save notice:', err));
     } catch (e) {
       console.warn('Supabase cloud upload notice:', e);
     }
   }
 
-  // 3. Save locally in LocalStorage & IndexedDB
-  saveRegistration(finalReg);
+  // 3. Save to Firebase Cloud Database if configured (Realtime Firestore)
+  if (isFirebaseConfigured()) {
+    try {
+      Promise.race([
+        saveRegistrationToFirebase(finalReg),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
+      ]).catch((e) => console.warn('Firebase cloud upload notice:', e));
+    } catch (e) {
+      console.warn('Firebase cloud upload notice:', e);
+    }
+  }
+
   return finalReg;
 };
 
@@ -635,7 +651,10 @@ export const findStudentByExactEmailOrPhoneAsync = async (email: string, phone: 
   const local = findStudentByExactEmailOrPhone(email, phone);
   if (local) return local;
   try {
-    const cloudList = await syncCloudRegistrations();
+    const cloudList = await Promise.race([
+      syncCloudRegistrations(),
+      new Promise<Registration[]>((resolve) => setTimeout(() => resolve([]), 2500))
+    ]);
     const cleanEmail = email ? email.trim().toLowerCase() : '';
     const cleanPhone = phone ? phone.trim() : '';
     if (!cleanEmail && !cleanPhone) return undefined;

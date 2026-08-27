@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles, RefreshCw, ShieldCheck, Image as ImageIcon, Layers, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles, RefreshCw, ShieldCheck, Layers, AlertCircle, Trash2, Camera, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
   saveRegistrationAsync, 
@@ -9,70 +9,12 @@ import {
   type Registration 
 } from '../services/registrationService';
 import { getSiteSettings } from '../services/siteSettingsService';
+import { compressImageToDataUrl } from '../utils/imageCompressor';
 
 interface RegistrationProps {
   selectedPassFromParent?: string;
   onOpenLookup?: () => void;
 }
-
-const compressImageToDataUrl = (
-  file: File, 
-  maxSizeBytes = 500 * 1024, 
-  initialMaxWidth = 1000, 
-  initialQuality = 0.75
-): Promise<string> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        let canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        let maxWidth = initialMaxWidth;
-        let quality = initialQuality;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(event.target?.result as string);
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-        // Guarantee output size <= 500 KB
-        let attempts = 0;
-        while (dataUrl.length * 0.75 > maxSizeBytes && attempts < 8) {
-          attempts++;
-          quality -= 0.1;
-          if (quality < 0.3) {
-            maxWidth = Math.round(maxWidth * 0.75);
-            width = Math.round(width * 0.75);
-            height = Math.round(height * 0.75);
-            canvas.width = Math.max(width, 100);
-            canvas.height = Math.max(height, 100);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            quality = 0.6;
-          }
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-        }
-
-        resolve(dataUrl);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-};
 
 export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFromParent, onOpenLookup }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
@@ -103,10 +45,15 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
   const [idCardPreview, setIdCardPreview] = useState<string | null>(null);
+  const [isProcessingIdCard, setIsProcessingIdCard] = useState(false);
+  const [idCardError, setIdCardError] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRegistration, setSubmittedRegistration] = useState<Registration | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const idCardSectionRef = useRef<HTMLDivElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -115,12 +62,39 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
   const handleIdCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setIdCardFile(file);
-      const compressed = await compressImageToDataUrl(file);
-      setIdCardPreview(compressed);
-      setValidationError(null);
+    if (!file) return;
+
+    setIdCardFile(file);
+    setIsProcessingIdCard(true);
+    setIdCardError(null);
+    setValidationError(null);
+
+    try {
+      const compressed = await compressImageToDataUrl(file, {
+        maxSizeBytes: 600 * 1024,
+        initialMaxWidth: 1200,
+        initialQuality: 0.8,
+        timeoutMs: 8000,
+      });
+
+      if (compressed) {
+        setIdCardPreview(compressed);
+      } else {
+        setIdCardError('Could not process this image format. Please try another photo or format (JPG/PNG).');
+      }
+    } catch (err) {
+      console.warn('ID card upload processing notice:', err);
+      setIdCardError('Failed to read image file. Please try taking a photo directly or picking a JPG/PNG.');
+    } finally {
+      setIsProcessingIdCard(false);
     }
+  };
+
+  const handleRemoveIdCard = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIdCardFile(null);
+    setIdCardPreview(null);
+    setIdCardError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,14 +102,32 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     if (isSubmitting) return;
     setValidationError(null);
 
+    // If ID card is still processing in background, notify the user
+    if (isProcessingIdCard) {
+      setValidationError('⏳ Please wait a moment for your ID Card photo to finish optimizing...');
+      return;
+    }
+
     // ID Card Upload Requirement
     if (!idCardPreview) {
-      setValidationError('Please upload a clear scanned copy or photo of your College Student ID Card.');
+      const err = '⚠️ Please upload a clear photo or scanned copy of your Student ID Card before submitting.';
+      setValidationError(err);
+      setIdCardError('Student ID Card photo is required for admin verification.');
+      if (idCardSectionRef.current) {
+        idCardSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
     const cleanEmail = formData.email.trim().toLowerCase();
     const cleanPhone = formData.phone.trim();
+
+    if (!cleanEmail || !cleanPhone || !formData.fullName.trim()) {
+      setValidationError('Please fill in all required fields (Full Name, Email, Phone Number).');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       // Check if user already exists by EXACT Email or EXACT Phone in local storage OR live cloud database
@@ -152,7 +144,6 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
       if (existing) {
         if (existing.approvalStatus === 'Rejected') {
-          setIsSubmitting(true);
           const updatedReg: Registration = {
             ...existing,
             ...formData,
@@ -184,12 +175,13 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         }
       }
 
-      setIsSubmitting(true);
-
       const randomId = generateUniqueRegistrationId();
       const draftReg: Registration = {
         id: randomId,
         ...formData,
+        fullName: formData.fullName.trim(),
+        email: cleanEmail,
+        phone: cleanPhone,
         idCardUrl: idCardPreview,
         paymentScreenshotUrl: '',
         paymentAmount: ticketAmount,
@@ -216,7 +208,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       });
     } catch (err) {
       console.error('Registration submit error:', err);
-      setValidationError('An unexpected error occurred while submitting. Please try again.');
+      setValidationError('An unexpected error occurred while submitting. Your details are safe, please try clicking submit once more.');
     } finally {
       setIsSubmitting(false);
     }
@@ -436,82 +428,148 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-xl border border-gold-royal/50 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 outline-none text-sm font-bold text-kerala-deep transition-all bg-gold-light/20"
                   >
-                    <option value="General Pass">General Pass (All Access & Onasadya Feast — ₹700)</option>
+                    <option value="General Pass">General Pass (All Access & Onasadya Feast — ₹{ticketAmount})</option>
                   </select>
                 </div>
               </div>
 
               {/* Step 2: Student ID Card Upload */}
-              <div className="space-y-4 pt-2">
-                <h3 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2 pb-2 border-b border-gold-royal/20">
-                  <span className="w-7 h-7 rounded-full bg-gold-light/40 text-gold-dark text-xs flex items-center justify-center font-bold font-sans">
-                    2
+              <div ref={idCardSectionRef} className="space-y-4 pt-2">
+                <div className="flex items-center justify-between pb-2 border-b border-gold-royal/20">
+                  <h3 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-full bg-gold-light/40 text-gold-dark text-xs flex items-center justify-center font-bold font-sans">
+                      2
+                    </span>
+                    <span>Upload Student ID Card Photo *</span>
+                  </h3>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-full">
+                    Required for Approval
                   </span>
-                  <span>Upload Student ID Card (Required for Admin Approval)</span>
-                </h3>
+                </div>
 
-                <div className="border-2 border-dashed border-gold-royal/40 rounded-2xl p-6 bg-cream-soft/60 text-center hover:bg-cream-soft transition-all relative">
+                {idCardError && (
+                  <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{idCardError}</span>
+                  </div>
+                )}
+
+                <div 
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all relative ${
+                    idCardPreview 
+                      ? 'border-emerald-400 bg-emerald-50/40' 
+                      : idCardError 
+                      ? 'border-rose-400 bg-rose-50/30' 
+                      : 'border-gold-royal/40 bg-cream-soft/60 hover:bg-cream-soft'
+                  }`}
+                >
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
                     onChange={handleIdCardUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={isProcessingIdCard || isSubmitting}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                    title="Click or drag to upload Student ID Card photo"
                   />
 
-                  {idCardPreview ? (
-                    <div className="space-y-3">
-                      <img
-                        src={idCardPreview}
-                        alt="Uploaded Student ID Preview"
-                        className="max-h-48 mx-auto rounded-xl shadow-md border border-gold-royal/30 object-contain"
-                      />
-                      <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Student ID Uploaded: {idCardFile?.name || 'student_id.jpg'}</span>
-                      </p>
-                      <span className="text-[11px] text-slate-400 underline">Click or drop image to replace</span>
+                  {isProcessingIdCard ? (
+                    <div className="space-y-3 py-6 animate-pulse">
+                      <Loader2 className="w-10 h-10 mx-auto text-gold-royal animate-spin" />
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">
+                          Optimizing & Securing ID Card Photo...
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Compressing photo for fast verification, please wait a moment
+                        </p>
+                      </div>
+                    </div>
+                  ) : idCardPreview ? (
+                    <div className="space-y-4">
+                      <div className="relative inline-block mx-auto group">
+                        <img
+                          src={idCardPreview}
+                          alt="Uploaded Student ID Preview"
+                          className="max-h-52 max-w-full mx-auto rounded-xl shadow-lg border-2 border-emerald-500/40 object-contain bg-white"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        <p className="text-xs font-bold text-emerald-800 bg-emerald-100/90 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Student ID Ready: {idCardFile?.name || 'student_id.jpg'}</span>
+                        </p>
+                        
+                        <button
+                          type="button"
+                          onClick={handleRemoveIdCard}
+                          className="relative z-20 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Change Photo</span>
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-slate-400 block">Click anywhere on box to replace with a different photo</span>
                     </div>
                   ) : (
                     <div className="space-y-3 py-4">
-                      <div className="w-14 h-14 rounded-full bg-gold-light/30 text-gold-dark mx-auto flex items-center justify-center text-2xl shadow-inner">
-                        <ImageIcon className="w-7 h-7 text-gold-dark" />
+                      <div className="w-16 h-16 rounded-full bg-gold-light/30 text-gold-dark mx-auto flex items-center justify-center text-2xl shadow-inner">
+                        <Camera className="w-8 h-8 text-gold-dark" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-800">
-                          Click to upload or drag & drop Student ID Card Photo
+                        <p className="text-sm font-extrabold text-slate-800">
+                          Click to Take Photo or Upload Student ID Card
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          PNG, JPG or JPEG • Scanned copy or clear phone photo
+                          PNG, JPG, JPEG, or HEIC • Clear photo of College Student ID Card
                         </p>
+                      </div>
+                      <div className="pt-1">
+                        <span className="inline-block px-3.5 py-1 rounded-full bg-gold-royal/10 text-kerala-deep text-[11px] font-bold border border-gold-royal/20">
+                          Tap to select image from Camera or Gallery
+                        </span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-4">
+              {/* Submit Button & Bottom Error Notice */}
+              <div className="pt-4 space-y-3">
+                {validationError && (
+                  <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-xl text-rose-900 text-xs sm:text-sm font-bold flex items-start gap-2.5 animate-fadeIn">
+                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{validationError}</span>
+                  </div>
+                )}
+
                 <button
+                  ref={submitButtonRef}
                   type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl"
+                  disabled={isSubmitting || isProcessingIdCard}
+                  className="w-full py-4 px-6 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-60 shadow-xl cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-gold-royal" />
+                      <RefreshCw className="w-5 h-5 animate-spin text-gold-royal" />
                       <span>Submitting Details & Student ID for Verification...</span>
+                    </>
+                  ) : isProcessingIdCard ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin text-gold-royal" />
+                      <span>Processing ID Card Image...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4 text-gold-royal" />
+                      <Sparkles className="w-5 h-5 text-gold-royal" />
                       <span>Submit Student Details & ID for Verification</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <p className="text-[11px] text-center text-slate-400">
-                🔒 Once Admin verifies your Student ID Card, the UPI QR Code (₹700) will be unlocked for your registration.
+              <p className="text-[11px] text-center text-slate-500 font-medium">
+                🔒 Once Admin verifies your Student ID Card, the UPI QR Code (₹{ticketAmount}) will be unlocked for your registration.
               </p>
             </form>
           </div>
