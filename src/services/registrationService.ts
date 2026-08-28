@@ -128,6 +128,25 @@ const loadAllFromIndexedDB = (): Promise<Registration[]> => {
 
 export const INITIAL_REGISTRATIONS: Registration[] = [
   {
+    id: 'KRP-558620',
+    fullName: 'Prithvij n pramod',
+    email: 'prithvijpramod01@gmail.com',
+    phone: '9876543210',
+    department: 'BCA',
+    section: 'Section A',
+    year: '2nd Year',
+    gender: 'Male',
+    ticketType: 'General Pass',
+    idCardUrl: getAssetUrl('images/hero_poster.jpg'),
+    paymentScreenshotUrl: '',
+    paymentAmount: 700,
+    paymentStatus: 'Pending',
+    paymentUtr: '',
+    approvalStatus: 'Pending_ID_Approval',
+    submittedAt: 'Aug 28, 2026',
+    isReported: false,
+  },
+  {
     id: 'KRP-947055',
     fullName: 'Sniya M',
     email: 'sniya9528@gmail.com',
@@ -1153,10 +1172,10 @@ const matchRecord = (r: Registration, q: string): boolean => {
   // 5. Payment UTR Match (minimum 6 characters)
   if (rUtr && (rUtr === cleanQ || (qAlphaNum.length >= 6 && rUtr.replace(/[^a-z0-9]/g, '').includes(qAlphaNum)))) return true;
 
-  // 6. Name Match (only for pure text names, e.g. "Albin", "Ashin Gopi", "Sniya")
+  // 6. Name Match (only for pure text names, e.g. "Albin", "Ashin Gopi", "Sniya", "Prithvij")
   if (rName && cleanQ.length >= 3) {
     const nameWords = rName.split(/\s+/);
-    if (rName === cleanQ || rName.startsWith(cleanQ) || nameWords.some(w => w === cleanQ)) {
+    if (rName === cleanQ || rName.startsWith(cleanQ) || rName.includes(cleanQ) || nameWords.some(w => w === cleanQ)) {
       return true;
     }
   }

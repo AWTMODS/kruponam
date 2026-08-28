@@ -760,15 +760,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         matchesFilter = item.approvalStatus === statusFilter;
       }
       const q = searchQuery.toLowerCase().trim();
+      const qAlphaNum = q.replace(/[^a-z0-9]/g, '');
       if (!q) return matchesFilter;
       const matchesQuery =
-        item.fullName.toLowerCase().includes(q) ||
-        item.email.toLowerCase().includes(q) ||
-        item.id.toLowerCase().includes(q) ||
-        item.phone.toLowerCase().includes(q) ||
-        isPhoneMatch(item.phone, q) ||
+        (item.fullName && item.fullName.toLowerCase().includes(q)) ||
+        (item.email && item.email.toLowerCase().includes(q)) ||
+        (item.id && item.id.toLowerCase().includes(q)) ||
+        (qAlphaNum.length >= 3 && item.id && item.id.toLowerCase().replace(/[^a-z0-9]/g, '').includes(qAlphaNum)) ||
+        (item.phone && item.phone.toLowerCase().includes(q)) ||
+        (item.phone && isPhoneMatch(item.phone, q)) ||
         (item.paymentUtr && item.paymentUtr.toLowerCase().includes(q)) ||
-        item.department.toLowerCase().includes(q) ||
+        (item.department && item.department.toLowerCase().includes(q)) ||
         (item.section && item.section.toLowerCase().includes(q));
       return matchesFilter && matchesQuery;
     })
