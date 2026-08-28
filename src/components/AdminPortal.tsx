@@ -948,6 +948,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               </button>
 
               <button
+                onClick={() => setShowAddModal(true)}
+                title="Add or Restore Missing Registration ID"
+                className="px-3 py-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">Add / Restore ID</span>
+              </button>
+
+              <button
                 onClick={loadData}
                 title="Refresh All Registrations"
                 className={`p-2 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all ${isRefreshing ? 'animate-spin text-amber-400' : ''}`}

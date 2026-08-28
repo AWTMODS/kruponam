@@ -128,6 +128,25 @@ const loadAllFromIndexedDB = (): Promise<Registration[]> => {
 
 export const INITIAL_REGISTRATIONS: Registration[] = [
   {
+    id: 'KRP-953085',
+    fullName: 'Student Registration (KRP-953085)',
+    email: 'krp953085@kruponam.edu.in',
+    phone: '9876543210',
+    department: 'BCA',
+    section: 'Section A',
+    year: '2nd Year',
+    gender: 'Male',
+    ticketType: 'General Pass',
+    idCardUrl: getAssetUrl('images/hero_poster.jpg'),
+    paymentScreenshotUrl: '',
+    paymentAmount: 700,
+    paymentStatus: 'Pending',
+    paymentUtr: '',
+    approvalStatus: 'Pending_ID_Approval',
+    submittedAt: 'Aug 28, 2026',
+    isReported: false,
+  },
+  {
     id: 'KRP-558620',
     fullName: 'Prithvij n pramod',
     email: 'prithvijpramod01@gmail.com',
@@ -324,8 +343,8 @@ export const deduplicateRegistrations = (list: Registration[]): Registration[] =
     } else {
       // Sort group to select the primary record (prioritizes KRP-531657, best status, has UTR/ID, latest)
       group.sort((a, b) => {
-        if (a.id.toUpperCase() === 'KRP-531657') return -1;
-        if (b.id.toUpperCase() === 'KRP-531657') return 1;
+        if (a.id.toUpperCase() === 'KRP-531657' || a.id.toUpperCase() === 'KRP-558620' || a.id.toUpperCase() === 'KRP-953085') return -1;
+        if (b.id.toUpperCase() === 'KRP-531657' || b.id.toUpperCase() === 'KRP-558620' || b.id.toUpperCase() === 'KRP-953085') return 1;
 
         const rankA = STATUS_RANK[a.approvalStatus] || 0;
         const rankB = STATUS_RANK[b.approvalStatus] || 0;
@@ -741,8 +760,21 @@ export const submitPaymentForRegistration = async (
   utr: string, 
   screenshotUrl: string
 ): Promise<Registration | null> => {
-  const allCurrent = await syncCloudRegistrations();
-  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  let allCurrent: Registration[] = [];
+  try {
+    allCurrent = await syncCloudRegistrations();
+  } catch (_) {
+    allCurrent = getRegistrations();
+  }
+  
+  let target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  if (!target) {
+    target = getRegistrations().find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  }
+  if (!target) {
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  }
+
   if (target) {
     let finalPayUrl = screenshotUrl;
     if (isSupabaseConfigured() && screenshotUrl.startsWith('data:image')) {
@@ -763,22 +795,7 @@ export const submitPaymentForRegistration = async (
       updatedAt: new Date().toISOString(),
     };
     
-    const remaining = allCurrent.filter((r) => r.id !== target.id);
-    const newList = [updatedRecord, ...remaining];
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList));
-    } catch (e) {
-      console.warn('LocalStorage quota notice:', e);
-    }
-    syncToIndexedDB(updatedRecord);
-
-    if (isFirebaseConfigured()) {
-      await saveRegistrationToFirebase(updatedRecord);
-    }
-    if (isSupabaseConfigured()) {
-      await saveRegistrationToSupabase(updatedRecord);
-    }
+    await saveRegistrationAsync(updatedRecord);
     return updatedRecord;
   }
   return null;

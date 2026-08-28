@@ -9,7 +9,7 @@ import {
   type Registration 
 } from '../services/registrationService';
 import { getSiteSettings } from '../services/siteSettingsService';
-import { compressImageToDataUrl } from '../utils/imageCompressor';
+import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageCompressor';
 
 interface RegistrationProps {
   selectedPassFromParent?: string;
@@ -40,7 +40,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     section: 'Section A',
     year: '2nd Year',
     gender: 'Male',
-    ticketType: selectedPassFromParent || 'General Pass',
+    ticketType: selectedPassFromParent || 'Student Pass',
   });
 
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -53,10 +53,12 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const idCardSectionRef = useRef<HTMLDivElement>(null);
+  const idCardInputRef = useRef<HTMLInputElement>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setValidationError(null);
   };
 
@@ -74,27 +76,43 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         maxSizeBytes: 600 * 1024,
         initialMaxWidth: 1200,
         initialQuality: 0.8,
-        timeoutMs: 8000,
+        timeoutMs: 6000,
       });
 
-      if (compressed) {
+      if (compressed && compressed.length > 50) {
         setIdCardPreview(compressed);
       } else {
-        setIdCardError('Could not process this image format. Please try another photo or format (JPG/PNG).');
+        const raw = await readRawFileAsDataUrl(file);
+        if (raw) {
+          setIdCardPreview(raw);
+        } else {
+          setIdCardError('Could not process this image format. Please select another photo or format (JPG/PNG).');
+        }
       }
     } catch (err) {
       console.warn('ID card upload processing notice:', err);
-      setIdCardError('Failed to read image file. Please try taking a photo directly or picking a JPG/PNG.');
+      try {
+        const raw = await readRawFileAsDataUrl(file);
+        if (raw) {
+          setIdCardPreview(raw);
+        } else {
+          setIdCardError('Failed to read image file. Please try taking a photo directly or picking a JPG/PNG.');
+        }
+      } catch {
+        setIdCardError('Failed to read image file. Please try taking a photo directly or picking a JPG/PNG.');
+      }
     } finally {
       setIsProcessingIdCard(false);
+      if (e.target) e.target.value = '';
     }
   };
 
-  const handleRemoveIdCard = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleRemoveIdCard = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setIdCardFile(null);
     setIdCardPreview(null);
     setIdCardError(null);
+    if (idCardInputRef.current) idCardInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -455,7 +473,12 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                 )}
 
                 <div 
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all relative ${
+                  onClick={() => {
+                    if (!isProcessingIdCard && !isSubmitting) {
+                      idCardInputRef.current?.click();
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer relative hover:border-gold-royal ${
                     idCardPreview 
                       ? 'border-emerald-400 bg-emerald-50/40' 
                       : idCardError 
@@ -464,16 +487,16 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                   }`}
                 >
                   <input
+                    ref={idCardInputRef}
                     type="file"
-                    accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
+                    accept="image/*,image/jpeg,image/png,image/webp"
                     onChange={handleIdCardUpload}
                     disabled={isProcessingIdCard || isSubmitting}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                    title="Click or drag to upload Student ID Card photo"
+                    className="hidden"
                   />
 
                   {isProcessingIdCard ? (
-                    <div className="space-y-3 py-6 animate-pulse">
+                    <div className="space-y-3 py-6 animate-pulse pointer-events-none">
                       <Loader2 className="w-10 h-10 mx-auto text-gold-royal animate-spin" />
                       <div>
                         <p className="text-sm font-bold text-slate-800">
@@ -497,19 +520,21 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         <p className="text-xs font-bold text-emerald-800 bg-emerald-100/90 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>Student ID Ready: {idCardFile?.name || 'student_id.jpg'}</span>
+                          <span>Student ID Attached: {idCardFile?.name || 'student_id.jpg'}</span>
                         </p>
                         
                         <button
                           type="button"
-                          onClick={handleRemoveIdCard}
-                          className="relative z-20 text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveIdCard();
+                          }}
+                          className="text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Change Photo</span>
                         </button>
                       </div>
-                      <span className="text-[11px] text-slate-400 block">Click anywhere on box to replace with a different photo</span>
                     </div>
                   ) : (
                     <div className="space-y-3 py-4">
@@ -521,13 +546,19 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                           Click to Take Photo or Upload Student ID Card
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          PNG, JPG, JPEG, or HEIC • Clear photo of College Student ID Card
+                          Clear photo of College Student ID Card (JPG, PNG)
                         </p>
-                      </div>
-                      <div className="pt-1">
-                        <span className="inline-block px-3.5 py-1 rounded-full bg-gold-royal/10 text-kerala-deep text-[11px] font-bold border border-gold-royal/20">
-                          Tap to select image from Camera or Gallery
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            idCardInputRef.current?.click();
+                          }}
+                          className="mt-3 px-4 py-2 rounded-xl bg-gold-royal/20 text-kerala-deep font-bold text-xs hover:bg-gold-royal/30 transition-colors inline-flex items-center gap-1.5 border border-gold-royal/40"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Browse Gallery / Camera</span>
+                        </button>
                       </div>
                     </div>
                   )}

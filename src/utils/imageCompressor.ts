@@ -6,6 +6,7 @@
 export interface CompressionOptions {
   maxSizeBytes?: number;
   initialMaxWidth?: number;
+  initialMaxHeight?: number;
   initialQuality?: number;
   timeoutMs?: number;
 }
@@ -15,10 +16,11 @@ export const compressImageToDataUrl = (
   options: CompressionOptions = {}
 ): Promise<string> => {
   const {
-    maxSizeBytes = 500 * 1024, // 500 KB target
+    maxSizeBytes = 600 * 1024, // 600 KB target
     initialMaxWidth = 1200,
+    initialMaxHeight = 1600,
     initialQuality = 0.8,
-    timeoutMs = 8000,
+    timeoutMs = 6000,
   } = options;
 
   return new Promise((resolve) => {
@@ -33,15 +35,15 @@ export const compressImageToDataUrl = (
       resolve(result);
     };
 
-    if (!file || !file.type.startsWith('image/') && !file.name.match(/\.(jpg|jpeg|png|webp|gif|heic|heif)$/i)) {
-      readRawFileAsDataUrl(file).then(cleanupAndResolve);
+    if (!file) {
+      cleanupAndResolve('');
       return;
     }
 
     const reader = new FileReader();
 
     reader.onload = (event) => {
-      const rawDataUrl = event.target?.result as string;
+      const rawDataUrl = (event.target?.result as string) || '';
       if (!rawDataUrl) {
         readRawFileAsDataUrl(file).then(cleanupAndResolve);
         return;
@@ -54,19 +56,25 @@ export const compressImageToDataUrl = (
       }
 
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      // NOTE: DO NOT set crossOrigin on data: URLs as it causes canvas taint / decode errors in Safari & mobile WebViews
 
       img.onload = () => {
         try {
-          let canvas = document.createElement('canvas');
-          let width = img.naturalWidth || img.width;
-          let height = img.naturalHeight || img.height;
+          const canvas = document.createElement('canvas');
+          let width = img.naturalWidth || img.width || 800;
+          let height = img.naturalHeight || img.height || 600;
           let maxWidth = initialMaxWidth;
+          let maxHeight = initialMaxHeight;
           let quality = initialQuality;
 
+          // Scale proportionally to fit within maxWidth and maxHeight
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
             width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
           }
 
           canvas.width = Math.max(width, 100);
@@ -87,24 +95,29 @@ export const compressImageToDataUrl = (
 
           // Iteratively downscale if size exceeds maxSizeBytes
           let attempts = 0;
-          while (dataUrl.length * 0.75 > maxSizeBytes && attempts < 6) {
+          while (dataUrl && dataUrl.length * 0.75 > maxSizeBytes && attempts < 5) {
             attempts++;
-            quality = Math.max(0.3, quality - 0.15);
-            if (quality <= 0.45) {
-              maxWidth = Math.round(maxWidth * 0.75);
-              width = Math.round(width * 0.75);
-              height = Math.round(height * 0.75);
+            quality = Math.max(0.35, quality - 0.15);
+            if (quality <= 0.5) {
+              maxWidth = Math.round(maxWidth * 0.8);
+              maxHeight = Math.round(maxHeight * 0.8);
+              width = Math.round(width * 0.8);
+              height = Math.round(height * 0.8);
               canvas.width = Math.max(width, 100);
               canvas.height = Math.max(height, 100);
               ctx.fillStyle = '#FFFFFF';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              quality = 0.6;
+              quality = 0.65;
             }
             dataUrl = canvas.toDataURL('image/jpeg', quality);
           }
 
-          cleanupAndResolve(dataUrl);
+          if (dataUrl && dataUrl.length > 50) {
+            cleanupAndResolve(dataUrl);
+          } else {
+            cleanupAndResolve(rawDataUrl);
+          }
         } catch (canvasErr) {
           console.warn('Canvas compression error, using raw file:', canvasErr);
           cleanupAndResolve(rawDataUrl);
@@ -121,10 +134,14 @@ export const compressImageToDataUrl = (
 
     reader.onerror = () => {
       console.error('FileReader error on image upload');
-      cleanupAndResolve('');
+      readRawFileAsDataUrl(file).then(cleanupAndResolve);
     };
 
-    reader.readAsDataURL(file);
+    try {
+      reader.readAsDataURL(file);
+    } catch {
+      readRawFileAsDataUrl(file).then(cleanupAndResolve);
+    }
   });
 };
 
@@ -134,6 +151,10 @@ export const compressImageToDataUrl = (
 export const readRawFileAsDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve) => {
     try {
+      if (!file) {
+        resolve('');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => resolve((e.target?.result as string) || '');
       reader.onerror = () => resolve('');

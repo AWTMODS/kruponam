@@ -5,7 +5,7 @@ import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { fetchActiveUpiSlotFromFirebase } from '../services/firebaseService';
 import { getSiteSettings } from '../services/siteSettingsService';
-import { compressImageToDataUrl } from '../utils/imageCompressor';
+import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageCompressor';
 
 interface LookupProps {
   onClose?: () => void;
@@ -43,6 +43,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
 
+  const paymentFileInputRef = useRef<HTMLInputElement>(null);
+  const reuploadIdInputRef = useRef<HTMLInputElement>(null);
+
   // Resubmit / Re-upload state for rejected applications
   const [resubmitName, setResubmitName] = useState('');
   const [reuploadIdFile, setReuploadIdFile] = useState<File | null>(null);
@@ -68,17 +71,32 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           maxSizeBytes: 600 * 1024,
           initialMaxWidth: 1200,
           initialQuality: 0.8,
-          timeoutMs: 8000,
+          timeoutMs: 6000,
         });
-        if (compressed) {
+        if (compressed && compressed.length > 50) {
           setReuploadIdPreview(compressed);
         } else {
-          setPaymentError('Could not process this image format. Please select another JPG/PNG photo.');
+          const raw = await readRawFileAsDataUrl(file);
+          if (raw) {
+            setReuploadIdPreview(raw);
+          } else {
+            setPaymentError('Could not process this image format. Please select another JPG/PNG photo.');
+          }
         }
       } catch {
-        setPaymentError('Error reading ID card photo. Please try again.');
+        try {
+          const raw = await readRawFileAsDataUrl(file);
+          if (raw) {
+            setReuploadIdPreview(raw);
+          } else {
+            setPaymentError('Error reading ID card photo. Please try again.');
+          }
+        } catch {
+          setPaymentError('Error reading ID card photo. Please try again.');
+        }
       } finally {
         setIsProcessingReuploadId(false);
+        if (e.target) e.target.value = '';
       }
     }
   };
@@ -199,17 +217,32 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           maxSizeBytes: 600 * 1024,
           initialMaxWidth: 1200,
           initialQuality: 0.8,
-          timeoutMs: 8000,
+          timeoutMs: 6000,
         });
-        if (compressed) {
+        if (compressed && compressed.length > 50) {
           setPaymentScreenshotPreview(compressed);
         } else {
-          setPaymentError('Could not process this screenshot format. Please select another JPG/PNG image.');
+          const raw = await readRawFileAsDataUrl(file);
+          if (raw) {
+            setPaymentScreenshotPreview(raw);
+          } else {
+            setPaymentError('Could not process this screenshot format. Please select another JPG/PNG image.');
+          }
         }
       } catch {
-        setPaymentError('Error reading payment screenshot. Please try again.');
+        try {
+          const raw = await readRawFileAsDataUrl(file);
+          if (raw) {
+            setPaymentScreenshotPreview(raw);
+          } else {
+            setPaymentError('Error reading payment screenshot. Please try again.');
+          }
+        } catch {
+          setPaymentError('Error reading payment screenshot. Please try again.');
+        }
       } finally {
         setIsProcessingPaymentScreenshot(false);
+        if (e.target) e.target.value = '';
       }
     }
   };
@@ -649,24 +682,47 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                 {/* Screenshot upload */}
                 <div className="pt-4 border-t border-gold-royal/20 space-y-3">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Upload className="w-4 h-4 text-gold-royal" />
-                    Upload Payment Screenshot (Showing UTR Number) *
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-gold-royal" />
+                      Upload Payment Screenshot (Showing UTR Number) *
+                    </span>
+                    {paymentScreenshotPreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentScreenshotPreview(null);
+                          setPaymentScreenshotFile(null);
+                          if (paymentFileInputRef.current) paymentFileInputRef.current.value = '';
+                        }}
+                        className="text-[11px] text-rose-600 hover:text-rose-800 font-bold underline cursor-pointer"
+                      >
+                        Remove / Re-upload
+                      </button>
+                    )}
                   </label>
 
-                  <div className={`border-2 border-dashed rounded-2xl p-5 bg-white text-center transition-all relative ${
-                    paymentScreenshotPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
-                  }`}>
+                  <div 
+                    onClick={() => {
+                      if (!isProcessingPaymentScreenshot && !isSubmittingPayment) {
+                        paymentFileInputRef.current?.click();
+                      }
+                    }}
+                    className={`border-2 border-dashed rounded-2xl p-5 bg-white text-center transition-all cursor-pointer relative hover:border-gold-royal ${
+                      paymentScreenshotPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
+                    }`}
+                  >
                     <input
+                      ref={paymentFileInputRef}
                       type="file"
-                      accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
+                      accept="image/*,image/jpeg,image/png,image/webp"
                       onChange={handlePaymentScreenshotUpload}
                       disabled={isProcessingPaymentScreenshot || isSubmittingPayment}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                      className="hidden"
                     />
 
                     {isProcessingPaymentScreenshot ? (
-                      <div className="py-4 space-y-2 animate-pulse">
+                      <div className="py-4 space-y-2 animate-pulse pointer-events-none">
                         <Loader2 className="w-8 h-8 mx-auto text-gold-royal animate-spin" />
                         <p className="text-xs font-bold text-slate-800">Optimizing Payment Receipt Photo...</p>
                         <p className="text-[11px] text-slate-500">Please wait a moment</p>
@@ -680,19 +736,41 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         />
                         <p className="text-xs font-bold text-emerald-700 flex items-center justify-center gap-1">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span>Payment Receipt Uploaded: {paymentScreenshotFile?.name || 'payment_receipt.png'}</span>
+                          <span>Payment Receipt Attached: {paymentScreenshotFile?.name || 'payment_receipt.png'}</span>
                         </p>
-                        <span className="text-[11px] text-slate-400 underline">Click to replace screenshot</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            paymentFileInputRef.current?.click();
+                          }}
+                          className="text-xs text-gold-dark hover:text-kerala-deep font-bold underline inline-block"
+                        >
+                          Tap to select a different screenshot
+                        </button>
                       </div>
                     ) : (
                       <div className="py-3 space-y-2">
-                        <Upload className="w-7 h-7 mx-auto text-gold-dark" />
-                        <p className="text-xs font-bold text-slate-800">
-                          Upload GPay / PhonePe / Paytm Payment Screenshot
+                        <div className="w-12 h-12 rounded-full bg-amber-100 text-gold-dark mx-auto flex items-center justify-center shadow-inner">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <p className="text-sm font-bold text-slate-800">
+                          Tap to Choose GPay / PhonePe / Paytm Screenshot
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          Must clearly display ₹{ticketAmount} paid amount and 12-digit UTR number.
+                          Supports JPG, PNG, Screenshots from mobile gallery (₹{ticketAmount} amount & 12-digit UTR clearly visible)
                         </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            paymentFileInputRef.current?.click();
+                          }}
+                          className="mt-2 px-4 py-2 rounded-xl bg-amber-100 text-gold-dark font-bold text-xs hover:bg-amber-200 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Browse Gallery / Files</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -831,19 +909,27 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     </p>
                   </div>
 
-                  <div className={`border-2 border-dashed rounded-2xl p-6 bg-white text-center transition-all relative ${
-                    reuploadIdPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
-                  }`}>
+                  <div 
+                    onClick={() => {
+                      if (!isProcessingReuploadId && !isResubmitting) {
+                        reuploadIdInputRef.current?.click();
+                      }
+                    }}
+                    className={`border-2 border-dashed rounded-2xl p-6 bg-white text-center transition-all cursor-pointer relative hover:border-gold-royal ${
+                      reuploadIdPreview ? 'border-emerald-400 bg-emerald-50/30' : 'border-gold-royal/40 hover:bg-amber-50/50'
+                    }`}
+                  >
                     <input
+                      ref={reuploadIdInputRef}
                       type="file"
-                      accept="image/png, image/jpeg, image/jpg, image/webp, image/*, .heic, .heif"
+                      accept="image/*,image/jpeg,image/png,image/webp"
                       onChange={handleReuploadIdCard}
                       disabled={isProcessingReuploadId || isResubmitting}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                      className="hidden"
                     />
 
                     {isProcessingReuploadId ? (
-                      <div className="space-y-3 py-4 animate-pulse">
+                      <div className="space-y-3 py-4 animate-pulse pointer-events-none">
                         <Loader2 className="w-8 h-8 mx-auto text-gold-royal animate-spin" />
                         <p className="text-sm font-bold text-slate-800">Optimizing ID Card Photo...</p>
                         <p className="text-xs text-slate-500">Please wait a moment</p>
@@ -859,17 +945,39 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                           <span>New Student ID Uploaded: {reuploadIdFile?.name || 'student_id.jpg'}</span>
                         </p>
-                        <span className="text-[11px] text-slate-400 underline">Click to choose a different photo</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            reuploadIdInputRef.current?.click();
+                          }}
+                          className="text-xs text-gold-dark hover:text-kerala-deep font-bold underline inline-block"
+                        >
+                          Tap to select a different photo
+                        </button>
                       </div>
                     ) : (
                       <div className="space-y-2 py-3">
-                        <Upload className="w-8 h-8 mx-auto text-gold-dark" />
+                        <div className="w-12 h-12 rounded-full bg-amber-100 text-gold-dark mx-auto flex items-center justify-center shadow-inner">
+                          <Upload className="w-6 h-6" />
+                        </div>
                         <p className="text-sm font-bold text-slate-800">
-                          Click to upload or drag & drop New Student ID Photo
+                          Click to upload or take New Student ID Photo
                         </p>
                         <p className="text-xs text-slate-500">
-                          Clear phone photo or scanned copy of Student ID Card
+                          Clear phone photo or scanned copy of Student ID Card (JPG/PNG)
                         </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            reuploadIdInputRef.current?.click();
+                          }}
+                          className="mt-2 px-4 py-2 rounded-xl bg-amber-100 text-gold-dark font-bold text-xs hover:bg-amber-200 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Browse Gallery / Camera</span>
+                        </button>
                       </div>
                     )}
                   </div>
