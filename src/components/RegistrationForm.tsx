@@ -73,10 +73,10 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
     try {
       const compressed = await compressImageToDataUrl(file, {
-        maxSizeBytes: 600 * 1024,
-        initialMaxWidth: 1200,
-        initialQuality: 0.8,
-        timeoutMs: 6000,
+        maxSizeBytes: 180 * 1024,
+        initialMaxWidth: 1000,
+        initialQuality: 0.76,
+        timeoutMs: 5000,
       });
 
       if (compressed && compressed.length > 50) {
@@ -489,7 +489,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                   <input
                     ref={idCardInputRef}
                     type="file"
-                    accept="image/*,image/jpeg,image/png,image/webp"
+                    accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
                     onChange={handleIdCardUpload}
                     disabled={isProcessingIdCard || isSubmitting}
                     className="hidden"

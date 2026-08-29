@@ -174,6 +174,62 @@ export const fetchRegistrationsFromSupabase = async (): Promise<Registration[] |
   }
 };
 
+/**
+ * Superfast targeted single-record search in Supabase (takes ~50-200ms)
+ */
+export const findRegistrationInSupabase = async (queryStr: string): Promise<Registration | null> => {
+  const client = getSupabaseClient();
+  if (!client || !queryStr || !queryStr.trim()) return null;
+
+  const q = queryStr.trim();
+  const lowerQ = q.toLowerCase();
+
+  try {
+    // Search by ID, Email, or Phone
+    const digitsOnly = lowerQ.replace(/\D/g, '');
+    let filterString = `id.ilike.%${q}%,email.ilike.%${lowerQ}%`;
+    if (digitsOnly.length >= 6) {
+      filterString += `,phone.ilike.%${digitsOnly}%`;
+    }
+
+    const { data, error } = await client
+      .from('registrations')
+      .select('*')
+      .or(filterString)
+      .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+
+    const row = data[0];
+    return {
+      id: row.id,
+      fullName: row.full_name || row.fullName,
+      email: row.email,
+      phone: row.phone,
+      department: row.department,
+      section: row.section || 'Section A',
+      year: row.year,
+      gender: row.gender,
+      ticketType: row.ticket_type || row.ticketType,
+      idCardUrl: row.id_card_url || row.idCardUrl,
+      paymentScreenshotUrl: row.payment_screenshot_url || row.paymentScreenshotUrl,
+      paymentAmount: Number(row.payment_amount || row.paymentAmount || 700),
+      paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
+      paymentUtr: row.payment_utr || row.paymentUtr || '',
+      approvalStatus: row.approval_status || row.approvalStatus || 'Pending_ID_Approval',
+      rejectionReason: row.rejection_reason || row.rejectionReason || '',
+      submittedAt: row.submitted_at || row.submittedAt,
+      approvedAt: row.approved_at || row.approvedAt,
+      updatedAt: row.updated_at || row.updatedAt,
+      isReported: Boolean(row.is_reported || row.isReported),
+      reportedAt: row.reported_at || row.reportedAt,
+    };
+  } catch (err) {
+    console.warn('Supabase fast lookup notice:', err);
+    return null;
+  }
+};
+
 const compressBase64ForPostgres = (base64Str: string, maxWidth = 500, quality = 0.4): Promise<string> => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !base64Str || !base64Str.startsWith('data:image')) {

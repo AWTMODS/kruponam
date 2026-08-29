@@ -4,13 +4,15 @@ import {
   saveRegistrationToSupabase, 
   uploadImageToSupabase, 
   deleteRegistrationFromSupabase,
-  isSupabaseConfigured 
+  isSupabaseConfigured,
+  findRegistrationInSupabase 
 } from './supabaseService';
 import {
   isFirebaseConfigured,
   fetchRegistrationsFromFirebase,
   saveRegistrationToFirebase,
   deleteRegistrationFromFirebase,
+  findRegistrationInFirebase,
 } from './firebaseService';
 
 export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending' | 'VIP_Pending' | 'VIP';
@@ -688,19 +690,37 @@ export const findStudentByExactEmailOrPhone = (email: string, phone: string): Re
 export const findStudentByExactEmailOrPhoneAsync = async (email: string, phone: string): Promise<Registration | undefined> => {
   const local = findStudentByExactEmailOrPhone(email, phone);
   if (local) return local;
+
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const cleanPhone = phone ? phone.trim() : '';
+  if (!cleanEmail && !cleanPhone) return undefined;
+
   try {
-    const cloudList = await Promise.race([
-      syncCloudRegistrations(),
-      new Promise<Registration[]>((resolve) => setTimeout(() => resolve([]), 2500))
+    const cloudPromises: Promise<Registration | null>[] = [];
+    if (isFirebaseConfigured()) {
+      if (cleanEmail) cloudPromises.push(findRegistrationInFirebase(cleanEmail));
+      if (cleanPhone) cloudPromises.push(findRegistrationInFirebase(cleanPhone));
+    }
+    if (isSupabaseConfigured()) {
+      if (cleanEmail) cloudPromises.push(findRegistrationInSupabase(cleanEmail));
+      if (cleanPhone) cloudPromises.push(findRegistrationInSupabase(cleanPhone));
+    }
+
+    const results = await Promise.race([
+      Promise.allSettled(cloudPromises),
+      new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
     ]);
-    const cleanEmail = email ? email.trim().toLowerCase() : '';
-    const cleanPhone = phone ? phone.trim() : '';
-    if (!cleanEmail && !cleanPhone) return undefined;
-    return cloudList.find((r) => {
-      if (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) return true;
-      if (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone)) return true;
-      return false;
-    });
+
+    if (Array.isArray(results)) {
+      for (const res of results) {
+        if (res.status === 'fulfilled' && res.value) {
+          const r = res.value as Registration;
+          if (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) return r;
+          if (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone)) return r;
+        }
+      }
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -760,26 +780,32 @@ export const submitPaymentForRegistration = async (
   utr: string, 
   screenshotUrl: string
 ): Promise<Registration | null> => {
-  let allCurrent: Registration[] = [];
-  try {
-    allCurrent = await syncCloudRegistrations();
-  } catch (_) {
-    allCurrent = getRegistrations();
-  }
-  
-  let target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  const cleanId = (id || '').trim();
+  if (!cleanId) return null;
+
+  let target = getRegistrations().find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
   if (!target) {
-    target = getRegistrations().find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
   }
+
+  // If not found locally, do a fast targeted lookup in Firebase/Supabase
   if (!target) {
-    target = INITIAL_REGISTRATIONS.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+    if (isFirebaseConfigured()) {
+      target = (await findRegistrationInFirebase(cleanId)) || undefined;
+    }
+    if (!target && isSupabaseConfigured()) {
+      target = (await findRegistrationInSupabase(cleanId)) || undefined;
+    }
   }
 
   if (target) {
     let finalPayUrl = screenshotUrl;
     if (isSupabaseConfigured() && screenshotUrl.startsWith('data:image')) {
       try {
-        const uploaded = await uploadImageToSupabase(screenshotUrl, `pay_${id}`);
+        const uploaded = await Promise.race([
+          uploadImageToSupabase(screenshotUrl, `pay_${cleanId}`),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
         if (uploaded) finalPayUrl = uploaded;
       } catch (e) {
         console.warn('Supabase upload notice:', e);
@@ -788,13 +814,14 @@ export const submitPaymentForRegistration = async (
 
     const updatedRecord: Registration = {
       ...target,
-      paymentUtr: utr,
+      paymentUtr: utr.trim(),
       paymentScreenshotUrl: finalPayUrl,
       paymentStatus: 'Pending',
       approvalStatus: 'Payment_Pending',
       updatedAt: new Date().toISOString(),
     };
     
+    // Save to local & cloud async
     await saveRegistrationAsync(updatedRecord);
     return updatedRecord;
   }
@@ -1208,22 +1235,46 @@ export const findRegistration = (query: string): Registration | undefined => {
 
 export const findRegistrationAsync = async (query: string): Promise<Registration | undefined> => {
   if (!query || !query.trim()) return undefined;
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
+  const lowerQ = q.toLowerCase();
   
   const localList = getRegistrations();
-  const localMatch = localList.find((r) => matchRecord(r, q));
+  const localMatch = localList.find((r) => matchRecord(r, lowerQ));
 
+  // Perform superfast targeted lookup from Firebase & Supabase in parallel
   try {
-    const cloudList = await syncCloudRegistrations();
-    const cloudMatch = cloudList.find((r) => matchRecord(r, q));
-    if (cloudMatch) return cloudMatch;
+    const cloudPromises: Promise<Registration | null>[] = [];
+    if (isFirebaseConfigured()) {
+      cloudPromises.push(findRegistrationInFirebase(q));
+    }
+    if (isSupabaseConfigured()) {
+      cloudPromises.push(findRegistrationInSupabase(q));
+    }
+
+    if (cloudPromises.length > 0) {
+      const results = await Promise.race([
+        Promise.allSettled(cloudPromises),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+      ]);
+
+      if (Array.isArray(results)) {
+        for (const res of results) {
+          if (res.status === 'fulfilled' && res.value) {
+            const cloudReg = res.value as Registration;
+            // Update local memory / storage so future lookups are instant
+            saveRegistration(cloudReg);
+            return cloudReg;
+          }
+        }
+      }
+    }
   } catch (e) {
-    console.warn('Cloud search notice:', e);
+    console.warn('Fast cloud search notice:', e);
   }
 
   if (localMatch) return localMatch;
 
-  return INITIAL_REGISTRATIONS.find((r) => matchRecord(r, q));
+  return INITIAL_REGISTRATIONS.find((r) => matchRecord(r, lowerQ));
 };
 
 // ── Backup & Safety Helper Exports ──────────────────────────────────

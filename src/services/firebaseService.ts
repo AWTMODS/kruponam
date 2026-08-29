@@ -6,11 +6,15 @@ import {
   setDoc, 
   getDocs, 
   getDoc,
+  query,
+  where,
+  limit,
   onSnapshot, 
   deleteDoc, 
   Firestore 
 } from 'firebase/firestore';
 import type { Registration } from './registrationService';
+import { downscaleBase64 } from '../utils/imageCompressor';
 
 const FIREBASE_CONFIG_KEY = 'kruponam_firebase_config_v1';
 
@@ -111,6 +115,17 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
   if (!db) return false;
 
   try {
+    // Compress base64 images if they exceed safe Firestore document size (Firestore doc limit = 1MB)
+    let safeIdCard = reg.idCardUrl || '';
+    let safePayment = reg.paymentScreenshotUrl || '';
+
+    if (safeIdCard.startsWith('data:image') && safeIdCard.length > 250 * 1024) {
+      safeIdCard = await downscaleBase64(safeIdCard, 180 * 1024);
+    }
+    if (safePayment.startsWith('data:image') && safePayment.length > 250 * 1024) {
+      safePayment = await downscaleBase64(safePayment, 180 * 1024);
+    }
+
     const cleanReg: Record<string, any> = {
       id: reg.id,
       fullName: reg.fullName || '',
@@ -121,8 +136,8 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
       year: reg.year || '1st Year',
       gender: reg.gender || 'Other',
       ticketType: reg.ticketType || 'General Pass',
-      idCardUrl: reg.idCardUrl || '',
-      paymentScreenshotUrl: reg.paymentScreenshotUrl || '',
+      idCardUrl: safeIdCard,
+      paymentScreenshotUrl: safePayment,
       paymentAmount: reg.paymentAmount !== undefined ? Number(reg.paymentAmount) : (reg.ticketType === 'VIP Pass' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 0 : 700),
       paymentStatus: reg.paymentStatus || (reg.approvalStatus === 'Approved' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 'Verified' : 'Pending'),
       paymentUtr: reg.paymentUtr || '',
@@ -141,6 +156,94 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
   } catch (err) {
     console.error('Firebase save exception:', err);
     return false;
+  }
+};
+
+const mapFirebaseDoc = (data: any, docId: string): Registration => ({
+  id: String(data?.id || docId),
+  fullName: data?.fullName || data?.name || data?.studentName || '',
+  email: data?.email || '',
+  phone: data?.phone || data?.mobile || data?.phoneNumber || '',
+  department: data?.department || data?.dept || '',
+  section: data?.section || 'Section A',
+  year: data?.year || '1st Year',
+  gender: data?.gender || 'Other',
+  ticketType: data?.ticketType || 'General Pass',
+  idCardUrl: data?.idCardUrl || data?.idCard || '',
+  paymentScreenshotUrl: data?.paymentScreenshotUrl || data?.paymentScreenshot || '',
+  paymentAmount: data?.paymentAmount !== undefined ? Number(data.paymentAmount) : (data?.ticketType === 'VIP Pass' || data?.approvalStatus === 'VIP' || data?.approvalStatus === 'VIP_Pending' ? 0 : 700),
+  paymentStatus: data?.paymentStatus || (data?.status === 'Approved' || data?.status === 'VIP' || data?.status === 'VIP_Pending' ? 'Verified' : 'Pending'),
+  paymentUtr: data?.paymentUtr || data?.utr || '',
+  approvalStatus: data?.approvalStatus || data?.status || 'Pending_ID_Approval',
+  rejectionReason: data?.rejectionReason || '',
+  submittedAt: data?.submittedAt || data?.createdAt || '',
+  approvedAt: data?.approvedAt || '',
+  updatedAt: data?.updatedAt || '',
+  isReported: Boolean(data?.isReported || data?.checkedIn),
+  reportedAt: data?.reportedAt || '',
+});
+
+/**
+ * Superfast targeted single-record search directly in Firebase (takes ~50-200ms)
+ */
+export const findRegistrationInFirebase = async (queryStr: string): Promise<Registration | null> => {
+  const db = getFirebaseDb();
+  if (!db || !queryStr || !queryStr.trim()) return null;
+
+  const q = queryStr.trim();
+  const lowerQ = q.toLowerCase();
+  const upperQ = q.toUpperCase();
+
+  try {
+    // 1. Direct document key lookup by ID (e.g. KRP-123456) - 10-30ms!
+    const docRef = doc(db, 'registrations', upperQ);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return mapFirebaseDoc(docSnap.data(), docSnap.id);
+    }
+
+    // Also check lowercase / as-is ID
+    if (upperQ !== q) {
+      const altSnap = await getDoc(doc(db, 'registrations', q));
+      if (altSnap.exists()) {
+        return mapFirebaseDoc(altSnap.data(), altSnap.id);
+      }
+    }
+
+    // 2. Query by email if it looks like an email or search string
+    if (lowerQ.includes('@')) {
+      const emailQuery = query(collection(db, 'registrations'), where('email', '==', lowerQ), limit(1));
+      const emailSnap = await getDocs(emailQuery);
+      if (!emailSnap.empty) {
+        const first = emailSnap.docs[0];
+        return mapFirebaseDoc(first.data(), first.id);
+      }
+    }
+
+    // 3. Query by phone number
+    const digitsOnly = lowerQ.replace(/\D/g, '');
+    if (digitsOnly.length >= 7) {
+      const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
+      const phoneQuery = query(collection(db, 'registrations'), where('phone', '==', last10), limit(1));
+      const phoneSnap = await getDocs(phoneQuery);
+      if (!phoneSnap.empty) {
+        const first = phoneSnap.docs[0];
+        return mapFirebaseDoc(first.data(), first.id);
+      }
+
+      // Also try with +91 or original q
+      const altPhoneQuery = query(collection(db, 'registrations'), where('phone', '==', q), limit(1));
+      const altPhoneSnap = await getDocs(altPhoneQuery);
+      if (!altPhoneSnap.empty) {
+        const first = altPhoneSnap.docs[0];
+        return mapFirebaseDoc(first.data(), first.id);
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Firebase fast lookup notice:', err);
+    return null;
   }
 };
 

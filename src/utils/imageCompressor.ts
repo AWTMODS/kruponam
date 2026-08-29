@@ -1,6 +1,7 @@
 /**
  * Robust image compressor with fallbacks for mobile browsers, iOS HEIC/HEIF,
  * large camera photos, and slow devices.
+ * Produces crisp, lightweight images safely within Firestore & Supabase limits.
  */
 
 export interface CompressionOptions {
@@ -16,131 +17,139 @@ export const compressImageToDataUrl = (
   options: CompressionOptions = {}
 ): Promise<string> => {
   const {
-    maxSizeBytes = 600 * 1024, // 600 KB target
-    initialMaxWidth = 1200,
-    initialMaxHeight = 1600,
-    initialQuality = 0.8,
-    timeoutMs = 6000,
+    maxSizeBytes = 180 * 1024, // 180 KB target (well within Firestore 1MB doc limit)
+    initialMaxWidth = 1000,
+    initialMaxHeight = 1400,
+    initialQuality = 0.76,
+    timeoutMs = 5000,
   } = options;
 
   return new Promise((resolve) => {
-    // Failsafe timeout to prevent hanging promises on slow mobile devices
-    const timeoutTimer = setTimeout(() => {
-      console.warn('Image compression timed out, attempting direct raw FileReader fallback');
-      readRawFileAsDataUrl(file).then(resolve);
-    }, timeoutMs);
+    let resolved = false;
 
     const cleanupAndResolve = (result: string) => {
+      if (resolved) return;
+      resolved = true;
       clearTimeout(timeoutTimer);
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (_) {}
+      }
       resolve(result);
     };
+
+    // Failsafe timeout to prevent hanging promises on slow mobile devices
+    const timeoutTimer = setTimeout(() => {
+      console.warn('Image compression timed out, using fallback');
+      readRawFileAsDataUrl(file).then((raw) => {
+        if (raw && raw.length > 500 * 1024) {
+          // If raw is too large, downscale it
+          downscaleBase64(raw, maxSizeBytes).then(cleanupAndResolve);
+        } else {
+          cleanupAndResolve(raw);
+        }
+      });
+    }, timeoutMs);
 
     if (!file) {
       cleanupAndResolve('');
       return;
     }
 
-    const reader = new FileReader();
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (_) {
+      objectUrl = '';
+    }
 
-    reader.onload = (event) => {
-      const rawDataUrl = (event.target?.result as string) || '';
-      if (!rawDataUrl) {
-        readRawFileAsDataUrl(file).then(cleanupAndResolve);
-        return;
-      }
+    const img = new Image();
 
-      // If file is already smaller than maxSizeBytes and is a standard image, return it directly
-      if (file.size <= maxSizeBytes && (file.type === 'image/jpeg' || file.type === 'image/png')) {
-        cleanupAndResolve(rawDataUrl);
-        return;
-      }
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        let width = img.naturalWidth || img.width || 800;
+        let height = img.naturalHeight || img.height || 600;
+        let maxWidth = initialMaxWidth;
+        let maxHeight = initialMaxHeight;
+        let quality = initialQuality;
 
-      const img = new Image();
-      // NOTE: DO NOT set crossOrigin on data: URLs as it causes canvas taint / decode errors in Safari & mobile WebViews
+        // Scale proportionally to fit within maxWidth and maxHeight
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
 
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          let width = img.naturalWidth || img.width || 800;
-          let height = img.naturalHeight || img.height || 600;
-          let maxWidth = initialMaxWidth;
-          let maxHeight = initialMaxHeight;
-          let quality = initialQuality;
+        canvas.width = Math.max(width, 100);
+        canvas.height = Math.max(height, 100);
 
-          // Scale proportionally to fit within maxWidth and maxHeight
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) {
+          readRawFileAsDataUrl(file).then(cleanupAndResolve);
+          return;
+        }
 
+        // Fill white background for transparent PNGs converted to JPEG
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        // Iteratively downscale if size exceeds maxSizeBytes
+        let attempts = 0;
+        while (dataUrl && dataUrl.length * 0.75 > maxSizeBytes && attempts < 4) {
+          attempts++;
+          quality = Math.max(0.4, quality - 0.12);
+          maxWidth = Math.round(maxWidth * 0.85);
+          maxHeight = Math.round(maxHeight * 0.85);
+          width = Math.round(width * 0.85);
+          height = Math.round(height * 0.85);
           canvas.width = Math.max(width, 100);
           canvas.height = Math.max(height, 100);
-
-          const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) {
-            cleanupAndResolve(rawDataUrl);
-            return;
-          }
-
-          // Fill white background for transparent PNGs converted to JPEG
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-          let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-          // Iteratively downscale if size exceeds maxSizeBytes
-          let attempts = 0;
-          while (dataUrl && dataUrl.length * 0.75 > maxSizeBytes && attempts < 5) {
-            attempts++;
-            quality = Math.max(0.35, quality - 0.15);
-            if (quality <= 0.5) {
-              maxWidth = Math.round(maxWidth * 0.8);
-              maxHeight = Math.round(maxHeight * 0.8);
-              width = Math.round(width * 0.8);
-              height = Math.round(height * 0.8);
-              canvas.width = Math.max(width, 100);
-              canvas.height = Math.max(height, 100);
-              ctx.fillStyle = '#FFFFFF';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              quality = 0.65;
-            }
-            dataUrl = canvas.toDataURL('image/jpeg', quality);
-          }
-
-          if (dataUrl && dataUrl.length > 50) {
-            cleanupAndResolve(dataUrl);
-          } else {
-            cleanupAndResolve(rawDataUrl);
-          }
-        } catch (canvasErr) {
-          console.warn('Canvas compression error, using raw file:', canvasErr);
-          cleanupAndResolve(rawDataUrl);
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
         }
-      };
 
-      img.onerror = () => {
-        console.warn('Image decoding failed (may be HEIC or unsupported format), falling back to raw data');
-        cleanupAndResolve(rawDataUrl);
-      };
-
-      img.src = rawDataUrl;
+        if (dataUrl && dataUrl.length > 50) {
+          cleanupAndResolve(dataUrl);
+        } else {
+          readRawFileAsDataUrl(file).then(cleanupAndResolve);
+        }
+      } catch (canvasErr) {
+        console.warn('Canvas compression error, using raw fallback:', canvasErr);
+        readRawFileAsDataUrl(file).then(cleanupAndResolve);
+      }
     };
 
-    reader.onerror = () => {
-      console.error('FileReader error on image upload');
-      readRawFileAsDataUrl(file).then(cleanupAndResolve);
+    img.onerror = () => {
+      console.warn('Image ObjectURL decoding failed, trying FileReader');
+      readRawFileAsDataUrl(file).then((raw) => {
+        if (raw && raw.length > 400 * 1024) {
+          downscaleBase64(raw, maxSizeBytes).then(cleanupAndResolve);
+        } else {
+          cleanupAndResolve(raw);
+        }
+      });
     };
 
-    try {
-      reader.readAsDataURL(file);
-    } catch {
-      readRawFileAsDataUrl(file).then(cleanupAndResolve);
+    if (objectUrl) {
+      img.src = objectUrl;
+    } else {
+      readRawFileAsDataUrl(file).then((raw) => {
+        if (raw) {
+          img.src = raw;
+        } else {
+          cleanupAndResolve('');
+        }
+      });
     }
   });
 };
@@ -162,5 +171,71 @@ export const readRawFileAsDataUrl = (file: File): Promise<string> => {
     } catch {
       resolve('');
     }
+  });
+};
+
+/**
+ * Downscales an existing Base64 data URL image to safe size
+ */
+export const downscaleBase64 = (
+  base64DataUrl: string,
+  maxSizeBytes: number = 200 * 1024
+): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64DataUrl || !base64DataUrl.startsWith('data:image')) {
+      resolve(base64DataUrl);
+      return;
+    }
+    // If already small, return as is
+    if (base64DataUrl.length * 0.75 <= maxSizeBytes) {
+      resolve(base64DataUrl);
+      return;
+    }
+
+    const img = new Image();
+    const timer = setTimeout(() => resolve(base64DataUrl), 3000);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      try {
+        const canvas = document.createElement('canvas');
+        const maxDim = 900;
+        let w = img.naturalWidth || img.width || 800;
+        let h = img.naturalHeight || img.height || 600;
+
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+
+        canvas.width = Math.max(w, 100);
+        canvas.height = Math.max(h, 100);
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) {
+          resolve(base64DataUrl);
+          return;
+        }
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressed && compressed.length > 50 ? compressed : base64DataUrl);
+      } catch {
+        resolve(base64DataUrl);
+      }
+    };
+
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(base64DataUrl);
+    };
+
+    img.src = base64DataUrl;
   });
 };

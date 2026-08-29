@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
-import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, syncCloudRegistrations, type Registration } from '../services/registrationService';
+import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { fetchActiveUpiSlotFromFirebase } from '../services/firebaseService';
@@ -68,10 +68,10 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       setPaymentError(null);
       try {
         const compressed = await compressImageToDataUrl(file, {
-          maxSizeBytes: 600 * 1024,
-          initialMaxWidth: 1200,
-          initialQuality: 0.8,
-          timeoutMs: 6000,
+          maxSizeBytes: 180 * 1024,
+          initialMaxWidth: 1000,
+          initialQuality: 0.76,
+          timeoutMs: 5000,
         });
         if (compressed && compressed.length > 50) {
           setReuploadIdPreview(compressed);
@@ -174,7 +174,6 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
   // Auto-scroll page to top & focus search input field immediately on mount
   useEffect(() => {
-    syncCloudRegistrations().catch(() => {});
     window.scrollTo({ top: 0, behavior: 'instant' });
     setTimeout(() => {
       if (searchInputRef.current) {
@@ -189,18 +188,33 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     const q = searchQuery.trim();
     if (!q) return;
 
-    setIsSearching(true);
     setPaymentError(null);
     setHasSearched(true);
-    setSearchResult(undefined); // Reset immediately so previous user is never shown while loading
+
+    // 1. Instant 0ms response from local memory / IndexedDB cache
+    const instantMatch = findRegistration(q);
+    if (instantMatch) {
+      setSearchResult(instantMatch);
+    } else {
+      setSearchResult(undefined); // Show loader only if no local cache match
+    }
+
+    setIsSearching(true);
 
     try {
+      // 2. Fast parallel cloud lookup for latest real-time approval status
       const latest = await findRegistrationAsync(q);
-      setSearchResult(latest || null);
+      if (latest) {
+        setSearchResult(latest);
+      } else if (!instantMatch) {
+        setSearchResult(null);
+      }
     } catch (err) {
       console.warn('Live lookup search notice:', err);
-      const instantMatch = findRegistration(q);
-      setSearchResult(instantMatch || null);
+      if (!instantMatch) {
+        const fallback = findRegistration(q);
+        setSearchResult(fallback || null);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -214,10 +228,10 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       setPaymentError(null);
       try {
         const compressed = await compressImageToDataUrl(file, {
-          maxSizeBytes: 600 * 1024,
-          initialMaxWidth: 1200,
-          initialQuality: 0.8,
-          timeoutMs: 6000,
+          maxSizeBytes: 180 * 1024,
+          initialMaxWidth: 1000,
+          initialQuality: 0.76,
+          timeoutMs: 5000,
         });
         if (compressed && compressed.length > 50) {
           setPaymentScreenshotPreview(compressed);
@@ -273,11 +287,18 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
       recordPaymentToActiveSlot();
     } catch (_) {}
 
-    const updated = await submitPaymentForRegistration(searchResult.id, paymentUtr, paymentScreenshotPreview);
-    setIsSubmittingPayment(false);
+    try {
+      const updated = await submitPaymentForRegistration(searchResult.id, paymentUtr, paymentScreenshotPreview);
+      setIsSubmittingPayment(false);
 
-    if (updated) {
-      setSearchResult(updated);
+      if (updated) {
+        setSearchResult(updated);
+      } else {
+        setPaymentError('Could not update payment details. Please check your internet connection and try again.');
+      }
+    } catch (err: any) {
+      setIsSubmittingPayment(false);
+      setPaymentError(err?.message || 'Failed to submit payment details. Please try again.');
     }
   };
 
@@ -715,7 +736,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     <input
                       ref={paymentFileInputRef}
                       type="file"
-                      accept="image/*,image/jpeg,image/png,image/webp"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
                       onChange={handlePaymentScreenshotUpload}
                       disabled={isProcessingPaymentScreenshot || isSubmittingPayment}
                       className="hidden"
@@ -922,7 +943,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                     <input
                       ref={reuploadIdInputRef}
                       type="file"
-                      accept="image/*,image/jpeg,image/png,image/webp"
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
                       onChange={handleReuploadIdCard}
                       disabled={isProcessingReuploadId || isResubmitting}
                       className="hidden"
