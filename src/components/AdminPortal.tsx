@@ -357,27 +357,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleApprove = async (id: string) => {
+    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Approved', paymentStatus: 'Verified', updatedAt: new Date().toISOString() } : r))
+      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Approved', paymentStatus: 'Verified', approvedAt: today, updatedAt: new Date().toISOString() } : r))
     );
+    if (inspectItem?.id === id) {
+      setInspectItem((prev) => prev ? { ...prev, approvalStatus: 'Approved', paymentStatus: 'Verified', approvedAt: today } : null);
+    }
+    addToast('✅ Pass approved! Syncing & dispatching QR ticket...', 'success');
+
     const approved = await approveRegistration(id);
-    await loadData();
-    if (inspectItem?.id === id) setInspectItem(null);
 
     if (approved) {
       setSendingEmail(id);
-      addToast(`✅ ${approved.fullName}'s pass approved! Generating QR ticket email...`, 'info');
-
-      const result = await sendApprovalEmail(approved);
-      setSendingEmail(null);
-
-      if (result.success) {
-        addToast(`✉️ Invoice & QR Pass emailed to ${approved.email}`, 'success');
-      } else {
-        addToast(`📧 Preview Mode: ${result.message}`, 'info');
-      }
-
-      setEmailPreview(result);
+      sendApprovalEmail(approved).then((result) => {
+        setSendingEmail(null);
+        if (result.success) {
+          addToast(`✉️ Invoice & QR Pass emailed to ${approved.email}`, 'success');
+        } else {
+          addToast(`📧 Preview Mode: ${result.message}`, 'info');
+        }
+        setEmailPreview(result);
+      }).catch((err) => {
+        setSendingEmail(null);
+        console.warn('Email dispatch notice:', err);
+      });
     }
   };
 
@@ -385,21 +389,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setRegistrations((prev) =>
       prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'ID_Approved', updatedAt: new Date().toISOString() } : r))
     );
+    if (inspectItem?.id === id) {
+      setInspectItem((prev) => prev ? { ...prev, approvalStatus: 'ID_Approved' } : null);
+    }
+    addToast('✅ Student ID Card Approved! Payment QR code unlocked for student.', 'success');
+
     const res = await approveIdCard(id);
-    await loadData();
-    if (inspectItem?.id === id) setInspectItem(null);
-    if (res) {
-      addToast(`✅ ${res.fullName}'s Student ID Card Approved! Payment QR code unlocked for student.`, 'success');
+    if (res && inspectItem?.id === id) {
+      setInspectItem(res);
     }
   };
 
   const handleConfirmDelete = async (id: string) => {
     setRegistrations((prev) => prev.filter((r) => r.id !== id));
-    await deleteRegistration(id);
-    await loadData();
     setShowDeleteModal(null);
     if (inspectItem?.id === id) setInspectItem(null);
     addToast('🗑️ Registration request permanently deleted.', 'info');
+
+    await deleteRegistration(id);
   };
 
   const handleConfirmReject = async (id: string) => {
@@ -407,17 +414,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setRegistrations((prev) =>
       prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Rejected', rejectionReason: reason, updatedAt: new Date().toISOString() } : r))
     );
-    await rejectRegistration(id, reason);
-    await loadData();
     setShowRejectModal(null);
     setRejectionReasonInput('');
     if (inspectItem?.id === id) setInspectItem(null);
     addToast('❌ Application rejected and student notified.', 'error');
+
+    await rejectRegistration(id, reason);
   };
 
   const handleMarkReportedDirect = (id: string) => {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, isReported: true, reportedAt: now, updatedAt: new Date().toISOString() } : r))
+    );
+    if (inspectItem?.id === id) {
+      setInspectItem((prev) => prev ? { ...prev, isReported: true, reportedAt: now } : null);
+    }
     markAsReported(id);
-    loadData();
     addToast('✅ Student marked as Reported at Gate!', 'success');
   };
 

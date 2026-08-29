@@ -745,8 +745,13 @@ export const generateUniqueRegistrationId = (): string => {
 
 
 export const approveIdCard = async (id: string): Promise<Registration | null> => {
-  const allCurrent = await syncCloudRegistrations();
-  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  const cleanId = (id || '').trim();
+  const allCurrent = getRegistrations();
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  if (!target) {
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
   if (target) {
     const updatedRecord: Registration = {
       ...target,
@@ -764,12 +769,11 @@ export const approveIdCard = async (id: string): Promise<Registration | null> =>
     }
     syncToIndexedDB(updatedRecord);
 
-    if (isFirebaseConfigured()) {
-      await saveRegistrationToFirebase(updatedRecord);
-    }
-    if (isSupabaseConfigured()) {
-      await saveRegistrationToSupabase(updatedRecord);
-    }
+    Promise.allSettled([
+      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
+      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
+    ]).catch(() => {});
+
     return updatedRecord;
   }
   return null;
@@ -837,7 +841,7 @@ export const issueVipPass = async (params: {
   year?: string;
   isVipPending?: boolean;
 }): Promise<Registration> => {
-  const allCurrent = await syncCloudRegistrations();
+  const allCurrent = getRegistrations();
   const cleanEmail = params.email.trim().toLowerCase();
   
   // Check if existing record exists with this email
@@ -903,19 +907,22 @@ export const issueVipPass = async (params: {
   }
   syncToIndexedDB(vipRecord);
 
-  if (isFirebaseConfigured()) {
-    await saveRegistrationToFirebase(vipRecord);
-  }
-  if (isSupabaseConfigured()) {
-    await saveRegistrationToSupabase(vipRecord);
-  }
+  Promise.allSettled([
+    isFirebaseConfigured() ? saveRegistrationToFirebase(vipRecord) : Promise.resolve(false),
+    isSupabaseConfigured() ? saveRegistrationToSupabase(vipRecord) : Promise.resolve(false),
+  ]).catch(() => {});
 
   return vipRecord;
 };
 
 export const convertToOfficialVip = async (id: string): Promise<Registration | null> => {
-  const allCurrent = await syncCloudRegistrations();
-  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  const cleanId = (id || '').trim();
+  const allCurrent = getRegistrations();
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  if (!target) {
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
   if (target) {
     const updatedRecord: Registration = {
       ...target,
@@ -936,12 +943,11 @@ export const convertToOfficialVip = async (id: string): Promise<Registration | n
     }
     syncToIndexedDB(updatedRecord);
 
-    if (isFirebaseConfigured()) {
-      await saveRegistrationToFirebase(updatedRecord);
-    }
-    if (isSupabaseConfigured()) {
-      await saveRegistrationToSupabase(updatedRecord);
-    }
+    Promise.allSettled([
+      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
+      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
+    ]).catch(() => {});
+
     return updatedRecord;
   }
   return null;
@@ -961,13 +967,11 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
     
     deleteFromIndexedDB(id);
 
-    if (isFirebaseConfigured()) {
-      await deleteRegistrationFromFirebase(id);
-    }
+    Promise.allSettled([
+      isFirebaseConfigured() ? deleteRegistrationFromFirebase(id) : Promise.resolve(false),
+      isSupabaseConfigured() ? deleteRegistrationFromSupabase(id) : Promise.resolve(false),
+    ]).catch(() => {});
 
-    if (isSupabaseConfigured()) {
-      await deleteRegistrationFromSupabase(id);
-    }
     return true;
   } catch (e) {
     console.error('Error deleting registration:', e);
@@ -976,8 +980,13 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
 };
 
 export const approveRegistration = async (id: string): Promise<Registration | null> => {
-  const allCurrent = await syncCloudRegistrations();
-  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  const cleanId = (id || '').trim();
+  const allCurrent = getRegistrations();
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  if (!target) {
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
   if (target) {
     const updatedRecord: Registration = {
       ...target,
@@ -1001,20 +1010,24 @@ export const approveRegistration = async (id: string): Promise<Registration | nu
     }
     syncToIndexedDB(updatedRecord);
 
-    if (isFirebaseConfigured()) {
-      await saveRegistrationToFirebase(updatedRecord);
-    }
-    if (isSupabaseConfigured()) {
-      await saveRegistrationToSupabase(updatedRecord);
-    }
+    Promise.allSettled([
+      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
+      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
+    ]).catch(() => {});
+
     return updatedRecord;
   }
   return null;
 };
 
 export const rejectRegistration = async (id: string, reason: string): Promise<Registration | null> => {
-  const allCurrent = await syncCloudRegistrations();
-  const target = allCurrent.find((r) => r.id === id || r.id.trim().toLowerCase() === id.trim().toLowerCase());
+  const cleanId = (id || '').trim();
+  const allCurrent = getRegistrations();
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  if (!target) {
+    target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
   if (target) {
     const updatedRecord: Registration = {
       ...target,
@@ -1033,12 +1046,11 @@ export const rejectRegistration = async (id: string, reason: string): Promise<Re
     }
     syncToIndexedDB(updatedRecord);
 
-    if (isFirebaseConfigured()) {
-      await saveRegistrationToFirebase(updatedRecord);
-    }
-    if (isSupabaseConfigured()) {
-      await saveRegistrationToSupabase(updatedRecord);
-    }
+    Promise.allSettled([
+      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
+      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
+    ]).catch(() => {});
+
     return updatedRecord;
   }
   return null;
