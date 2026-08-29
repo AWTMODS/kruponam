@@ -356,24 +356,53 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     addToast('🔒 Admin session terminated.', 'info');
   };
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = (id: string) => {
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    
+    // Find target in current state or inspectItem
+    const target = registrations.find((r) => r.id === id) || (inspectItem?.id === id ? inspectItem : undefined);
+    
+    const approvedRecord: Registration = {
+      ...(target || {
+        id,
+        fullName: 'Student',
+        email: '',
+        phone: '',
+        department: 'BCA',
+        section: 'Section A',
+        year: '2nd Year',
+        gender: 'Other',
+        ticketType: 'General Pass',
+        idCardUrl: '',
+        paymentAmount: 700,
+        paymentUtr: '',
+        submittedAt: today,
+      }),
+      approvalStatus: 'Approved',
+      paymentStatus: 'Verified',
+      approvedAt: today,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Instant 0ms local state update in React
     setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Approved', paymentStatus: 'Verified', approvedAt: today, updatedAt: new Date().toISOString() } : r))
+      prev.map((r) => (r.id === id ? approvedRecord : r))
     );
     if (inspectItem?.id === id) {
-      setInspectItem((prev) => prev ? { ...prev, approvalStatus: 'Approved', paymentStatus: 'Verified', approvedAt: today } : null);
+      setInspectItem(approvedRecord);
     }
-    addToast('✅ Pass approved! Syncing & dispatching QR ticket...', 'success');
+    addToast(`✅ ${approvedRecord.fullName}'s pass approved!`, 'success');
 
-    const approved = await approveRegistration(id);
+    // 2. Asynchronous background database persistence
+    approveRegistration(id, approvedRecord).catch(() => {});
 
-    if (approved) {
+    // 3. Asynchronous background email ticket dispatch with immediate toast
+    if (approvedRecord.email) {
       setSendingEmail(id);
-      sendApprovalEmail(approved).then((result) => {
+      sendApprovalEmail(approvedRecord).then((result) => {
         setSendingEmail(null);
         if (result.success) {
-          addToast(`✉️ Invoice & QR Pass emailed to ${approved.email}`, 'success');
+          addToast(`✉️ Invoice & QR Pass emailed to ${approvedRecord.email}`, 'success');
         } else {
           addToast(`📧 Preview Mode: ${result.message}`, 'info');
         }
@@ -2729,9 +2758,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               {(inspectItem.approvalStatus === 'ID_Approved' || inspectItem.approvalStatus === 'Payment_Pending') && (
                 <button
                   onClick={() => { handleApprove(inspectItem.id); }}
-                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5"
+                  disabled={sendingEmail === inspectItem.id}
+                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
                 >
-                  <Check className="w-4 h-4" /> Approve Pass & Dispatch Ticket
+                  {sendingEmail === inspectItem.id ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Approving & Dispatching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Approve Pass & Dispatch Ticket</span>
+                    </>
+                  )}
                 </button>
               )}
 

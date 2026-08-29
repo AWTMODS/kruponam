@@ -979,10 +979,10 @@ export const deleteRegistration = async (id: string): Promise<boolean> => {
   }
 };
 
-export const approveRegistration = async (id: string): Promise<Registration | null> => {
+export const approveRegistration = async (id: string, fallbackRecord?: Registration): Promise<Registration | null> => {
   const cleanId = (id || '').trim();
   const allCurrent = getRegistrations();
-  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase()) || fallbackRecord;
   if (!target) {
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
   }
@@ -992,7 +992,7 @@ export const approveRegistration = async (id: string): Promise<Registration | nu
       ...target,
       approvalStatus: 'Approved',
       paymentStatus: 'Verified',
-      approvedAt: new Date().toLocaleDateString('en-US', {
+      approvedAt: target.approvedAt || new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
