@@ -9,7 +9,6 @@ import { TicketPasses } from './components/TicketPasses';
 import { BookingGuidelines } from './components/BookingGuidelines';
 import { RegistrationForm } from './components/RegistrationForm';
 import { PassStatusLookup } from './components/PassStatusLookup';
-import { FAQ } from './components/FAQ';
 import { AdminPortal } from './components/AdminPortal';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
@@ -122,7 +121,6 @@ export function App() {
               selectedPassFromParent={selectedPass}
               onOpenLookup={handleOpenLookup}
             />
-            <FAQ />
             <Contact />
           </main>
 
