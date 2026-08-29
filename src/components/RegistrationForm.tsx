@@ -72,11 +72,12 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     setValidationError(null);
 
     try {
+      // 1. Try smart fast compression (with short 2.5s timeout)
       const compressed = await compressImageToDataUrl(file, {
         maxSizeBytes: 180 * 1024,
         initialMaxWidth: 1000,
         initialQuality: 0.76,
-        timeoutMs: 5000,
+        timeoutMs: 2500,
       });
 
       if (compressed && compressed.length > 50) {
@@ -86,7 +87,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         if (raw) {
           setIdCardPreview(raw);
         } else {
-          setIdCardError('Could not process this image format. Please select another photo or format (JPG/PNG).');
+          setIdCardError('Could not process this image format. Please select another photo (JPG/PNG).');
         }
       }
     } catch (err) {
@@ -153,7 +154,10 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       let existingCloud: Registration | undefined = undefined;
       if (!existingLocal) {
         try {
-          existingCloud = await findStudentByExactEmailOrPhoneAsync(cleanEmail, cleanPhone);
+          existingCloud = await Promise.race([
+            findStudentByExactEmailOrPhoneAsync(cleanEmail, cleanPhone),
+            new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 1500))
+          ]);
         } catch (cloudErr) {
           console.warn('Cloud duplicate check notice (continuing with local check):', cloudErr);
         }
@@ -161,36 +165,43 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
       const existing = existingLocal || existingCloud;
 
       if (existing) {
-        if (existing.approvalStatus === 'Rejected') {
-          const updatedReg: Registration = {
-            ...existing,
-            ...formData,
-            fullName: formData.fullName.trim(),
-            email: cleanEmail,
-            phone: cleanPhone,
-            idCardUrl: idCardPreview || existing.idCardUrl,
-            approvalStatus: 'Pending_ID_Approval',
-            rejectionReason: undefined,
-            submittedAt: new Date().toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            }),
-          };
-          const savedReg = await saveRegistrationAsync(updatedReg);
-          setSubmittedRegistration(savedReg);
-          confetti({
-            particleCount: 100,
-            spread: 80,
-            origin: { y: 0.6 },
-            colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
-          });
-          return;
-        } else {
-          // If existing registration is found, block duplicate registration!
-          setValidationError(`⚠️ The Email Address "${cleanEmail}" or Phone Number "${cleanPhone}" is already registered (Pass ID: ${existing.id}). Please use "Check Pass Status" to track your approval.`);
+        // If already Approved, redirect to view official pass
+        if (existing.approvalStatus === 'Approved' || existing.approvalStatus === 'VIP') {
+          setValidationError(`🎟️ An official event pass is already active for this email/phone (Pass ID: ${existing.id}). Please click "Check Pass Status" below to download your pass.`);
           return;
         }
+
+        // If ID is already Approved, redirect to pay ₹700
+        if (existing.approvalStatus === 'ID_Approved') {
+          setValidationError(`🎉 Your Student ID is already verified and approved (Pass ID: ${existing.id})! Please click "Check Pass Status" to scan the QR code and complete your ₹${ticketAmount} payment.`);
+          return;
+        }
+
+        // If Pending_ID_Approval or Rejected, allow student to update their details / re-upload ID card!
+        const updatedReg: Registration = {
+          ...existing,
+          ...formData,
+          fullName: formData.fullName.trim(),
+          email: cleanEmail,
+          phone: cleanPhone,
+          idCardUrl: idCardPreview || existing.idCardUrl,
+          approvalStatus: 'Pending_ID_Approval',
+          rejectionReason: undefined,
+          submittedAt: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+        };
+        const savedReg = await saveRegistrationAsync(updatedReg);
+        setSubmittedRegistration(savedReg);
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#D4AF37', '#0D472B', '#EA580C', '#FFFFFF'],
+        });
+        return;
       }
 
       const randomId = generateUniqueRegistrationId();
@@ -307,9 +318,20 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
         ) : (
           <div className="max-w-4xl mx-auto glass-card rounded-3xl p-6 sm:p-10 border border-gold-royal/40 shadow-card-hover">
             {validationError && (
-              <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl text-rose-900 text-xs sm:text-sm font-bold flex items-start gap-3 animate-fadeIn">
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                <span>{validationError}</span>
+              <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl text-rose-900 text-xs sm:text-sm font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{validationError}</span>
+                </div>
+                {onOpenLookup && (validationError.includes('Check Pass Status') || validationError.includes('Pass ID') || validationError.includes('already registered')) && (
+                  <button
+                    type="button"
+                    onClick={onOpenLookup}
+                    className="shrink-0 px-4 py-2 bg-kerala-deep text-white hover:bg-kerala-emerald rounded-full text-xs font-black uppercase tracking-wider shadow transition-transform hover:scale-105 cursor-pointer"
+                  >
+                    Check Status Now →
+                  </button>
+                )}
               </div>
             )}
 
@@ -471,13 +493,9 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                   </div>
                 )}
 
-                <div 
-                  onClick={() => {
-                    if (!isProcessingIdCard && !isSubmitting) {
-                      idCardInputRef.current?.click();
-                    }
-                  }}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer relative hover:border-gold-royal ${
+                <label 
+                  htmlFor="studentIdCardUpload"
+                  className={`block border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer relative hover:border-gold-royal ${
                     idCardPreview 
                       ? 'border-emerald-400 bg-emerald-50/40' 
                       : idCardError 
@@ -486,12 +504,13 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                   }`}
                 >
                   <input
+                    id="studentIdCardUpload"
                     ref={idCardInputRef}
                     type="file"
-                    accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif"
+                    accept="image/*,capture=camera,.jpg,.jpeg,.png,.webp,.heic,.heif"
                     onChange={handleIdCardUpload}
                     disabled={isProcessingIdCard || isSubmitting}
-                    className="hidden"
+                    className="sr-only"
                   />
 
                   {isProcessingIdCard ? (
@@ -525,10 +544,11 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                         <button
                           type="button"
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             handleRemoveIdCard();
                           }}
-                          className="text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                          className="text-xs font-bold text-rose-700 hover:text-rose-900 bg-rose-100 hover:bg-rose-200 px-3 py-1.5 rounded-full transition-all flex items-center gap-1 cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Change Photo</span>
@@ -536,32 +556,25 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3 py-4">
+                    <div className="space-y-3 py-4 pointer-events-none">
                       <div className="w-16 h-16 rounded-full bg-gold-light/30 text-gold-dark mx-auto flex items-center justify-center text-2xl shadow-inner">
                         <Camera className="w-8 h-8 text-gold-dark" />
                       </div>
                       <div>
                         <p className="text-sm font-extrabold text-slate-800">
-                          Click to Take Photo or Upload Student ID Card
+                          Click / Tap to Take Photo or Upload Student ID Card
                         </p>
                         <p className="text-xs text-slate-500 mt-1">
-                          Clear photo of College Student ID Card (JPG, PNG)
+                          Clear photo of College Student ID Card (Camera, JPG, PNG)
                         </p>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            idCardInputRef.current?.click();
-                          }}
-                          className="mt-3 px-4 py-2 rounded-xl bg-gold-royal/20 text-kerala-deep font-bold text-xs hover:bg-gold-royal/30 transition-colors inline-flex items-center gap-1.5 border border-gold-royal/40"
-                        >
+                        <span className="mt-3 px-4 py-2 rounded-xl bg-gold-royal/20 text-kerala-deep font-bold text-xs hover:bg-gold-royal/30 transition-colors inline-flex items-center gap-1.5 border border-gold-royal/40">
                           <Camera className="w-3.5 h-3.5" />
-                          <span>Browse Gallery / Camera</span>
-                        </button>
+                          <span>Browse Gallery / Open Camera</span>
+                        </span>
                       </div>
                     </div>
                   )}
-                </div>
+                </label>
               </div>
 
               {/* Submit Button & Bottom Error Notice */}
