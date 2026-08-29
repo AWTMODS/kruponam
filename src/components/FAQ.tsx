@@ -23,8 +23,20 @@ export const FAQ: React.FC = () => {
       a: 'External guests and alumni are welcome to attend with a pre-registered VIP or Guest Pass. Make sure your guest completes the online registration form before arrival.',
     },
     {
+      q: 'Is there a refund policy if I cannot attend after booking?',
+      a: 'No. All pass fee payments (₹700) are strictly non-refundable and non-transferable once booked under any circumstances.',
+    },
+    {
+      q: 'Is there a limit on the total number of event passes?',
+      a: 'Yes! Total passes are strictly capped at 700 passes. Once 700 passes are claimed, no additional passes will be released. Passes are allocated strictly on a first-to-pay, first-served basis.',
+    },
+    {
+      q: 'How will I receive my official ticket after paying the pass fee?',
+      a: 'Once your ID card and ₹700 payment are verified by admin, your official scanner-ready QR pass and GST invoice will be automatically emailed to your registered email address, accessible anytime on the Pass Status Lookup page, and supported via WhatsApp.',
+    },
+    {
       q: 'How do departments register for the Pookalam & Tug-of-War contests?',
-      a: 'Department class representatives can register their team (up to 8 members) with the Cultural Secretary or via the Student Council lead before Sep 11th.',
+      a: 'Department class representatives can register their team (up to 8 members) with the Cultural Secretary or via the Student Council lead before Sep 14th.',
     },
     {
       q: 'Is parking available on campus during the event?',

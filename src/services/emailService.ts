@@ -59,10 +59,10 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
             <td style="padding:28px 40px 8px;">
               <div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px 18px;margin-bottom:18px;">
                 <p style="margin:0;font-size:13px;font-weight:800;color:#92400E;letter-spacing:0.5px;">
-                  📅 OFFICIAL EVENT DATE: FRIDAY, 11 SEPTEMBER 2026 (8:00 AM)
+                  📅 OFFICIAL EVENT DATE: MONDAY, 14 SEPTEMBER 2026 (8:00 AM)
                 </p>
                 <p style="margin:6px 0 0;font-size:12px;color:#78350F;line-height:1.6;">
-                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>11 September 2026, 8:00 AM onwards</strong> at <strong>PSR Convention Centre, Bengaluru</strong>. Your digital event pass below is active, validated, and scanner-ready for venue entry!
+                  Please note that <strong>Kruponam 2026</strong> is scheduled for <strong>14 September 2026, 8:00 AM onwards</strong> at <strong>PSR Convention Centre, Bengaluru</strong>. Your digital event pass below is active, validated, and scanner-ready for venue entry!
                 </p>
               </div>
 
@@ -100,7 +100,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Amount Paid', '₹700.00'],
                   ['Payment UTR / Ref', (!registration.paymentUtr || registration.paymentUtr === 'VIP_COMPLIMENTARY' || registration.paymentUtr === 'VIP') ? 'UPI-VERIFIED-700' : registration.paymentUtr],
                   ['Payment Status', '✅ Verified & Confirmed'],
-                  ['Event Date', '11 September 2026, 8:00 AM onwards'],
+                  ['Event Date', '14 September 2026, 8:00 AM onwards'],
                   ['Venue', 'PSR Convention Centre, Bengaluru'],
                   ['Approved On', registration.approvedAt || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })],
                 ].map(([label, value], i) => `
@@ -145,7 +145,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                       ${registration.department} • ${registration.year}
                     </p>
                     <p style="margin:10px 0 0;font-size:11px;color:#D4AF37;font-weight:700;">
-                      📅 11 September 2026 &nbsp;|&nbsp; 8:00 AM
+                      📅 14 September 2026 &nbsp;|&nbsp; 8:00 AM
                     </p>
                     <p style="margin:4px 0 0;font-size:11px;color:#a8d5b5;">
                       📍 PSR Convention Centre
@@ -270,7 +270,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         body: JSON.stringify({
           from: cfg.resendFromEmail || 'Kruponam 2026 Pass <pass@lifestack.in>',
           to: [registration.email],
-          subject: `🎟️ Kruponam 2026 Official Pass [Sep 11, 2026] & Invoice (${registration.id})`,
+          subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
           html: html,
         }),
       });
@@ -309,7 +309,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         body: JSON.stringify({
           sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
           to: [{ email: registration.email, name: registration.fullName }],
-          subject: `🎟️ Kruponam 2026 Official Pass [Sep 11, 2026] & Invoice (${registration.id})`,
+          subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
           htmlContent: html,
         }),
       });

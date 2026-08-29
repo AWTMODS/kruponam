@@ -61,6 +61,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenLookup }) => {
                 <li><a href="#programs" className="hover:text-gold-royal transition-colors">Program Schedule</a></li>
               )}
               <li><a href="#tickets" className="hover:text-gold-royal transition-colors">Ticket Passes</a></li>
+              <li><a href="#guidelines" className="hover:text-gold-royal transition-colors">Booking Guidelines & Policy</a></li>
               <li><a href="#contact" className="hover:text-gold-royal transition-colors">Contact Organizers</a></li>
             </ul>
           </div>

@@ -6,8 +6,10 @@ import { About } from './components/About';
 import { Countdown } from './components/Countdown';
 import { ProgramsTimeline } from './components/ProgramsTimeline';
 import { TicketPasses } from './components/TicketPasses';
+import { BookingGuidelines } from './components/BookingGuidelines';
 import { RegistrationForm } from './components/RegistrationForm';
 import { PassStatusLookup } from './components/PassStatusLookup';
+import { FAQ } from './components/FAQ';
 import { AdminPortal } from './components/AdminPortal';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
@@ -115,10 +117,12 @@ export function App() {
             <Countdown />
             {showProgramsSchedule && <ProgramsTimeline />}
             <TicketPasses onSelectTicket={handleSelectTicketFromPasses} />
+            <BookingGuidelines onOpenLookup={handleOpenLookup} />
             <RegistrationForm
               selectedPassFromParent={selectedPass}
               onOpenLookup={handleOpenLookup}
             />
+            <FAQ />
             <Contact />
           </main>
 

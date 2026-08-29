@@ -597,7 +597,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 <div className={`pt-4 border-t border-dashed flex flex-wrap items-center justify-between gap-3 text-xs ${
                   ticketTheme === 'dark' ? 'border-slate-800 text-slate-400' : 'border-gold-royal/40 text-slate-500'
                 }`}>
-                  <span>📍 PSR Convention Centre • Sep 11, 2026</span>
+                  <span>📍 PSR Convention Centre • Sep 14, 2026</span>
                   <span>Approved: {searchResult.approvedAt || searchResult.submittedAt}</span>
                 </div>
               </div>
@@ -646,7 +646,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
           ) : searchResult?.approvalStatus === 'ID_Approved' ? (
             /* STAGE 2 UNLOCKED: ID APPROVED -> PAY ₹700 & UPLOAD SCREENSHOT */
             <div className="space-y-6">
-              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-center font-bold text-sm space-y-1 shadow-sm">
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-center font-bold text-sm space-y-2 shadow-sm">
                 <p className="flex items-center justify-center gap-2 text-emerald-700">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                   <span>🎉 STUDENT ID CARD APPROVED BY ADMIN!</span>
@@ -654,6 +654,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                 <p className="text-xs text-emerald-800 font-normal">
                   Welcome <span className="font-bold">{searchResult.fullName}</span>! Please scan the QR code below to pay ₹{ticketAmount} pass fee, enter your 12-digit UTR, and upload your payment screenshot.
                 </p>
+                <div className="pt-1 text-[11px] text-emerald-900 bg-emerald-100/80 p-2 rounded-xl border border-emerald-300/60 font-medium">
+                  🛡️ <strong>Guaranteed Ticket Dispatch:</strong> Your official scanner-ready QR pass & invoice will be delivered directly to <strong>{searchResult.email}</strong> and supported via WhatsApp. Passes are <strong>non-refundable</strong> & capped at <strong>700 passes total</strong> (first-come, first-served).
+                </div>
               </div>
 
               {paymentError && (

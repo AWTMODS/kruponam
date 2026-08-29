@@ -55,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
     { name: 'About', href: '#about' },
     { name: 'Programs', href: '#programs', hide: !showProgramsSchedule },
     { name: 'Tickets', href: '#tickets' },
+    { name: 'Guidelines', href: '#guidelines' },
     { name: 'Contact', href: '#contact' },
   ];
 

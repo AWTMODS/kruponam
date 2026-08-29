@@ -68,7 +68,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [showSecretKeyModal, setShowSecretKeyModal] = useState(false);
   const [secretKeyInput, setSecretKeyInput] = useState('');
 
-  // Bulk Resend Sep 11 Passes State
+  // Bulk Resend Sep 14 Passes State
   const [showBulkResendModal, setShowBulkResendModal] = useState(false);
   const [bulkResendRunning, setBulkResendRunning] = useState(false);
   const [bulkResendProgress, setBulkResendProgress] = useState<{ current: number; total: number; currentName: string }>({ current: 0, total: 0, currentName: '' });
@@ -744,7 +744,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const vipPendingCount = registrations.filter((r) => r.approvalStatus === 'VIP_Pending' || (isVipRecord(r) && r.approvalStatus !== 'VIP')).length;
   const totalVipGuests = vipOfficialCount + vipPendingCount;
 
-  // Bulk Resend Sep 11 Passes Broadcast Handler
+  // Bulk Resend Sep 14 Passes Broadcast Handler
   const handleStartBulkResend = async () => {
     const approvedList = normalRegistrations.filter((r) => r.approvalStatus === 'Approved');
     if (approvedList.length === 0) {
@@ -968,11 +968,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
               <button
                 onClick={() => setShowBulkResendModal(true)}
-                title="Broadcast Updated Sep 11 Passes to All Approved Students"
+                title="Broadcast Updated Sep 14 Passes to All Approved Students"
                 className="px-3.5 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Mail className="w-3.5 h-3.5 text-blue-200" />
-                <span>Resend Sep 11 Passes ({approvedApps})</span>
+                <span>Resend Sep 14 Passes ({approvedApps})</span>
               </button>
 
               <button
@@ -3650,7 +3650,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         </div>
       )}
 
-      {/* ── Bulk Resend Sep 11 Passes Broadcast Modal ──────────────────── */}
+      {/* ── Bulk Resend Sep 14 Passes Broadcast Modal ──────────────────── */}
       {showBulkResendModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="bg-slate-900 rounded-3xl max-w-xl w-full p-6 sm:p-8 border-2 border-blue-500/50 shadow-2xl space-y-6 animate-fadeIn max-h-[90vh] overflow-y-auto relative">
@@ -3660,7 +3660,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                   <Mail className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-serif text-xl font-bold text-white">Broadcast Sep 11 Passes</h3>
+                  <h3 className="font-serif text-xl font-bold text-white">Broadcast Sep 14 Passes</h3>
                   <p className="text-xs text-slate-400">Resend official tickets with updated event date to all approved students</p>
                 </div>
               </div>
@@ -3677,10 +3677,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-2">
               <p className="font-bold flex items-center gap-1.5">
-                <span>📅 Date Revision Notice (Sep 11, 2026)</span>
+                <span>📅 Date Revision Notice (Sep 14, 2026)</span>
               </p>
               <p className="text-slate-300 leading-relaxed">
-                This will automatically generate and send updated pass emails to all <strong>{approvedApps} approved students</strong>. Each email includes the revised date badge (<strong>Friday, 11 September 2026</strong>), payment invoice, and scanner-ready QR token.
+                This will automatically generate and send updated pass emails to all <strong>{approvedApps} approved students</strong>. Each email includes the revised date badge (<strong>Monday, 14 September 2026</strong>), payment invoice, and scanner-ready QR token.
               </p>
             </div>
 

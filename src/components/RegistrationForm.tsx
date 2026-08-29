@@ -598,6 +598,15 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                 </button>
               </div>
 
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-950 font-medium text-center space-y-1">
+                <p className="font-bold text-amber-900 flex items-center justify-center gap-1.5">
+                  <span>⚠️ Important Booking Regulations</span>
+                </p>
+                <p className="text-slate-600">
+                  Strictly <strong>Non-Refundable</strong> • Total event passes capped at <strong>700 passes</strong> (first-to-pay basis) • Official event date: <strong>Monday, 14 September 2026</strong>.
+                </p>
+              </div>
+
               <p className="text-[11px] text-center text-slate-500 font-medium">
                 🔒 Once Admin verifies your Student ID Card, the UPI QR Code (₹{ticketAmount}) will be unlocked for your registration.
               </p>

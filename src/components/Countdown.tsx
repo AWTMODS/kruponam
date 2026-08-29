@@ -3,7 +3,7 @@ import { Timer, PartyPopper } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const Countdown: React.FC = () => {
-  const eventTargetDate = new Date('2026-09-11T08:00:00').getTime();
+  const eventTargetDate = new Date('2026-09-14T08:00:00').getTime();
 
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
