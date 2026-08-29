@@ -1086,7 +1086,14 @@ export const rejectRegistration = async (id: string, reason: string, fallbackRec
   return null;
 };
 
-export type ScanResultStatus = 'success' | 'already_reported' | 'not_approved' | 'not_found';
+export type ScanResultStatus = 
+  | 'success' 
+  | 'already_reported' 
+  | 'payment_required' 
+  | 'payment_pending_review' 
+  | 'id_pending' 
+  | 'not_approved' 
+  | 'not_found';
 
 export interface ScanResult {
   status: ScanResultStatus;
@@ -1096,61 +1103,70 @@ export interface ScanResult {
 }
 
 export const markAsReportedAsync = async (query: string): Promise<ScanResult> => {
-  try {
-    await syncCloudRegistrations();
-  } catch (_) {}
-  return markAsReported(query);
-};
+  if (!query || !query.trim()) {
+    return { status: 'not_found', message: 'No scan data provided.' };
+  }
 
-export const markAsReported = (query: string): ScanResult => {
-  const registrations = getRegistrations();
   let q = query.trim().toLowerCase();
   
-  // Extract KRP token ID using Regex (e.g. handles "KRP -995318", "TOKEN : KRP-995318", etc.)
+  // 1. Extract KRP token ID using Regex (e.g. handles "KRP -995318", "TOKEN : KRP-995318", "KRUPONAM2026|TOKEN:KRP-995318|...")
   const krpMatch = query.match(/krp\s*[-_]?\s*(\d+)/i);
   let targetId = '';
   if (krpMatch) {
     targetId = `KRP-${krpMatch[1]}`;
   }
 
-  // Extract token if code contains "TOKEN:" keyword
   if (!targetId && q.includes('token')) {
     const parts = q.split('|');
     const tokenPart = parts.find((p) => p.includes('token'));
     if (tokenPart) {
       const splitColon = tokenPart.split(':');
       if (splitColon.length > 1) {
-        q = splitColon[1].trim().toLowerCase();
+        const extracted = splitColon[1].trim();
+        if (extracted) {
+          targetId = extracted.toUpperCase().startsWith('KRP-') ? extracted.toUpperCase() : `KRP-${extracted.replace(/\D/g, '')}`;
+          q = extracted.toLowerCase();
+        }
       }
     }
   }
 
   const cleanQueryAlphaNum = q.replace(/[^a-z0-9]/g, '');
 
-  const index = registrations.findIndex(
-    (r) => {
-      const cleanIdAlphaNum = r.id.toLowerCase().replace(/[^a-z0-9]/g, '');
-      return (
-        (targetId && r.id.toLowerCase() === targetId.toLowerCase()) ||
-        r.id.toLowerCase() === q ||
-        r.email.toLowerCase() === q ||
-        isPhoneMatch(r.phone, q) ||
-        r.paymentUtr === q ||
-        (cleanIdAlphaNum && cleanQueryAlphaNum.includes(cleanIdAlphaNum))
-      );
-    }
-  );
+  // 2. Search local registrations first
+  const localList = getRegistrations();
+  let student = localList.find((r) => {
+    const cleanIdAlphaNum = r.id.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return (
+      (targetId && r.id.toLowerCase() === targetId.toLowerCase()) ||
+      r.id.toLowerCase() === q ||
+      (r.email && r.email.toLowerCase() === q) ||
+      (r.phone && isPhoneMatch(r.phone, q)) ||
+      (r.paymentUtr && r.paymentUtr.toLowerCase() === q) ||
+      (cleanIdAlphaNum && cleanQueryAlphaNum.length >= 4 && (cleanQueryAlphaNum.includes(cleanIdAlphaNum) || cleanIdAlphaNum.includes(cleanQueryAlphaNum)))
+    );
+  });
 
-  if (index === -1) {
+  // 3. If not found locally or if local record might be stale, search directly in Cloud Firebase / Supabase
+  if (!student) {
+    try {
+      const cloudMatch = await findRegistrationAsync(targetId || query);
+      if (cloudMatch) {
+        student = cloudMatch;
+      }
+    } catch (err) {
+      console.warn('Cloud lookup error during gate scan:', err);
+    }
+  }
+
+  if (!student) {
     return {
       status: 'not_found',
-      message: `Invalid Pass QR Code / Registration ID: "${query}"`,
+      message: `Invalid Pass QR Code / Registration ID: "${query}". No matching pass found in campus database.`,
     };
   }
 
-  const student = registrations[index];
-
-  // 1. If application was explicitly REJECTED by Admin, block entry
+  // 4. Case: Rejected by Admin
   if (student.approvalStatus === 'Rejected') {
     return {
       status: 'not_approved',
@@ -1161,72 +1177,197 @@ export const markAsReported = (query: string): ScanResult => {
 
   const isVip = student.approvalStatus === 'VIP_Pending' || student.approvalStatus === 'VIP' || student.ticketType === 'VIP Pass';
 
-  // 2. Check if student has submitted payment (UTR, Payment Screenshot, or Payment_Pending / Approved / VIP status)
-  const hasSubmittedPayment = isVip || !!(
-    (student.paymentUtr && student.paymentUtr.trim()) ||
-    (student.paymentScreenshotUrl && student.paymentScreenshotUrl.trim()) ||
-    student.approvalStatus === 'Approved' ||
-    student.approvalStatus === 'Payment_Pending'
-  );
+  // 5. Case: Approved Pass or VIP Pass
+  if (student.approvalStatus === 'Approved' || isVip) {
+    // If already checked in earlier
+    if (student.isReported) {
+      return {
+        status: 'already_reported',
+        registration: student,
+        timestamp: student.reportedAt,
+        message: `DUPLICATE SCAN ALERT: ${isVip ? '👑 VIP ' : ''}${student.fullName} (${student.id}) ALREADY CHECKED IN at Campus Gate on ${student.reportedAt || 'earlier today'}.`,
+      };
+    }
 
-  if (!hasSubmittedPayment) {
-    return {
-      status: 'not_approved',
-      registration: student,
-      message: `ACCESS DENIED: ${student.fullName} (${student.id}) HAS NOT PAID the pass fee (No UTR or Payment Screenshot submitted). Collect fee at gate!`,
-    };
-  }
-
-  // If pass was already checked-in at gate earlier
-  if (student.isReported) {
-    return {
-      status: 'already_reported',
-      registration: student,
-      timestamp: student.reportedAt,
-      message: `DUPLICATE SCAN ALERT: ${isVip ? '👑 VIP ' : ''}${student.fullName} (${student.id}) ALREADY REPORTED at gate on ${student.reportedAt || 'earlier today'}.`,
-    };
-  }
-
-  const nowString = new Date().toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  // Automatically approve pass upon gate scan (if not already approved/VIP) & mark as Reported
-  if (!isVip) {
-    registrations[index].approvalStatus = 'Approved';
-  }
-  registrations[index].paymentStatus = 'Verified';
-  if (!registrations[index].approvedAt) {
-    registrations[index].approvedAt = new Date().toLocaleDateString('en-US', {
+    // First time check-in: Mark as Reported & save to Cloud
+    const nowString = new Date().toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
-  }
-  registrations[index].isReported = true;
-  registrations[index].reportedAt = nowString;
-  registrations[index].updatedAt = new Date().toISOString();
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(registrations));
-  syncToIndexedDB(registrations[index]);
-  if (isFirebaseConfigured()) {
-    saveRegistrationToFirebase(registrations[index]);
+    const updatedStudent: Registration = {
+      ...student,
+      isReported: true,
+      reportedAt: nowString,
+      paymentStatus: 'Verified',
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (!updatedStudent.approvedAt) {
+      updatedStudent.approvedAt = new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+
+    await saveRegistrationAsync(updatedStudent);
+
+    return {
+      status: 'success',
+      registration: updatedStudent,
+      timestamp: nowString,
+      message: isVip
+        ? `ENTRY GRANTED: 👑 VIP Guest ${student.fullName} (${student.id}) successfully VALIDATED & CHECKED IN at Campus Gate! VIP Entry & Onasadya Token Validated.`
+        : `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully CHECKED IN at Campus Gate! Onasadya Token Validated.`,
+    };
   }
-  if (isSupabaseConfigured()) {
-    saveRegistrationToSupabase(registrations[index]);
+
+  // 6. Case: ID Approved, but Payment Pending / Not Paid
+  if (student.approvalStatus === 'ID_Approved') {
+    return {
+      status: 'payment_required',
+      registration: student,
+      message: `PAYMENT REQUIRED AT GATE: Student ID for ${student.fullName} (${student.id}) is APPROVED, but the ₹${student.paymentAmount || 700} pass fee is UNPAID. Collect payment to grant entry.`,
+    };
+  }
+
+  // 7. Case: Payment Pending Admin Verification
+  if (student.approvalStatus === 'Payment_Pending') {
+    return {
+      status: 'payment_pending_review',
+      registration: student,
+      message: `PAYMENT PENDING REVIEW: ${student.fullName} (${student.id}) submitted payment (UTR: ${student.paymentUtr || 'Submitted'}). Confirm payment to grant entry.`,
+    };
+  }
+
+  // 8. Case: Student ID Pending Verification
+  if (student.approvalStatus === 'Pending_ID_Approval') {
+    return {
+      status: 'id_pending',
+      registration: student,
+      message: `ID APPROVAL PENDING: Student ID card for ${student.fullName} (${student.id}) has not been verified yet. Inspect ID card and collect ₹700 pass fee to grant entry.`,
+    };
   }
 
   return {
-    status: 'success',
-    registration: registrations[index],
-    timestamp: nowString,
-    message: isVip
-      ? `ENTRY GRANTED: 👑 VIP Guest ${student.fullName} (${student.id}) successfully VALIDATED & MARKED AS REPORTED at Campus Gate! VIP Entry & Onasadya Token Validated.`
-      : `ENTRY GRANTED: ${student.fullName} (${student.id}) successfully APPROVED & MARKED AS REPORTED at Campus Gate! Onasadya Token Validated.`,
+    status: 'not_approved',
+    registration: student,
+    message: `ACCESS RESTRICTED: Pass for ${student.fullName} (${student.id}) is in status "${student.approvalStatus}".`,
+  };
+};
+
+export const markAsReported = (query: string): ScanResult => {
+  const registrations = getRegistrations();
+  let q = query.trim().toLowerCase();
+  
+  const krpMatch = query.match(/krp\s*[-_]?\s*(\d+)/i);
+  let targetId = '';
+  if (krpMatch) {
+    targetId = `KRP-${krpMatch[1]}`;
+  }
+
+  if (!targetId && q.includes('token')) {
+    const parts = q.split('|');
+    const tokenPart = parts.find((p) => p.includes('token'));
+    if (tokenPart) {
+      const splitColon = tokenPart.split(':');
+      if (splitColon.length > 1) {
+        const extracted = splitColon[1].trim();
+        if (extracted) {
+          targetId = extracted.toUpperCase().startsWith('KRP-') ? extracted.toUpperCase() : `KRP-${extracted.replace(/\D/g, '')}`;
+          q = extracted.toLowerCase();
+        }
+      }
+    }
+  }
+
+  const cleanQueryAlphaNum = q.replace(/[^a-z0-9]/g, '');
+
+  const student = registrations.find((r) => {
+    const cleanIdAlphaNum = r.id.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return (
+      (targetId && r.id.toLowerCase() === targetId.toLowerCase()) ||
+      r.id.toLowerCase() === q ||
+      (r.email && r.email.toLowerCase() === q) ||
+      (r.phone && isPhoneMatch(r.phone, q)) ||
+      (r.paymentUtr && r.paymentUtr.toLowerCase() === q) ||
+      (cleanIdAlphaNum && cleanQueryAlphaNum.length >= 4 && (cleanQueryAlphaNum.includes(cleanIdAlphaNum) || cleanIdAlphaNum.includes(cleanQueryAlphaNum)))
+    );
+  });
+
+  if (!student) {
+    return {
+      status: 'not_found',
+      message: `Invalid Pass QR Code / Registration ID: "${query}"`,
+    };
+  }
+
+  if (student.approvalStatus === 'Rejected') {
+    return {
+      status: 'not_approved',
+      registration: student,
+      message: `ACCESS DENIED: Application for ${student.fullName} (${student.id}) was REJECTED by Admin.`,
+    };
+  }
+
+  const isVip = student.approvalStatus === 'VIP_Pending' || student.approvalStatus === 'VIP' || student.ticketType === 'VIP Pass';
+
+  if (student.approvalStatus === 'Approved' || isVip) {
+    if (student.isReported) {
+      return {
+        status: 'already_reported',
+        registration: student,
+        timestamp: student.reportedAt,
+        message: `DUPLICATE SCAN ALERT: ${student.fullName} (${student.id}) ALREADY CHECKED IN on ${student.reportedAt || 'earlier today'}.`,
+      };
+    }
+
+    const nowString = new Date().toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    student.isReported = true;
+    student.reportedAt = nowString;
+    student.paymentStatus = 'Verified';
+    saveRegistration(student);
+    if (isFirebaseConfigured()) saveRegistrationToFirebase(student);
+
+    return {
+      status: 'success',
+      registration: student,
+      timestamp: nowString,
+      message: `ENTRY GRANTED: ${student.fullName} (${student.id}) CHECKED IN at Campus Gate!`,
+    };
+  }
+
+  if (student.approvalStatus === 'ID_Approved') {
+    return {
+      status: 'payment_required',
+      registration: student,
+      message: `PAYMENT REQUIRED AT GATE: Student ID for ${student.fullName} (${student.id}) is APPROVED, but pass fee (₹700) is pending.`,
+    };
+  }
+
+  if (student.approvalStatus === 'Payment_Pending') {
+    return {
+      status: 'payment_pending_review',
+      registration: student,
+      message: `PAYMENT PENDING REVIEW: ${student.fullName} (${student.id}) submitted UTR (${student.paymentUtr || 'Submitted'}).`,
+    };
+  }
+
+  return {
+    status: 'id_pending',
+    registration: student,
+    message: `ID PENDING: Student ID card for ${student.fullName} (${student.id}) has not been approved yet.`,
   };
 };
 
