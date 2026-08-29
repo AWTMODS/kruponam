@@ -142,6 +142,8 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
       paymentStatus: reg.paymentStatus || (reg.approvalStatus === 'Approved' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 'Verified' : 'Pending'),
       paymentUtr: reg.paymentUtr || '',
       approvalStatus: reg.approvalStatus || 'Pending_ID_Approval',
+      approval_status: reg.approvalStatus || 'Pending_ID_Approval',
+      status: reg.approvalStatus || 'Pending_ID_Approval',
       rejectionReason: reg.rejectionReason || '',
       submittedAt: reg.submittedAt || new Date().toLocaleDateString('en-US'),
       approvedAt: reg.approvedAt || '',
@@ -172,9 +174,9 @@ const mapFirebaseDoc = (data: any, docId: string): Registration => ({
   idCardUrl: data?.idCardUrl || data?.idCard || '',
   paymentScreenshotUrl: data?.paymentScreenshotUrl || data?.paymentScreenshot || '',
   paymentAmount: data?.paymentAmount !== undefined ? Number(data.paymentAmount) : (data?.ticketType === 'VIP Pass' || data?.approvalStatus === 'VIP' || data?.approvalStatus === 'VIP_Pending' ? 0 : 700),
-  paymentStatus: data?.paymentStatus || (data?.status === 'Approved' || data?.status === 'VIP' || data?.status === 'VIP_Pending' ? 'Verified' : 'Pending'),
+  paymentStatus: data?.paymentStatus || (data?.status === 'Approved' || data?.status === 'VIP' || data?.status === 'VIP_Pending' || data?.approval_status === 'Approved' || data?.approvalStatus === 'Approved' ? 'Verified' : 'Pending'),
   paymentUtr: data?.paymentUtr || data?.utr || '',
-  approvalStatus: data?.approvalStatus || data?.status || 'Pending_ID_Approval',
+  approvalStatus: data?.approvalStatus || data?.approval_status || data?.status || 'Pending_ID_Approval',
   rejectionReason: data?.rejectionReason || '',
   submittedAt: data?.submittedAt || data?.createdAt || '',
   approvedAt: data?.approvedAt || '',
@@ -193,6 +195,7 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
   const q = queryStr.trim();
   const lowerQ = q.toLowerCase();
   const upperQ = q.toUpperCase();
+  const digitsOnly = lowerQ.replace(/\D/g, '');
 
   try {
     // 1. Direct document key lookup by ID (e.g. KRP-123456) - 10-30ms!
@@ -202,7 +205,17 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       return mapFirebaseDoc(docSnap.data(), docSnap.id);
     }
 
-    // Also check lowercase / as-is ID
+    // Check if input is formatted like numeric ID (e.g. 953085 or krp 953085)
+    const krpMatch = q.match(/krp\s*[-_]?\s*(\d+)/i) || (digitsOnly.length === 6 ? [null, digitsOnly] : null);
+    if (krpMatch && krpMatch[1]) {
+      const formattedKrp = `KRP-${krpMatch[1]}`;
+      const krpSnap = await getDoc(doc(db, 'registrations', formattedKrp));
+      if (krpSnap.exists()) {
+        return mapFirebaseDoc(krpSnap.data(), krpSnap.id);
+      }
+    }
+
+    // Also check as-is ID
     if (upperQ !== q) {
       const altSnap = await getDoc(doc(db, 'registrations', q));
       if (altSnap.exists()) {
@@ -210,7 +223,7 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       }
     }
 
-    // 2. Query by email if it looks like an email or search string
+    // 2. Query by email
     if (lowerQ.includes('@')) {
       const emailQuery = query(collection(db, 'registrations'), where('email', '==', lowerQ), limit(1));
       const emailSnap = await getDocs(emailQuery);
@@ -218,10 +231,19 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
         const first = emailSnap.docs[0];
         return mapFirebaseDoc(first.data(), first.id);
       }
+
+      // Also try as-is email
+      if (lowerQ !== q) {
+        const rawEmailQuery = query(collection(db, 'registrations'), where('email', '==', q), limit(1));
+        const rawEmailSnap = await getDocs(rawEmailQuery);
+        if (!rawEmailSnap.empty) {
+          const first = rawEmailSnap.docs[0];
+          return mapFirebaseDoc(first.data(), first.id);
+        }
+      }
     }
 
     // 3. Query by phone number
-    const digitsOnly = lowerQ.replace(/\D/g, '');
     if (digitsOnly.length >= 7) {
       const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
       const phoneQuery = query(collection(db, 'registrations'), where('phone', '==', last10), limit(1));
@@ -231,7 +253,7 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
         return mapFirebaseDoc(first.data(), first.id);
       }
 
-      // Also try with +91 or original q
+      // Also try with original q
       const altPhoneQuery = query(collection(db, 'registrations'), where('phone', '==', q), limit(1));
       const altPhoneSnap = await getDocs(altPhoneQuery);
       if (!altPhoneSnap.empty) {

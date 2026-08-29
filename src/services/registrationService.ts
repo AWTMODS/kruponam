@@ -314,6 +314,8 @@ const STATUS_RANK: Record<string, number> = {
   'ID_Approved': 2,
   'Payment_Pending': 3,
   'Approved': 4,
+  'VIP_Pending': 4,
+  'VIP': 5,
 };
 
 export const deduplicateRegistrations = (list: Registration[]): Registration[] => {
@@ -744,12 +746,22 @@ export const generateUniqueRegistrationId = (): string => {
 };
 
 
-export const approveIdCard = async (id: string): Promise<Registration | null> => {
+export const approveIdCard = async (id: string, fallbackRecord?: Registration): Promise<Registration | null> => {
   const cleanId = (id || '').trim();
   const allCurrent = getRegistrations();
-  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase()) || fallbackRecord;
   if (!target) {
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
+  // If still not found, do a targeted cloud lookup
+  if (!target) {
+    if (isFirebaseConfigured()) {
+      target = (await findRegistrationInFirebase(cleanId)) || undefined;
+    }
+    if (!target && isSupabaseConfigured()) {
+      target = (await findRegistrationInSupabase(cleanId)) || undefined;
+    }
   }
 
   if (target) {
@@ -1266,16 +1278,37 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     if (cloudPromises.length > 0) {
       const results = await Promise.race([
         Promise.allSettled(cloudPromises),
-        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 3000)),
       ]);
 
       if (Array.isArray(results)) {
         for (const res of results) {
           if (res.status === 'fulfilled' && res.value) {
             const cloudReg = res.value as Registration;
+            
+            // Merge with local match if exists
+            let mergedReg: Registration = cloudReg;
+            if (localMatch) {
+              const localRank = STATUS_RANK[localMatch.approvalStatus] || 0;
+              const cloudRank = STATUS_RANK[cloudReg.approvalStatus] || 0;
+              const preferCloud = cloudRank >= localRank;
+
+              mergedReg = {
+                ...localMatch,
+                ...cloudReg,
+                approvalStatus: preferCloud ? cloudReg.approvalStatus : localMatch.approvalStatus,
+                paymentStatus: preferCloud ? cloudReg.paymentStatus : localMatch.paymentStatus,
+                idCardUrl: cloudReg.idCardUrl || localMatch.idCardUrl,
+                paymentScreenshotUrl: cloudReg.paymentScreenshotUrl || localMatch.paymentScreenshotUrl,
+                paymentUtr: cloudReg.paymentUtr || localMatch.paymentUtr,
+                rejectionReason: cloudReg.rejectionReason !== undefined ? cloudReg.rejectionReason : localMatch.rejectionReason,
+                updatedAt: cloudReg.updatedAt || localMatch.updatedAt || new Date().toISOString(),
+              };
+            }
+
             // Update local memory / storage so future lookups are instant
-            saveRegistration(cloudReg);
-            return cloudReg;
+            saveRegistration(mergedReg);
+            return mergedReg;
           }
         }
       }

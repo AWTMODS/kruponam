@@ -415,15 +415,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   };
 
   const handleApproveIdCard = async (id: string) => {
+    const target = registrations.find((r) => r.id === id) || (inspectItem?.id === id ? inspectItem : undefined);
+    const updated: Registration = {
+      ...(target || {
+        id,
+        fullName: 'Student',
+        email: '',
+        phone: '',
+        department: 'BCA',
+        section: 'Section A',
+        year: '2nd Year',
+        gender: 'Other',
+        ticketType: 'General Pass',
+        idCardUrl: '',
+        paymentAmount: 700,
+        paymentStatus: 'Pending',
+        paymentUtr: '',
+        submittedAt: new Date().toLocaleDateString('en-US'),
+      }),
+      approvalStatus: 'ID_Approved',
+      updatedAt: new Date().toISOString(),
+    };
+
     setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'ID_Approved', updatedAt: new Date().toISOString() } : r))
+      prev.map((r) => (r.id === id ? updated : r))
     );
     if (inspectItem?.id === id) {
-      setInspectItem((prev) => prev ? { ...prev, approvalStatus: 'ID_Approved' } : null);
+      setInspectItem(updated);
     }
     addToast('✅ Student ID Card Approved! Payment QR code unlocked for student.', 'success');
 
-    const res = await approveIdCard(id);
+    const res = await approveIdCard(id, updated);
     if (res && inspectItem?.id === id) {
       setInspectItem(res);
     }

@@ -183,6 +183,31 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     }, 150);
   }, []);
 
+  // Real-time live status auto-polling: If student is waiting for ID card or payment approval, poll cloud every 4 seconds
+  useEffect(() => {
+    if (!searchResult) return;
+    const isPendingStatus = 
+      searchResult.approvalStatus === 'Pending_ID_Approval' || 
+      searchResult.approvalStatus === 'Pending' || 
+      searchResult.approvalStatus === 'Payment_Pending';
+
+    if (!isPendingStatus) return;
+
+    const lookupQuery = searchResult.id || searchResult.email || searchResult.phone || searchQuery;
+    if (!lookupQuery) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const live = await findRegistrationAsync(lookupQuery);
+        if (live && live.approvalStatus !== searchResult.approvalStatus) {
+          setSearchResult(live);
+        }
+      } catch (_) {}
+    }, 4000);
+
+    return () => clearInterval(pollInterval);
+  }, [searchResult, searchQuery]);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
@@ -864,7 +889,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </p>
 
               <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl text-xs text-amber-950 font-medium">
-                ℹ️ Once Admin approves your Student ID Card, check back here to see the UPI QR Code (₹700) and upload your payment screenshot.
+                ℹ️ Once Admin approves your Student ID Card, this screen will automatically refresh with the payment QR code (₹700) to upload your payment screenshot.
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+                  disabled={isSearching}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
+                  <span>{isSearching ? 'Checking Live Cloud Status...' : 'Check Live Status Now'}</span>
+                </button>
               </div>
             </div>
           ) : (
