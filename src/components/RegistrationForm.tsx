@@ -391,7 +391,6 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                       <option value="BA">Humanities & Arts (BA)</option>
                       <option value="Pharmacy">Pharmacy (B.Pharm / D.Pharm)</option>
                       <option value="Nursing">Nursing (B.Sc Nursing / GNM)</option>
-                      <option value="PG/MBA/MCA">Post Graduate (MBA / MCA)</option>
                     </select>
                   </div>
 
