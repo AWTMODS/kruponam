@@ -1147,16 +1147,30 @@ export const markAsReportedAsync = async (query: string): Promise<ScanResult> =>
     );
   });
 
-  // 3. If not found locally or if local record might be stale, search directly in Cloud Firebase / Supabase
-  if (!student) {
-    try {
-      const cloudMatch = await findRegistrationAsync(targetId || query);
-      if (cloudMatch) {
+  // 3. ALWAYS cross-reference with Cloud Firebase / Supabase to get the authoritative live status!
+  try {
+    const cloudMatch = await findRegistrationAsync(targetId || q || query);
+    if (cloudMatch) {
+      if (!student) {
         student = cloudMatch;
+      } else {
+        const localRank = STATUS_RANK[student.approvalStatus] || 0;
+        const cloudRank = STATUS_RANK[cloudMatch.approvalStatus] || 0;
+        if (cloudRank >= localRank) {
+          student = {
+            ...student,
+            ...cloudMatch,
+            approvalStatus: cloudMatch.approvalStatus,
+            paymentStatus: cloudMatch.paymentStatus,
+            isReported: cloudMatch.isReported !== undefined ? cloudMatch.isReported : student.isReported,
+            reportedAt: cloudMatch.reportedAt || student.reportedAt,
+          };
+          saveRegistration(student);
+        }
       }
-    } catch (err) {
-      console.warn('Cloud lookup error during gate scan:', err);
     }
+  } catch (err) {
+    console.warn('Cloud lookup notice during gate scan:', err);
   }
 
   if (!student) {

@@ -26,7 +26,7 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   const registrations = getRegistrations();
   const approvedList = registrations.filter((r) => r.approvalStatus === 'Approved' || r.approvalStatus === 'VIP' || r.approvalStatus === 'VIP_Pending');
 
-  // Web Audio chime synthesized sounds
+  // Web Audio synthesized sound cues
   const playScanSound = (isSuccess: boolean) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -38,15 +38,15 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
       gain.connect(ctx.destination);
 
       if (isSuccess) {
-        // High pleasant double-beep for check-in
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
+        // High pleasant double-chime for check-in
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
         osc.start();
         osc.stop(ctx.currentTime + 0.35);
       } else {
-        // Low double-buzz for unpaid / error
+        // Low buzz for unapproved / warning
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(220, ctx.currentTime);
         osc.frequency.setValueAtTime(160, ctx.currentTime + 0.15);
@@ -59,7 +59,7 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   };
 
   const handleProcessScan = async (code: string) => {
-    if (!code.trim()) return;
+    if (!code || !code.trim()) return;
 
     // Debounce duplicate camera scans within 2.5 seconds
     const now = Date.now();
@@ -154,8 +154,11 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
         await html5QrCode.start(
           { facingMode: facingMode },
           {
-            fps: 10,
-            qrbox: { width: 240, height: 240 },
+            fps: 15,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              return { width: Math.max(180, Math.floor(minEdge * 0.78)), height: Math.max(180, Math.floor(minEdge * 0.78)) };
+            },
             aspectRatio: 1.0,
           },
           (decodedText) => {
@@ -169,9 +172,9 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
         );
       } catch (err: any) {
         if (isMounted) {
-          console.warn('Camera camera start notice:', err);
+          console.warn('Camera start notice:', err);
           setCameraError(
-            'Live Camera access unavailable or permission denied. Ensure camera permissions are allowed in browser settings, or enter Token ID manually below.'
+            'Live camera access unavailable. Please ensure camera permissions are allowed in browser settings, or enter the Token ID manually below.'
           );
           setCameraActive(false);
         }
@@ -179,10 +182,9 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
     };
 
     if (cameraActive) {
-      // Small timeout to guarantee DOM container exists
       const timer = setTimeout(() => {
         startCamera();
-      }, 200);
+      }, 150);
       return () => {
         clearTimeout(timer);
         isMounted = false;
@@ -215,60 +217,61 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 border-2 border-gold-royal shadow-2xl relative animate-fadeIn text-white max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
+      <div className="bg-slate-900 rounded-3xl max-w-lg w-full p-4 sm:p-6 border-2 border-gold-royal shadow-2xl relative animate-fadeIn text-white max-h-[94vh] overflow-y-auto overflow-x-hidden my-auto">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+          aria-label="Close Scanner"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors z-20"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-800 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gold-royal text-kerala-dark flex items-center justify-center font-bold text-2xl shadow-gold-glow">
+        <div className="flex items-center gap-3 pb-3 border-b border-slate-800 mb-4 pr-10">
+          <div className="w-10 h-10 rounded-2xl bg-gold-royal text-kerala-dark flex items-center justify-center font-bold text-xl shadow-gold-glow shrink-0">
             📸
           </div>
           <div>
-            <h3 className="font-serif text-2xl font-bold text-white flex items-center gap-2">
-              Campus Gate QR Code Scanner
+            <h3 className="font-serif text-lg sm:text-xl font-bold text-white leading-tight">
+              Gate QR Code Scanner
             </h3>
-            <p className="text-xs text-slate-400">
-              Point mobile camera at student pass QR code to mark attendee as <span className="text-emerald-400 font-bold">Reported (Checked-In)</span>.
+            <p className="text-[11px] text-slate-400">
+              Scan pass QR code to check in attendees
             </p>
           </div>
         </div>
 
-        {/* Live Camera Viewfinder Box */}
-        <div className="relative rounded-2xl overflow-hidden bg-slate-950 border-2 border-dashed border-gold-royal/40 p-4 text-center space-y-4 mb-6 min-h-[300px] flex flex-col justify-center items-center">
+        {/* Live Camera Viewfinder Box (Mobile Optimized) */}
+        <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-gold-royal/40 p-3 text-center space-y-3 mb-4 flex flex-col justify-center items-center">
           
-          {/* Animated Scanning Line */}
+          {/* Animated Scanning Pulse Line */}
           {cameraActive && !cameraError && (
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-gold-royal to-transparent shadow-gold-glow animate-pulse z-10 pointer-events-none" />
           )}
 
           {/* HTML5 QR Camera Container */}
-          <div className={`w-full max-w-sm mx-auto rounded-2xl overflow-hidden bg-black relative border border-gold-royal/30 ${!cameraActive || cameraError ? 'hidden' : 'block'}`}>
-            <div id="html5qr-code-full-region" className="w-full h-full min-h-[260px]" />
+          <div className={`w-full max-w-[270px] sm:max-w-[300px] aspect-square mx-auto rounded-2xl overflow-hidden bg-black relative border-2 border-gold-royal/40 shadow-inner ${!cameraActive || cameraError ? 'hidden' : 'block'}`}>
+            <div id="html5qr-code-full-region" className="w-full h-full" />
           </div>
 
           {/* Camera Disabled or Error Fallback UI */}
           {(!cameraActive || cameraError) && (
-            <div className="py-6 space-y-3 px-4 max-w-md mx-auto">
-              <div className="w-16 h-16 mx-auto rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
-                <CameraOff className="w-8 h-8" />
+            <div className="py-4 space-y-2.5 px-3 max-w-md mx-auto">
+              <div className="w-12 h-12 mx-auto rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
+                <CameraOff className="w-6 h-6" />
               </div>
 
               {cameraError ? (
                 <div className="p-3 bg-amber-950/80 border border-amber-500/40 rounded-xl text-amber-200 text-xs font-medium flex items-start gap-2 text-left">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{cameraError}</span>
+                  <span className="leading-relaxed">{cameraError}</span>
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 font-medium">
-                  Camera feed is currently turned off. Click below to re-enable camera scanning.
+                  Camera feed is currently turned off.
                 </p>
               )}
 
@@ -281,40 +284,40 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                 className="px-4 py-2 rounded-full bg-gold-royal text-slate-950 font-bold text-xs uppercase tracking-wider hover:bg-gold-light transition-all inline-flex items-center gap-1.5 shadow-md"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>Turn On Camera Scanner</span>
+                <span>Turn On Camera</span>
               </button>
             </div>
           )}
 
           {/* Camera Controls Bar */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 w-full">
             {cameraActive && !cameraError && (
               <>
                 <button
                   type="button"
                   onClick={toggleCameraFacing}
-                  className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-gold-royal" />
-                  <span>Switch Camera ({facingMode === 'environment' ? 'Back 📷' : 'Front 🤳'})</span>
+                  <span>Switch ({facingMode === 'environment' ? 'Back 📷' : 'Front 🤳'})</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCameraActive(false)}
-                  className="px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-rose-300 text-xs font-bold transition-all flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-rose-300 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <CameraOff className="w-3.5 h-3.5" />
-                  <span>Turn Off Camera</span>
+                  <span>Turn Off</span>
                 </button>
               </>
             )}
           </div>
 
-          {/* Quick Select Dropdown for Testing Approved Passes */}
-          <div className="pt-2 max-w-md mx-auto w-full">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-gold-light mb-1">
-              ⚡ Quick Select Approved Pass (For Testing Without Camera)
+          {/* Quick Select Dropdown */}
+          <div className="pt-2 w-full max-w-sm mx-auto">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-gold-light mb-1 text-left">
+              ⚡ Quick Select Approved Pass (Direct Lookup)
             </label>
             <select
               onChange={(e) => {
@@ -323,12 +326,12 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   handleProcessScan(e.target.value);
                 }
               }}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-gold-royal"
+              className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white outline-none focus:border-gold-royal truncate"
             >
               <option value="">-- Choose Approved Student Pass --</option>
               {approvedList.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.fullName} ({item.id}) - {item.isReported ? 'Already Reported' : 'Not Reported Yet'}
+                  {item.fullName} ({item.id}) - {item.isReported ? '✓ Checked-In' : 'Pending Gate'}
                 </option>
               ))}
             </select>
@@ -336,28 +339,28 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
         </div>
 
-        {/* Manual Scan Input Form */}
-        <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
+        {/* Manual Scan Input Form (Mobile Responsive Stack) */}
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
           <input
             type="text"
             required
-            placeholder="Scan or type Token ID (e.g. KRP-849201)..."
+            placeholder="Scan QR or enter Token ID (e.g. KRP-995318)..."
             value={scanQuery}
             onChange={(e) => setScanQuery(e.target.value)}
-            className="flex-1 px-4 py-3 rounded-full bg-slate-950 border border-slate-700 text-sm font-mono text-white outline-none focus:border-gold-royal"
+            className="flex-1 px-4 py-2.5 rounded-xl sm:rounded-full bg-slate-950 border border-slate-700 text-xs sm:text-sm font-mono text-white outline-none focus:border-gold-royal"
           />
 
           <button
             type="submit"
             disabled={isScanning}
-            className="px-6 py-3 rounded-full bg-gold-royal text-kerala-dark font-extrabold text-xs uppercase tracking-wider hover:bg-gold-light transition-all flex items-center gap-2 shadow-md disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl sm:rounded-full bg-gold-royal text-slate-950 font-black text-xs uppercase tracking-wider hover:bg-gold-light transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 shrink-0 cursor-pointer"
           >
             {isScanning ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
               <UserCheck className="w-4 h-4" />
             )}
-            <span>Process Gate Entry</span>
+            <span>Process Entry</span>
           </button>
         </form>
 
@@ -367,56 +370,56 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
             
             {/* 1. SUCCESS: ENTRY GRANTED */}
             {scanResult.status === 'success' && (
-              <div className="bg-emerald-950/90 border-2 border-emerald-500 rounded-2xl p-6 space-y-4 shadow-xl text-center">
-                <div className="w-14 h-14 rounded-full bg-emerald-500 text-slate-950 mx-auto flex items-center justify-center text-3xl font-bold">
+              <div className="bg-emerald-950/95 border-2 border-emerald-500 rounded-2xl p-5 space-y-3 shadow-xl text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
                   ✓
                 </div>
 
                 <div className="space-y-1">
-                  <span className="px-3.5 py-1 rounded-full bg-emerald-500 text-slate-950 text-xs font-black uppercase tracking-wider">
+                  <span className="px-3 py-1 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-black uppercase tracking-wider">
                     ENTRY GRANTED — CHECKED IN AT GATE
                   </span>
-                  <h4 className="font-serif text-2xl font-bold text-emerald-200 pt-2">
+                  <h4 className="font-serif text-xl sm:text-2xl font-bold text-emerald-200 pt-1">
                     {scanResult.registration?.fullName}
                   </h4>
                   <p className="text-xs text-emerald-300 font-mono">
-                    Token ID: {scanResult.registration?.id} • Department: {scanResult.registration?.department} ({scanResult.registration?.year})
+                    Token: <span className="font-bold text-white">{scanResult.registration?.id}</span> • {scanResult.registration?.department} ({scanResult.registration?.year})
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-900/80 p-3 rounded-xl border border-emerald-800/60 max-w-md mx-auto text-left">
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/90 p-3 rounded-xl border border-emerald-800/60 max-w-md mx-auto text-left">
                   <div>
                     <span className="text-slate-400 uppercase font-bold block text-[10px]">Pass Status</span>
                     <span className="text-emerald-400 font-bold">
                       {scanResult.registration?.approvalStatus === 'VIP' || scanResult.registration?.approvalStatus === 'VIP_Pending' || scanResult.registration?.ticketType === 'VIP Pass'
-                        ? '👑 VIP Pass (Complimentary)'
+                        ? '👑 VIP Pass'
                         : `✓ Verified & Approved`}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 uppercase font-bold block text-[10px]">Onasadya Food Token</span>
+                    <span className="text-slate-400 uppercase font-bold block text-[10px]">Onasadya Feast</span>
                     <span className="text-emerald-400 font-bold">✓ Validated</span>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-400 uppercase font-bold block text-[10px]">Check-In Timestamp</span>
-                    <span className="text-white font-mono font-bold">{scanResult.timestamp}</span>
+                  <div className="col-span-2 border-t border-slate-800 pt-1 mt-1">
+                    <span className="text-slate-400 uppercase font-bold block text-[10px]">Check-In Time</span>
+                    <span className="text-white font-mono font-bold text-[11px]">{scanResult.timestamp}</span>
                   </div>
                 </div>
 
-                <p className="text-xs text-emerald-400 font-semibold">
-                  🎉 Pass successfully updated to CHECKED-IN in system database!
+                <p className="text-[11px] text-emerald-400 font-semibold">
+                  🎉 Pass successfully updated to CHECKED-IN in cloud database!
                 </p>
               </div>
             )}
 
             {/* 2. ALREADY REPORTED (DUPLICATE SCAN) */}
             {scanResult.status === 'already_reported' && (
-              <div className="bg-amber-950/90 border-2 border-amber-500 rounded-2xl p-6 space-y-3 shadow-xl text-center">
-                <div className="w-14 h-14 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-amber-950/95 border-2 border-amber-500 rounded-2xl p-5 space-y-3 shadow-xl text-center">
+                <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
                   ⚠️
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider">
                   DUPLICATE SCAN ALERT
                 </span>
 
@@ -424,15 +427,15 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   Pass Already Checked-In Earlier
                 </h4>
 
-                <p className="text-xs text-amber-300 max-w-md mx-auto">
+                <p className="text-xs text-amber-300 max-w-md mx-auto leading-relaxed">
                   {scanResult.message}
                 </p>
 
                 {scanResult.registration && (
-                  <div className="p-3 bg-slate-900/80 rounded-xl border border-amber-800/60 max-w-md mx-auto text-xs text-left">
+                  <div className="p-3 bg-slate-900/90 rounded-xl border border-amber-800/60 max-w-md mx-auto text-xs text-left space-y-1">
                     <p className="font-bold text-white">{scanResult.registration.fullName} ({scanResult.registration.id})</p>
                     <p className="text-slate-400">{scanResult.registration.department} • {scanResult.registration.year}</p>
-                    <p className="text-amber-400 font-mono mt-1">First Scanned At: {scanResult.timestamp || scanResult.registration.reportedAt || 'Earlier'}</p>
+                    <p className="text-amber-400 font-mono text-[11px]">First Scanned At: {scanResult.timestamp || scanResult.registration.reportedAt || 'Earlier today'}</p>
                   </div>
                 )}
               </div>
@@ -440,16 +443,16 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
             {/* 3. PAYMENT REQUIRED AT GATE */}
             {scanResult.status === 'payment_required' && scanResult.registration && (
-              <div className="bg-gradient-to-br from-amber-950/90 via-slate-900 to-rose-950/90 border-2 border-amber-500 rounded-2xl p-6 space-y-4 shadow-xl text-center animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-gradient-to-br from-amber-950/95 via-slate-900 to-rose-950/95 border-2 border-amber-500 rounded-2xl p-5 space-y-3 shadow-xl text-center animate-fadeIn">
+                <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
                   💳
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider">
                   UNPAID PASS — COLLECT ₹700 AT GATE
                 </span>
 
-                <h4 className="font-serif text-2xl font-bold text-amber-200">
+                <h4 className="font-serif text-xl font-bold text-amber-200">
                   {scanResult.registration.fullName}
                 </h4>
 
@@ -457,7 +460,7 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   Student ID is <strong>Approved</strong>, but the ₹{scanResult.registration.paymentAmount || 700} pass fee is not paid yet. Collect ₹700 cash or UPI at gate to grant admission.
                 </p>
 
-                <div className="grid grid-cols-2 gap-3 text-xs bg-slate-900/80 p-3 rounded-xl border border-amber-800/60 max-w-md mx-auto text-left">
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/90 p-2.5 rounded-xl border border-amber-800/60 max-w-md mx-auto text-left">
                   <div>
                     <span className="text-slate-400 uppercase font-bold block text-[10px]">Token ID</span>
                     <span className="text-white font-mono font-bold">{scanResult.registration.id}</span>
@@ -468,12 +471,12 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     type="button"
                     disabled={isScanning}
                     onClick={() => handleGateCollectAndApprove(scanResult.registration)}
-                    className="px-6 py-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-5 py-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center justify-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     <span>💳 Collect ₹700 & Check In Attendee Now</span>
@@ -484,16 +487,16 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
             {/* 4. PAYMENT PENDING VERIFICATION */}
             {scanResult.status === 'payment_pending_review' && scanResult.registration && (
-              <div className="bg-gradient-to-br from-blue-950/90 via-slate-900 to-slate-950 border-2 border-blue-500 rounded-2xl p-6 space-y-4 shadow-xl text-center animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-blue-500 text-white mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-gradient-to-br from-blue-950/95 via-slate-900 to-slate-950 border-2 border-blue-500 rounded-2xl p-5 space-y-3 shadow-xl text-center animate-fadeIn">
+                <div className="w-12 h-12 rounded-full bg-blue-500 text-white mx-auto flex items-center justify-center text-2xl font-bold">
                   ⏳
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-blue-500 text-white text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-blue-500 text-white text-[11px] font-black uppercase tracking-wider">
                   PAYMENT SUBMITTED — PENDING CONFIRMATION
                 </span>
 
-                <h4 className="font-serif text-2xl font-bold text-blue-200">
+                <h4 className="font-serif text-xl font-bold text-blue-200">
                   {scanResult.registration.fullName}
                 </h4>
 
@@ -501,12 +504,12 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   Student submitted payment with UTR: <strong className="font-mono text-gold-light">{scanResult.registration.paymentUtr || 'N/A'}</strong>. Verify and grant admission.
                 </p>
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     type="button"
                     disabled={isScanning}
                     onClick={() => handleGateCollectAndApprove(scanResult.registration)}
-                    className="px-6 py-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-5 py-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center justify-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     <span>✅ Confirm Payment & Check In Now</span>
@@ -517,21 +520,21 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
             {/* 5. ID APPROVAL PENDING */}
             {scanResult.status === 'id_pending' && scanResult.registration && (
-              <div className="bg-gradient-to-br from-amber-950/90 via-slate-900 to-slate-950 border-2 border-amber-500 rounded-2xl p-6 space-y-4 shadow-xl text-center animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-gradient-to-br from-amber-950/95 via-slate-900 to-slate-950 border-2 border-amber-500 rounded-2xl p-5 space-y-3 shadow-xl text-center animate-fadeIn">
+                <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 mx-auto flex items-center justify-center text-2xl font-bold">
                   🪪
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider">
                   STUDENT ID CARD PENDING VERIFICATION
                 </span>
 
-                <h4 className="font-serif text-2xl font-bold text-amber-200">
+                <h4 className="font-serif text-xl font-bold text-amber-200">
                   {scanResult.registration.fullName}
                 </h4>
 
                 <p className="text-xs text-slate-300 max-w-md mx-auto">
-                  Student ID card has not been approved yet. Inspect student's physical or digital ID card, collect ₹700 pass fee, and grant entry.
+                  Student ID card has not been approved yet. Inspect ID card, collect ₹700 pass fee, and grant entry.
                 </p>
 
                 {scanResult.registration.idCardUrl && (
@@ -539,17 +542,17 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                     <img
                       src={scanResult.registration.idCardUrl}
                       alt="Student ID Preview"
-                      className="max-h-36 rounded-xl border border-gold-royal/40 mx-auto object-contain bg-white"
+                      className="max-h-32 rounded-xl border border-gold-royal/40 mx-auto object-contain bg-white"
                     />
                   </div>
                 )}
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     type="button"
                     disabled={isScanning}
                     onClick={() => handleGateCollectAndApprove(scanResult.registration)}
-                    className="px-6 py-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-5 py-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg inline-flex items-center justify-center gap-2 hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
                   >
                     <ShieldCheck className="w-4 h-4" />
                     <span>🔍 Verify ID, Collect ₹700 & Check In</span>
@@ -560,12 +563,12 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
             {/* 6. NOT APPROVED / REJECTED */}
             {scanResult.status === 'not_approved' && (
-              <div className="bg-rose-950/90 border-2 border-rose-500 rounded-2xl p-6 space-y-3 shadow-xl text-center animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-rose-500 text-white mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-rose-950/95 border-2 border-rose-500 rounded-2xl p-5 space-y-3 shadow-xl text-center animate-fadeIn">
+                <div className="w-12 h-12 rounded-full bg-rose-500 text-white mx-auto flex items-center justify-center text-2xl font-bold">
                   ✕
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-rose-600 text-white text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-[11px] font-black uppercase tracking-wider">
                   ACCESS DENIED — PASS REJECTED
                 </span>
 
@@ -573,12 +576,12 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
                   {scanResult.registration?.fullName || 'Application Rejected'}
                 </h4>
 
-                <p className="text-xs text-rose-300 max-w-md mx-auto">
+                <p className="text-xs text-rose-300 max-w-md mx-auto leading-relaxed">
                   {scanResult.message}
                 </p>
 
                 {scanResult.registration && (
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button
                       type="button"
                       disabled={isScanning}
@@ -595,20 +598,20 @@ export const AdminQrScanner: React.FC<QrScannerProps> = ({ onClose, onRefreshDat
 
             {/* 7. NOT FOUND */}
             {scanResult.status === 'not_found' && (
-              <div className="bg-slate-900 border-2 border-slate-700 rounded-2xl p-6 space-y-3 shadow-xl text-center animate-fadeIn">
-                <div className="w-14 h-14 rounded-full bg-slate-800 text-slate-400 mx-auto flex items-center justify-center text-2xl font-bold">
+              <div className="bg-slate-900 border-2 border-slate-700 rounded-2xl p-5 space-y-3 shadow-xl text-center animate-fadeIn">
+                <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 mx-auto flex items-center justify-center text-2xl font-bold">
                   🔍
                 </div>
 
-                <span className="px-3.5 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-black uppercase tracking-wider">
+                <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-[11px] font-black uppercase tracking-wider">
                   PASS NOT FOUND
                 </span>
 
-                <h4 className="font-serif text-xl font-bold text-white">
+                <h4 className="font-serif text-lg sm:text-xl font-bold text-white">
                   Unrecognized QR Code or Token
                 </h4>
 
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                <p className="text-xs text-slate-400 max-w-md mx-auto break-all">
                   {scanResult.message}
                 </p>
               </div>
