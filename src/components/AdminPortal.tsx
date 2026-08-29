@@ -462,15 +462,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const handleConfirmReject = async (id: string) => {
     const reason = rejectionReasonInput.trim() || 'Uploaded Student ID or Payment UTR could not be verified.';
+    const target = registrations.find((r) => r.id === id) || (inspectItem?.id === id ? inspectItem : undefined);
+    const updated: Registration = {
+      ...(target || { id, fullName: 'Student', email: '', phone: '', department: 'BCA', section: 'Section A', year: '2nd Year', gender: 'Other', ticketType: 'General Pass', idCardUrl: '', paymentAmount: 700, paymentStatus: 'Pending', paymentUtr: '', submittedAt: new Date().toLocaleDateString('en-US') }),
+      approvalStatus: 'Rejected',
+      rejectionReason: reason,
+      updatedAt: new Date().toISOString(),
+    };
+
     setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, approvalStatus: 'Rejected', rejectionReason: reason, updatedAt: new Date().toISOString() } : r))
+      prev.map((r) => (r.id === id ? updated : r))
     );
     setShowRejectModal(null);
     setRejectionReasonInput('');
     if (inspectItem?.id === id) setInspectItem(null);
     addToast('❌ Application rejected and student notified.', 'error');
 
-    await rejectRegistration(id, reason);
+    await rejectRegistration(id, reason, updated);
   };
 
   const handleMarkReportedDirect = (id: string) => {

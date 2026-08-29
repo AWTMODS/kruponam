@@ -927,12 +927,21 @@ export const issueVipPass = async (params: {
   return vipRecord;
 };
 
-export const convertToOfficialVip = async (id: string): Promise<Registration | null> => {
+export const convertToOfficialVip = async (id: string, fallbackRecord?: Registration): Promise<Registration | null> => {
   const cleanId = (id || '').trim();
   const allCurrent = getRegistrations();
-  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase()) || fallbackRecord;
   if (!target) {
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
+  if (!target) {
+    if (isFirebaseConfigured()) {
+      target = (await findRegistrationInFirebase(cleanId)) || undefined;
+    }
+    if (!target && isSupabaseConfigured()) {
+      target = (await findRegistrationInSupabase(cleanId)) || undefined;
+    }
   }
 
   if (target) {
@@ -1032,12 +1041,21 @@ export const approveRegistration = async (id: string, fallbackRecord?: Registrat
   return null;
 };
 
-export const rejectRegistration = async (id: string, reason: string): Promise<Registration | null> => {
+export const rejectRegistration = async (id: string, reason: string, fallbackRecord?: Registration): Promise<Registration | null> => {
   const cleanId = (id || '').trim();
   const allCurrent = getRegistrations();
-  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  let target = allCurrent.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase()) || fallbackRecord;
   if (!target) {
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
+  }
+
+  if (!target) {
+    if (isFirebaseConfigured()) {
+      target = (await findRegistrationInFirebase(cleanId)) || undefined;
+    }
+    if (!target && isSupabaseConfigured()) {
+      target = (await findRegistrationInSupabase(cleanId)) || undefined;
+    }
   }
 
   if (target) {
