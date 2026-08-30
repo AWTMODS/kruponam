@@ -744,11 +744,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const vipPendingCount = registrations.filter((r) => r.approvalStatus === 'VIP_Pending' || (isVipRecord(r) && r.approvalStatus !== 'VIP')).length;
   const totalVipGuests = vipOfficialCount + vipPendingCount;
 
-  // Bulk Resend Sep 14 Passes Broadcast Handler
+  // All Approved passes including normal approved + VIP approved / hidden VIP passes with valid email
+  const allApprovedPasses = registrations.filter(
+    (r) =>
+      (r.approvalStatus === 'Approved' || r.approvalStatus === 'VIP' || (isVipRecord(r) && r.approvalStatus !== 'Rejected')) &&
+      r.email &&
+      r.email.trim().includes('@')
+  );
+
+  // Bulk Resend Sep 14 Passes Broadcast Handler (Includes all approved and VIP passes)
   const handleStartBulkResend = async () => {
-    const approvedList = normalRegistrations.filter((r) => r.approvalStatus === 'Approved');
+    const approvedList = allApprovedPasses;
     if (approvedList.length === 0) {
-      addToast('No approved student registrations found to resend.', 'info');
+      addToast('No approved student or VIP registrations found to resend.', 'info');
       return;
     }
     setBulkResendRunning(true);
@@ -968,11 +976,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
               <button
                 onClick={() => setShowBulkResendModal(true)}
-                title="Broadcast Updated Sep 14 Passes to All Approved Students"
+                title="Broadcast Updated Sep 14 Passes to All Approved Students & VIPs"
                 className="px-3.5 py-2 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-400 text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
               >
                 <Mail className="w-3.5 h-3.5 text-blue-200" />
-                <span>Resend Sep 14 Passes ({approvedApps})</span>
+                <span>Resend Sep 14 Passes ({allApprovedPasses.length})</span>
               </button>
 
               <button
@@ -3680,7 +3688,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <span>📅 Date Revision Notice (Sep 14, 2026)</span>
               </p>
               <p className="text-slate-300 leading-relaxed">
-                This will automatically generate and send updated pass emails to all <strong>{approvedApps} approved students</strong>. Each email includes the revised date badge (<strong>Monday, 14 September 2026</strong>), payment invoice, and scanner-ready QR token.
+                This will automatically generate and send updated pass emails to all <strong>{allApprovedPasses.length} approved students & VIP passes</strong> (including hidden VIPs). Each email includes the revised date badge (<strong>Monday, 14 September 2026</strong>), payment invoice, and scanner-ready QR token.
               </p>
             </div>
 
@@ -3750,7 +3758,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-blue-950/50 flex items-center gap-2"
                   >
                     <Mail className="w-4 h-4" />
-                    <span>Start Resending to {approvedApps} Students</span>
+                    <span>Start Resending to {allApprovedPasses.length} Attendees</span>
                   </button>
                 </>
               )}
