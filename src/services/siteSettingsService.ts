@@ -12,7 +12,7 @@ export interface SiteSettings {
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   showProgramsSchedule: false, // Default hidden
-  comingSoonMode: false,       // Default Main Website active (coming soon disabled)
+  comingSoonMode: true,        // Default Coming Soon page active
   ticketAmount: 700,           // Default ticket pass price in ₹
 };
 
@@ -22,9 +22,9 @@ export const getSiteSettings = (): SiteSettings => {
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
-        showProgramsSchedule: typeof parsed.showProgramsSchedule === 'boolean' ? parsed.showProgramsSchedule : false,
-        comingSoonMode: typeof parsed.comingSoonMode === 'boolean' ? parsed.comingSoonMode : false,
-        ticketAmount: typeof parsed.ticketAmount === 'number' && parsed.ticketAmount >= 0 ? parsed.ticketAmount : 700,
+        showProgramsSchedule: typeof parsed.showProgramsSchedule === 'boolean' ? parsed.showProgramsSchedule : DEFAULT_SITE_SETTINGS.showProgramsSchedule,
+        comingSoonMode: typeof parsed.comingSoonMode === 'boolean' ? parsed.comingSoonMode : DEFAULT_SITE_SETTINGS.comingSoonMode,
+        ticketAmount: typeof parsed.ticketAmount === 'number' && parsed.ticketAmount >= 0 ? parsed.ticketAmount : DEFAULT_SITE_SETTINGS.ticketAmount,
       };
     }
   } catch (_) {}
