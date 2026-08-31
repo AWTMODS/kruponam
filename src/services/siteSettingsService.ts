@@ -12,7 +12,7 @@ export interface SiteSettings {
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   showProgramsSchedule: false, // Default hidden
-  comingSoonMode: true,        // Default Coming Soon page active
+  comingSoonMode: false,       // Default Coming Soon page inactive, main website shown
   ticketAmount: 700,           // Default ticket pass price in ₹
 };
 
