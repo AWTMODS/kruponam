@@ -47,20 +47,22 @@ export const FloatingPetals: React.FC = () => {
       'rgba(239, 68, 68, 0.65)',   // Rose accent
     ];
 
-    const petalcCount = Math.min(Math.floor(width / 35), 45);
+    // Limit particle count to avoid GPU/RAM overload on mobile and low-memory devices
+    const isMobile = window.innerWidth < 768;
+    const petalcCount = isMobile ? 12 : Math.min(Math.floor(width / 70), 22);
     const petals: Petal[] = [];
 
     for (let i = 0; i < petalcCount; i++) {
       petals.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: Math.random() * 8 + 6,
-        speedY: Math.random() * 1.2 + 0.6,
-        speedX: Math.random() * 0.8 - 0.4,
+        size: Math.random() * 6 + 5,
+        speedY: Math.random() * 0.9 + 0.5,
+        speedX: Math.random() * 0.6 - 0.3,
         angle: Math.random() * Math.PI * 2,
-        spinSpeed: (Math.random() - 0.5) * 0.03,
+        spinSpeed: (Math.random() - 0.5) * 0.02,
         color: colors[Math.floor(Math.random() * colors.length)],
-        opacity: Math.random() * 0.5 + 0.4,
+        opacity: Math.random() * 0.4 + 0.4,
         shape: i % 3 === 0 ? 'marigold' : i % 3 === 1 ? 'lotus' : 'jasmine',
       });
     }
@@ -69,7 +71,7 @@ export const FloatingPetals: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       mouseX = e.clientX;
     };
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
     const drawPetal = (petal: Petal) => {
       ctx.save();
@@ -81,26 +83,37 @@ export const FloatingPetals: React.FC = () => {
       ctx.beginPath();
 
       if (petal.shape === 'marigold') {
-        // Petal tear drop
         ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(petal.size / 2, -petal.size, 0, -petal.size * 1.4);
+        ctx.quadraticCurveTo(petal.size / 2, -petal.size, 0, -petal.size * 1.3);
         ctx.quadraticCurveTo(-petal.size / 2, -petal.size, 0, 0);
       } else if (petal.shape === 'lotus') {
-        // Lotus leaf oval
-        ctx.ellipse(0, 0, petal.size * 0.7, petal.size * 1.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, petal.size * 0.6, petal.size * 1.1, 0, 0, Math.PI * 2);
       } else {
-        // Small organic flower petal
-        ctx.arc(0, 0, petal.size * 0.6, 0, Math.PI * 2);
+        ctx.arc(0, 0, petal.size * 0.5, 0, Math.PI * 2);
       }
 
       ctx.fill();
       ctx.restore();
     };
 
+    let isPaused = false;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isPaused = true;
+        cancelAnimationFrame(animationFrameId);
+      } else {
+        isPaused = false;
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const render = () => {
+      if (isPaused) return;
+
       ctx.clearRect(0, 0, width, height);
 
-      const windEffect = (mouseX - width / 2) * 0.0003;
+      const windEffect = (mouseX - width / 2) * 0.0002;
 
       for (let i = 0; i < petals.length; i++) {
         const p = petals[i];
@@ -130,6 +143,7 @@ export const FloatingPetals: React.FC = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cancelAnimationFrame(animationFrameId);
     };
   }, [isEnabled]);
