@@ -685,11 +685,10 @@ export const findStudentByExactEmailOrPhone = (email: string, phone: string): Re
 
 export const findStudentByExactEmailOrPhoneAsync = async (email: string, phone: string): Promise<Registration | undefined> => {
   const local = findStudentByExactEmailOrPhone(email, phone);
-  if (local) return local;
 
   const cleanEmail = email ? email.trim().toLowerCase() : '';
   const cleanPhone = phone ? phone.trim() : '';
-  if (!cleanEmail && !cleanPhone) return undefined;
+  if (!cleanEmail && !cleanPhone) return local;
 
   try {
     const cloudPromises: Promise<Registration | null>[] = [];
@@ -702,23 +701,44 @@ export const findStudentByExactEmailOrPhoneAsync = async (email: string, phone: 
       if (cleanPhone) cloudPromises.push(findRegistrationInSupabase(cleanPhone));
     }
 
-    const results = await Promise.race([
-      Promise.allSettled(cloudPromises),
-      new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
-    ]);
+    if (cloudPromises.length > 0) {
+      const results = await Promise.race([
+        Promise.allSettled(cloudPromises),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+      ]);
 
-    if (Array.isArray(results)) {
-      for (const res of results) {
-        if (res.status === 'fulfilled' && res.value) {
-          const r = res.value as Registration;
-          if (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) return r;
-          if (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone)) return r;
+      if (Array.isArray(results)) {
+        for (const res of results) {
+          if (res.status === 'fulfilled' && res.value) {
+            const r = res.value as Registration;
+            const isMatch = (cleanEmail && r.email && r.email.trim().toLowerCase() === cleanEmail) || 
+                            (cleanPhone && r.phone && isPhoneMatch(r.phone, cleanPhone));
+            if (isMatch) {
+              // If local exists, merge and prefer the higher/newer status
+              if (local) {
+                const localRank = STATUS_RANK[local.approvalStatus] || 0;
+                const cloudRank = STATUS_RANK[r.approvalStatus] || 0;
+                const preferCloud = cloudRank >= localRank;
+                const merged: Registration = {
+                  ...local,
+                  ...r,
+                  approvalStatus: preferCloud ? r.approvalStatus : local.approvalStatus,
+                  paymentStatus: preferCloud ? r.paymentStatus : local.paymentStatus,
+                  updatedAt: r.updatedAt || local.updatedAt || new Date().toISOString(),
+                };
+                saveRegistration(merged);
+                return merged;
+              }
+              saveRegistration(r);
+              return r;
+            }
+          }
         }
       }
     }
-    return undefined;
+    return local;
   } catch {
-    return undefined;
+    return local;
   }
 };
 
@@ -775,10 +795,10 @@ export const approveIdCard = async (id: string, fallbackRecord?: Registration): 
     }
     syncToIndexedDB(updatedRecord);
 
-    Promise.allSettled([
+    await Promise.allSettled([
       isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
       isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]).catch(() => {});
+    ]);
 
     return updatedRecord;
   }
@@ -1025,10 +1045,10 @@ export const approveRegistration = async (id: string, fallbackRecord?: Registrat
     }
     syncToIndexedDB(updatedRecord);
 
-    Promise.allSettled([
+    await Promise.allSettled([
       isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
       isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]).catch(() => {});
+    ]);
 
     return updatedRecord;
   }
@@ -1070,10 +1090,10 @@ export const rejectRegistration = async (id: string, reason: string, fallbackRec
     }
     syncToIndexedDB(updatedRecord);
 
-    Promise.allSettled([
+    await Promise.allSettled([
       isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
       isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]).catch(() => {});
+    ]);
 
     return updatedRecord;
   }

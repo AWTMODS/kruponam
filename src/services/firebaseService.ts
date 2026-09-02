@@ -223,42 +223,50 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       }
     }
 
-    // 2. Query by email
+    // 2. Query by email (check lower, as-is, and trimmed)
     if (lowerQ.includes('@')) {
       const emailQuery = query(collection(db, 'registrations'), where('email', '==', lowerQ), limit(1));
       const emailSnap = await getDocs(emailQuery);
       if (!emailSnap.empty) {
-        const first = emailSnap.docs[0];
-        return mapFirebaseDoc(first.data(), first.id);
+        return mapFirebaseDoc(emailSnap.docs[0].data(), emailSnap.docs[0].id);
       }
 
-      // Also try as-is email
       if (lowerQ !== q) {
         const rawEmailQuery = query(collection(db, 'registrations'), where('email', '==', q), limit(1));
         const rawEmailSnap = await getDocs(rawEmailQuery);
         if (!rawEmailSnap.empty) {
-          const first = rawEmailSnap.docs[0];
-          return mapFirebaseDoc(first.data(), first.id);
+          return mapFirebaseDoc(rawEmailSnap.docs[0].data(), rawEmailSnap.docs[0].id);
         }
       }
     }
 
-    // 3. Query by phone number
+    // 3. Query by phone number (check last10, +91, with spaces, digitsOnly, raw q)
     if (digitsOnly.length >= 7) {
       const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
-      const phoneQuery = query(collection(db, 'registrations'), where('phone', '==', last10), limit(1));
-      const phoneSnap = await getDocs(phoneQuery);
-      if (!phoneSnap.empty) {
-        const first = phoneSnap.docs[0];
-        return mapFirebaseDoc(first.data(), first.id);
-      }
+      const phoneVariations = Array.from(new Set([
+        last10,
+        `+91${last10}`,
+        `+91 ${last10}`,
+        `0${last10}`,
+        digitsOnly,
+        q,
+      ]));
 
-      // Also try with original q
-      const altPhoneQuery = query(collection(db, 'registrations'), where('phone', '==', q), limit(1));
-      const altPhoneSnap = await getDocs(altPhoneQuery);
-      if (!altPhoneSnap.empty) {
-        const first = altPhoneSnap.docs[0];
-        return mapFirebaseDoc(first.data(), first.id);
+      for (const pVal of phoneVariations) {
+        const phoneQuery = query(collection(db, 'registrations'), where('phone', '==', pVal), limit(1));
+        const phoneSnap = await getDocs(phoneQuery);
+        if (!phoneSnap.empty) {
+          return mapFirebaseDoc(phoneSnap.docs[0].data(), phoneSnap.docs[0].id);
+        }
+      }
+    }
+
+    // 4. Fallback: Search by fullName
+    if (q.length >= 3 && !q.includes('@')) {
+      const nameQuery = query(collection(db, 'registrations'), where('fullName', '==', q), limit(1));
+      const nameSnap = await getDocs(nameQuery);
+      if (!nameSnap.empty) {
+        return mapFirebaseDoc(nameSnap.docs[0].data(), nameSnap.docs[0].id);
       }
     }
 

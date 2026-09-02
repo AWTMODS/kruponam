@@ -185,9 +185,9 @@ export const findRegistrationInSupabase = async (queryStr: string): Promise<Regi
   const lowerQ = q.toLowerCase();
 
   try {
-    // Search by ID, Email, or Phone
+    // Search by ID, Email, Phone, or Name
     const digitsOnly = lowerQ.replace(/\D/g, '');
-    let filterString = `id.ilike.%${q}%,email.ilike.%${lowerQ}%`;
+    let filterString = `id.ilike.%${q}%,email.ilike.%${lowerQ}%,full_name.ilike.%${q}%`;
     if (digitsOnly.length >= 6) {
       filterString += `,phone.ilike.%${digitsOnly}%`;
     }

@@ -150,19 +150,15 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
 
     try {
       // Check if user already exists by EXACT Email or EXACT Phone in local storage OR live cloud database
-      const existingLocal = findStudentByExactEmailOrPhone(cleanEmail, cleanPhone);
-      let existingCloud: Registration | undefined = undefined;
-      if (!existingLocal) {
-        try {
-          existingCloud = await Promise.race([
-            findStudentByExactEmailOrPhoneAsync(cleanEmail, cleanPhone),
-            new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 1500))
-          ]);
-        } catch (cloudErr) {
-          console.warn('Cloud duplicate check notice (continuing with local check):', cloudErr);
-        }
+      let existing: Registration | undefined = undefined;
+      try {
+        existing = await Promise.race([
+          findStudentByExactEmailOrPhoneAsync(cleanEmail, cleanPhone),
+          new Promise<Registration | undefined>((resolve) => setTimeout(() => resolve(findStudentByExactEmailOrPhone(cleanEmail, cleanPhone)), 2000))
+        ]);
+      } catch {
+        existing = findStudentByExactEmailOrPhone(cleanEmail, cleanPhone);
       }
-      const existing = existingLocal || existingCloud;
 
       if (existing) {
         // If already Approved, redirect to view official pass
