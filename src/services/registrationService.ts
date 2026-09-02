@@ -458,57 +458,51 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   };
 
-  // 1. Try fetching remote cloud records from Firebase
+  // 1. Fetch remote cloud records from Firebase & Supabase in parallel with fast 2.5s timeout
+  const cloudTasks: Promise<any>[] = [];
+  
   if (isFirebaseConfigured()) {
-    try {
-      const fbRecords = await fetchRegistrationsFromFirebase();
-      if (fbRecords && fbRecords.length > 0) {
-        fbRecords.forEach(mergeCloudRecord);
-
-        // Push any local-only records to Firebase so they are not lost across devices
-        const fbIds = new Set(fbRecords.map((r) => r.id));
-        localMap.forEach((localReg, id) => {
-          if (!fbIds.has(id) && !deletedIds.has(id)) {
-            saveRegistrationToFirebase(localReg).catch((err) =>
-              console.warn('Background sync to Firebase failed for local record:', id, err)
-            );
-          }
-        });
-      } else {
-        // Firestore collection is empty — push all local records up
-        localMap.forEach((localReg, id) => {
-          if (!deletedIds.has(id)) {
-            saveRegistrationToFirebase(localReg).catch((err) =>
-              console.warn('Background sync to Firebase failed for local record:', id, err)
-            );
-          }
-        });
-      }
-    } catch (e) {
-      console.warn('Firebase sync notice:', e);
-    }
+    cloudTasks.push(
+      Promise.race([
+        fetchRegistrationsFromFirebase(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+      ]).then((fbRecords) => {
+        if (fbRecords && fbRecords.length > 0) {
+          fbRecords.forEach(mergeCloudRecord);
+          const fbIds = new Set(fbRecords.map((r) => r.id));
+          localMap.forEach((localReg, id) => {
+            if (!fbIds.has(id) && !deletedIds.has(id)) {
+              saveRegistrationToFirebase(localReg).catch(() => {});
+            }
+          });
+        }
+      }).catch((e) => console.warn('Firebase sync notice:', e))
+    );
   }
 
-  // 2. Try fetching remote cloud records from Supabase
   if (isSupabaseConfigured()) {
-    try {
-      const cloudRecords = await fetchRegistrationsFromSupabase();
-      if (cloudRecords && cloudRecords.length > 0) {
-        cloudRecords.forEach(mergeCloudRecord);
+    cloudTasks.push(
+      Promise.race([
+        fetchRegistrationsFromSupabase(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+      ]).then((cloudRecords) => {
+        if (cloudRecords && cloudRecords.length > 0) {
+          cloudRecords.forEach(mergeCloudRecord);
+          localMap.forEach((localReg, id) => {
+            const inCloud = cloudRecords.some((cr) => cr.id === id);
+            if (!inCloud && !deletedIds.has(id)) {
+              saveRegistrationToSupabase(localReg).catch(() => {});
+            }
+          });
+        }
+      }).catch((e) => console.warn('Supabase sync notice:', e))
+    );
+  }
 
-        // Push any local-only records to Supabase so they are not lost across devices
-        localMap.forEach((localReg, id) => {
-          const inCloud = cloudRecords.some((cr) => cr.id === id);
-          if (!inCloud && !deletedIds.has(id)) {
-            saveRegistrationToSupabase(localReg).catch((err) =>
-              console.warn('Background sync to Supabase failed for local record:', id, err)
-            );
-          }
-        });
-      }
-    } catch (e) {
-      console.warn('Supabase sync notice:', e);
-    }
+  if (cloudTasks.length > 0) {
+    try {
+      await Promise.allSettled(cloudTasks);
+    } catch (_) {}
   }
 
   const rawMerged = Array.from(localMap.values()).filter((r) => !deletedIds.has(r.id));

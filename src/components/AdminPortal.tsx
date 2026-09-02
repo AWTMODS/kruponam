@@ -6,7 +6,7 @@ import {
   Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown
 } from 'lucide-react';
 import { 
-  syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
+  getRegistrations, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
   exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
@@ -35,7 +35,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>(() => getRegistrations());
   const [statusFilter, setStatusFilter] = useState<'all' | 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Reported' | 'VIP_SECTION' | 'VIP' | 'VIP_Pending'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectItem, setInspectItem] = useState<Registration | null>(null);
@@ -199,8 +199,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
   const loadData = async () => {
     setIsRefreshing(true);
-    const regs = await syncCloudRegistrations();
-    setRegistrations(regs);
+    // 1. Immediately display local records without waiting for network
+    const local = getRegistrations();
+    if (local && local.length > 0) {
+      setRegistrations(local);
+    }
+
+    // 2. Fast non-blocking parallel sync with Firebase & Supabase
+    try {
+      const regs = await syncCloudRegistrations();
+      if (regs && regs.length > 0) {
+        setRegistrations(regs);
+      }
+    } catch (_) {}
+
     if (isSupabaseConfigured()) {
       testSupabaseConnection().then((res) => {
         if (!res.success) {
@@ -210,7 +222,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         }
       });
     }
-    setTimeout(() => setIsRefreshing(false), 300);
+    setIsRefreshing(false);
   };
 
   const handleCleanDuplicates = async () => {
