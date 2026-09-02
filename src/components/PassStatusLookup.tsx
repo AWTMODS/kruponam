@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
-import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsed, type Registration } from '../services/registrationService';
+import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsedAsync, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
 import { fetchActiveUpiSlotFromFirebase } from '../services/firebaseService';
@@ -41,6 +41,8 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   const [isProcessingPaymentScreenshot, setIsProcessingPaymentScreenshot] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [utrDuplicateWarning, setUtrDuplicateWarning] = useState<string | null>(null);
+  const [isCheckingUtr, setIsCheckingUtr] = useState(false);
   const [ticketTheme, setTicketTheme] = useState<'light' | 'dark'>('light');
 
   const paymentFileInputRef = useRef<HTMLInputElement>(null);
@@ -169,6 +171,28 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     }
   }, [upiSettings, ticketAmount]);
 
+  // Real-time debounced server UTR duplication check
+  useEffect(() => {
+    const cleanUtr = paymentUtr.trim();
+    if (!cleanUtr || cleanUtr.length < 8) {
+      setUtrDuplicateWarning(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsCheckingUtr(true);
+      const res = await isUtrAlreadyUsedAsync(cleanUtr, searchResult?.id);
+      setIsCheckingUtr(false);
+      if (res.isUsed) {
+        setUtrDuplicateWarning(res.message || '⚠️ This UPI UTR number is already registered on the server.');
+      } else {
+        setUtrDuplicateWarning(null);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [paymentUtr, searchResult]);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -291,13 +315,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     if (!searchResult) return;
     setPaymentError(null);
 
-    if (!paymentUtr || paymentUtr.trim().length < 6) {
+    const cleanUtr = paymentUtr.trim();
+    if (!cleanUtr || cleanUtr.length < 6) {
       setPaymentError('Please enter a valid 12-digit UPI UTR / Transaction Reference number.');
-      return;
-    }
-
-    if (isUtrAlreadyUsed(paymentUtr, searchResult.id)) {
-      setPaymentError(`⚠️ The UTR / Transaction ID (${paymentUtr.trim()}) has already been used for another registration.`);
       return;
     }
 
@@ -308,12 +328,20 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
     setIsSubmittingPayment(true);
 
+    // 1. Strict Server & Cloud UTR uniqueness check before submission
+    const utrCheck = await isUtrAlreadyUsedAsync(cleanUtr, searchResult.id);
+    if (utrCheck.isUsed) {
+      setIsSubmittingPayment(false);
+      setPaymentError(utrCheck.message || `⚠️ The UTR / Transaction ID (${cleanUtr}) has already been used on the server. Duplicate payments are not allowed.`);
+      return;
+    }
+
     try {
       recordPaymentToActiveSlot();
     } catch (_) {}
 
     try {
-      const updated = await submitPaymentForRegistration(searchResult.id, paymentUtr, paymentScreenshotPreview);
+      const updated = await submitPaymentForRegistration(searchResult.id, cleanUtr, paymentScreenshotPreview);
       setIsSubmittingPayment(false);
 
       if (updated) {
@@ -712,14 +740,28 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         placeholder="e.g. 320918239012"
                         value={paymentUtr}
                         onChange={(e) => setPaymentUtr(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 font-mono text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 bg-white"
+                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm outline-none transition-all ${
+                          utrDuplicateWarning 
+                            ? 'border-rose-500 ring-2 ring-rose-300 bg-rose-50/40 text-rose-950' 
+                            : 'border-slate-300 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 bg-white'
+                        }`}
                       />
                     </div>
 
-                    {paymentUtr.trim().length >= 6 ? (
+                    {isCheckingUtr ? (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold flex items-center gap-2 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                        <span>Verifying UTR uniqueness on server database...</span>
+                      </div>
+                    ) : utrDuplicateWarning ? (
+                      <div className="p-3 bg-rose-50 border-2 border-rose-300 text-rose-900 rounded-xl text-xs font-bold flex items-start gap-2 animate-fadeIn">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span>{utrDuplicateWarning}</span>
+                      </div>
+                    ) : paymentUtr.trim().length >= 6 ? (
                       <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>✓ UTR Entered: {paymentUtr}</span>
+                        <span>✓ UTR Valid & Available: {paymentUtr}</span>
                       </div>
                     ) : (
                       <p className="text-[11px] text-slate-500 italic">
@@ -827,7 +869,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
 
                 <button
                   type="submit"
-                  disabled={isSubmittingPayment || isProcessingPaymentScreenshot}
+                  disabled={isSubmittingPayment || isProcessingPaymentScreenshot || isCheckingUtr || Boolean(utrDuplicateWarning)}
                   className="w-full py-4 rounded-full text-sm font-bold uppercase tracking-wider text-white bg-gradient-to-r from-kerala-deep via-kerala-light to-kerala-deep hover:shadow-gold-glow transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl cursor-pointer"
                 >
                   {isSubmittingPayment ? (

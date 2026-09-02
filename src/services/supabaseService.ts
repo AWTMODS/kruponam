@@ -339,6 +339,53 @@ export const deleteRegistrationFromSupabase = async (id: string): Promise<boolea
   }
 };
 
+/**
+ * Check if a UPI UTR / Transaction Reference ID is already used in Supabase database.
+ */
+export const checkIfUtrExistsInSupabase = async (
+  utr: string,
+  excludeId?: string
+): Promise<{ exists: boolean; registeredTo?: string; passId?: string } | null> => {
+  const client = getSupabaseClient();
+  if (!client || !utr || utr.trim().length < 6) return null;
+
+  const cleanUtr = utr.trim();
+
+  try {
+    let queryBuilder = client
+      .from('registrations')
+      .select('id, full_name, payment_utr')
+      .ilike('payment_utr', cleanUtr)
+      .limit(2);
+
+    if (excludeId) {
+      queryBuilder = queryBuilder.neq('id', excludeId);
+    }
+
+    const { data, error } = await queryBuilder;
+    if (error) {
+      console.warn('Supabase UTR check error:', error.message);
+      return null;
+    }
+
+    if (data && data.length > 0) {
+      const match = data.find((r: any) => r.id !== excludeId);
+      if (match) {
+        return {
+          exists: true,
+          registeredTo: match.full_name || 'Another Student',
+          passId: match.id,
+        };
+      }
+    }
+
+    return { exists: false };
+  } catch (err) {
+    console.warn('Supabase UTR check exception:', err);
+    return null;
+  }
+};
+
 // SQL Setup script generator for user to copy-paste into Supabase SQL Editor
 export const SUPABASE_SQL_SETUP_SCRIPT = `-- 🌸 KRUPONAM 2026 — Free Supabase Database & Image Storage Setup
 -- Copy and run this script inside your Supabase Dashboard -> SQL Editor!

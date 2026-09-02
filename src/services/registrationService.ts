@@ -5,7 +5,8 @@ import {
   uploadImageToSupabase, 
   deleteRegistrationFromSupabase,
   isSupabaseConfigured,
-  findRegistrationInSupabase 
+  findRegistrationInSupabase,
+  checkIfUtrExistsInSupabase
 } from './supabaseService';
 import {
   isFirebaseConfigured,
@@ -13,6 +14,7 @@ import {
   saveRegistrationToFirebase,
   deleteRegistrationFromFirebase,
   findRegistrationInFirebase,
+  checkIfUtrExistsInFirebase,
 } from './firebaseService';
 
 export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending' | 'VIP_Pending' | 'VIP';
@@ -749,6 +751,65 @@ export const isUtrAlreadyUsed = (utr: string, excludeId?: string): boolean => {
   return list.some((r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr && r.id !== excludeId);
 };
 
+/**
+ * Super-secure async check verifying if UTR was already submitted across local and remote cloud databases.
+ */
+export const isUtrAlreadyUsedAsync = async (
+  utr: string,
+  excludeId?: string
+): Promise<{ isUsed: boolean; message?: string }> => {
+  if (!utr || utr.trim().length < 6) {
+    return { isUsed: false };
+  }
+
+  const cleanUtr = utr.trim();
+
+  // 1. Instant local check
+  const localList = getRegistrations();
+  const localMatch = localList.find(
+    (r) => r.paymentUtr && r.paymentUtr.trim().toLowerCase() === cleanUtr.toLowerCase() && r.id !== excludeId
+  );
+  if (localMatch) {
+    return {
+      isUsed: true,
+      message: `⚠️ This UPI UTR / Ref ID (${cleanUtr}) has already been registered in the database for ${localMatch.fullName} (${localMatch.id}). Each pass payment requires a unique transaction UTR.`,
+    };
+  }
+
+  // 2. Parallel Cloud Database Check (Firebase & Supabase)
+  try {
+    const cloudChecks: Promise<{ exists: boolean; registeredTo?: string; passId?: string } | null>[] = [];
+    if (isFirebaseConfigured()) {
+      cloudChecks.push(checkIfUtrExistsInFirebase(cleanUtr, excludeId));
+    }
+    if (isSupabaseConfigured()) {
+      cloudChecks.push(checkIfUtrExistsInSupabase(cleanUtr, excludeId));
+    }
+
+    if (cloudChecks.length > 0) {
+      const results = await Promise.race([
+        Promise.allSettled(cloudChecks),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+      ]);
+
+      if (Array.isArray(results)) {
+        for (const res of results) {
+          if (res.status === 'fulfilled' && res.value && res.value.exists) {
+            return {
+              isUsed: true,
+              message: `⚠️ This UPI UTR / Ref ID (${cleanUtr}) has already been submitted on the server (Pass ID: ${res.value.passId || 'Registered'}). Duplicate payment UTR numbers are strictly not permitted.`,
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Async UTR validation notice:', err);
+  }
+
+  return { isUsed: false };
+};
+
 export const generateUniqueRegistrationId = (): string => {
   const registrations = getRegistrations();
   const existingIds = new Set(registrations.map((r) => r.id.toUpperCase()));
@@ -813,6 +874,17 @@ export const submitPaymentForRegistration = async (
   const cleanId = (id || '').trim();
   if (!cleanId) return null;
 
+  const cleanUtr = (utr || '').trim();
+  if (!cleanUtr || cleanUtr.length < 6) {
+    throw new Error('Please enter a valid 12-digit UPI transaction reference / UTR number.');
+  }
+
+  // Enforce server & cloud UTR uniqueness check before saving
+  const utrCheck = await isUtrAlreadyUsedAsync(cleanUtr, cleanId);
+  if (utrCheck.isUsed) {
+    throw new Error(utrCheck.message || 'This UPI UTR number has already been submitted on the server. Please enter your valid transaction reference.');
+  }
+
   let target = getRegistrations().find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
   if (!target) {
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
@@ -844,7 +916,7 @@ export const submitPaymentForRegistration = async (
 
     const updatedRecord: Registration = {
       ...target,
-      paymentUtr: utr.trim(),
+      paymentUtr: cleanUtr,
       paymentScreenshotUrl: finalPayUrl,
       paymentStatus: 'Pending',
       approvalStatus: 'Payment_Pending',

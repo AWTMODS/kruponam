@@ -422,3 +422,80 @@ export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
     return null;
   }
 };
+
+/**
+ * Check if a UPI UTR / Transaction Reference ID is already used in Firestore database.
+ */
+export const checkIfUtrExistsInFirebase = async (
+  utr: string,
+  excludeId?: string
+): Promise<{ exists: boolean; registeredTo?: string; passId?: string } | null> => {
+  const db = getFirebaseDb();
+  if (!db || !utr || utr.trim().length < 6) return null;
+
+  const cleanUtr = utr.trim();
+  const lowerUtr = cleanUtr.toLowerCase();
+
+  try {
+    // 1. Check paymentUtr field
+    const q1 = query(
+      collection(db, 'registrations'),
+      where('paymentUtr', '==', cleanUtr),
+      limit(2)
+    );
+    const snap1 = await getDocs(q1);
+    for (const d of snap1.docs) {
+      if (d.id !== excludeId) {
+        const data = d.data();
+        return {
+          exists: true,
+          registeredTo: data.fullName || data.name || 'Another Student',
+          passId: d.id,
+        };
+      }
+    }
+
+    // 2. Check lower-case paymentUtr
+    if (lowerUtr !== cleanUtr) {
+      const qLower = query(
+        collection(db, 'registrations'),
+        where('paymentUtr', '==', lowerUtr),
+        limit(2)
+      );
+      const snapLower = await getDocs(qLower);
+      for (const d of snapLower.docs) {
+        if (d.id !== excludeId) {
+          const data = d.data();
+          return {
+            exists: true,
+            registeredTo: data.fullName || data.name || 'Another Student',
+            passId: d.id,
+          };
+        }
+      }
+    }
+
+    // 3. Check legacy utr field
+    const qLegacy = query(
+      collection(db, 'registrations'),
+      where('utr', '==', cleanUtr),
+      limit(2)
+    );
+    const snapLegacy = await getDocs(qLegacy);
+    for (const d of snapLegacy.docs) {
+      if (d.id !== excludeId) {
+        const data = d.data();
+        return {
+          exists: true,
+          registeredTo: data.fullName || data.name || 'Another Student',
+          passId: d.id,
+        };
+      }
+    }
+
+    return { exists: false };
+  } catch (err) {
+    console.warn('Firebase UTR check notice:', err);
+    return null;
+  }
+};
