@@ -551,21 +551,28 @@ export const saveRegistrationAsync = async (registration: Registration): Promise
           saveRegistration(finalReg);
         }
       }
-      saveRegistrationToSupabase(finalReg).catch((err) => console.warn('Supabase save notice:', err));
     } catch (e) {
-      console.warn('Supabase cloud upload notice:', e);
+      console.warn('Supabase storage upload notice:', e);
     }
   }
 
-  // 3. Save to Firebase Cloud Database if configured (Realtime Firestore)
+  // 3. Await cloud synchronization to Supabase & Firebase in parallel
+  const cloudWrites: Promise<any>[] = [];
+  if (isSupabaseConfigured()) {
+    cloudWrites.push(saveRegistrationToSupabase(finalReg));
+  }
   if (isFirebaseConfigured()) {
+    cloudWrites.push(saveRegistrationToFirebase(finalReg));
+  }
+
+  if (cloudWrites.length > 0) {
     try {
-      Promise.race([
-        saveRegistrationToFirebase(finalReg),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000))
-      ]).catch((e) => console.warn('Firebase cloud upload notice:', e));
+      await Promise.race([
+        Promise.allSettled(cloudWrites),
+        new Promise((resolve) => setTimeout(resolve, 5000))
+      ]);
     } catch (e) {
-      console.warn('Firebase cloud upload notice:', e);
+      console.warn('Cloud write notice:', e);
     }
   }
 
