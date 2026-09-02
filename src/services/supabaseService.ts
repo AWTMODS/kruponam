@@ -183,19 +183,41 @@ export const findRegistrationInSupabase = async (queryStr: string): Promise<Regi
 
   const q = queryStr.trim();
   const lowerQ = q.toLowerCase();
+  const digitsOnly = lowerQ.replace(/\D/g, '');
+  const last10 = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+  const safeAlpha = q.replace(/[^a-zA-Z0-9-]/g, '').trim();
+  const safeName = q.replace(/[^a-zA-Z0-9 ]/g, '').trim();
 
   try {
-    // Search by ID, Email, Phone, or Name
-    const digitsOnly = lowerQ.replace(/\D/g, '');
-    const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
-    let filterString = `id.ilike.%${q}%,email.ilike.%${lowerQ}%,full_name.ilike.%${q}%`;
-    if (digitsOnly.length >= 6) {
-      filterString += `,phone.ilike.%${digitsOnly}%`;
-      if (last10 && last10 !== digitsOnly) {
-        filterString += `,phone.ilike.%${last10}%`;
-      }
+    const filters: string[] = [];
+
+    // 1. Phone filters (safe numeric digits only)
+    if (last10 && last10.length >= 6) {
+      filters.push(`phone.ilike.%${last10}%`);
+    }
+    if (digitsOnly && digitsOnly.length >= 6 && digitsOnly !== last10) {
+      filters.push(`phone.ilike.%${digitsOnly}%`);
     }
 
+    // 2. Email filter
+    if (lowerQ.includes('@')) {
+      const cleanEmail = lowerQ.replace(/[^a-zA-Z0-9@._-]/g, '');
+      if (cleanEmail) filters.push(`email.ilike.%${cleanEmail}%`);
+    }
+
+    // 3. ID filter
+    if (safeAlpha && safeAlpha.length >= 3) {
+      filters.push(`id.ilike.%${safeAlpha}%`);
+    }
+
+    // 4. Name filter
+    if (safeName && safeName.length >= 3 && !lowerQ.includes('@') && digitsOnly.length < 7) {
+      filters.push(`full_name.ilike.%${safeName}%`);
+    }
+
+    if (filters.length === 0) return null;
+
+    const filterString = filters.join(',');
     const { data, error } = await client
       .from('registrations')
       .select('*')

@@ -644,11 +644,18 @@ export const isPhoneMatch = (phone1: string, phone2: string): boolean => {
   // Direct digit equality
   if (d1 === d2) return true;
 
+  // Direct 10-digit national suffix matching (e.g. +91 97780 29340 vs 9778029340)
+  if (d1.length >= 10 && d2.length >= 10) {
+    const l1 = d1.slice(-10);
+    const l2 = d2.slice(-10);
+    if (l1 === l2) return true;
+  }
+
   // Normalized 10-digit national number equality
   const n1 = normalizePhoneNumber(p1);
   const n2 = normalizePhoneNumber(p2);
 
-  return !!(n1 && n2 && n1 === n2);
+  return !!(n1 && n2 && (n1 === n2 || n1.endsWith(n2) || n2.endsWith(n1)));
 };
 
 export const isSameStudent = (r1: Registration, r2: Registration): boolean => {
