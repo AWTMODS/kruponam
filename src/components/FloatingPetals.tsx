@@ -26,7 +26,7 @@ export const FloatingPetals: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationFrameId: number;
+    let animationFrameId = 0;
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
@@ -98,9 +98,9 @@ export const FloatingPetals: React.FC = () => {
 
     let isPaused = false;
     const handleVisibilityChange = () => {
+      cancelAnimationFrame(animationFrameId);
       if (document.hidden) {
         isPaused = true;
-        cancelAnimationFrame(animationFrameId);
       } else {
         isPaused = false;
         animationFrameId = requestAnimationFrame(render);
@@ -138,7 +138,8 @@ export const FloatingPetals: React.FC = () => {
       animationFrameId = requestAnimationFrame(render);
     };
 
-    render();
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', handleResize);
