@@ -1101,6 +1101,16 @@ export const approveRegistration = async (id: string, fallbackRecord?: Registrat
     target = INITIAL_REGISTRATIONS.find((r) => r.id === cleanId || r.id.trim().toLowerCase() === cleanId.toLowerCase());
   }
 
+  // If still not found, do a targeted cloud lookup
+  if (!target) {
+    if (isFirebaseConfigured()) {
+      target = (await findRegistrationInFirebase(cleanId)) || undefined;
+    }
+    if (!target && isSupabaseConfigured()) {
+      target = (await findRegistrationInSupabase(cleanId)) || undefined;
+    }
+  }
+
   if (target) {
     const updatedRecord: Registration = {
       ...target,

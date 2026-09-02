@@ -368,7 +368,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     addToast('🔒 Admin session terminated.', 'info');
   };
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     
     // Find target in current state or inspectItem
@@ -405,8 +405,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
     addToast(`✅ ${approvedRecord.fullName}'s pass approved!`, 'success');
 
-    // 2. Asynchronous background database persistence
-    approveRegistration(id, approvedRecord).catch(() => {});
+    // 2. Database persistence with cloud synchronization
+    const saved = await approveRegistration(id, approvedRecord);
+    if (saved && inspectItem?.id === id) {
+      setInspectItem(saved);
+    }
 
     // 3. Asynchronous background email ticket dispatch with immediate toast
     if (approvedRecord.email) {

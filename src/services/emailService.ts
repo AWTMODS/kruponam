@@ -246,15 +246,23 @@ const getActiveBrevoKey = (rawKeys: string): string => {
 
 // ── Main Send Function ──────────────────────────────────────────────
 export const sendApprovalEmail = async (registration: Registration): Promise<EmailResult> => {
-  // 1. Generate QR code
+  const cleanEmail = registration.email ? registration.email.trim().toLowerCase() : '';
   const qrDataUrl = await generateQrCode(
-    `KRUPONAM2026|TOKEN:${registration.id}|NAME:${registration.fullName}|DEPT:${registration.department}|UTR:${registration.paymentUtr}`
+    `KRUPONAM2026|TOKEN:${registration.id}|NAME:${registration.fullName}|DEPT:${registration.department}|UTR:${registration.paymentUtr || 'VERIFIED'}`
   );
 
-  // 2. Build HTML body
   const html = buildEmailHtml(registration, qrDataUrl);
-  const cfg = getEmailConfig();
 
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return {
+      success: false,
+      message: 'No valid email address provided for this student pass.',
+      previewHtml: html,
+      qrDataUrl,
+    };
+  }
+
+  const cfg = getEmailConfig();
   let lastErrorNotice = '';
 
   // 3A. Try Resend API first (3,000 Free Emails / Month with verified lifestack.in domain)
@@ -269,7 +277,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         },
         body: JSON.stringify({
           from: cfg.resendFromEmail || 'Kruponam 2026 Pass <pass@lifestack.in>',
-          to: [registration.email],
+          to: [cleanEmail],
           subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
           html: html,
         }),
@@ -278,14 +286,14 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
       if (res.ok) {
         return {
           success: true,
-          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${registration.email}!`,
+          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
           previewHtml: html,
           qrDataUrl,
         };
       } else {
         const errorData = await res.json().catch(() => ({}));
         if (res.status === 403 && errorData.message?.includes('testing emails')) {
-          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner (awtwhatsapp.crashlog@gmail.com). Add domain at resend.com/domains or use Brevo xkeysib key.`;
+          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner. Falling back to next email provider...`;
         } else {
           lastErrorNotice = `⚠️ Resend API Notice (${res.status}): ${errorData.message || res.statusText}`;
         }
@@ -308,7 +316,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
         },
         body: JSON.stringify({
           sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
-          to: [{ email: registration.email, name: registration.fullName }],
+          to: [{ email: cleanEmail, name: registration.fullName }],
           subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
           htmlContent: html,
         }),
@@ -317,7 +325,7 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
       if (res.ok) {
         return {
           success: true,
-          message: `✉️ [Brevo API] Invoice & QR Ticket sent directly to ${registration.email}!`,
+          message: `✉️ [Brevo API] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
           previewHtml: html,
           qrDataUrl,
         };
@@ -332,44 +340,39 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
   }
 
   // 3C. Send via EmailJS API (Free 200 emails / mo)
-  if (cfg.provider === 'emailjs') {
+  if (cfg.emailjsServiceId && cfg.emailjsTemplateId && cfg.emailjsPublicKey && cfg.emailjsServiceId !== 'YOUR_EMAILJS_SERVICE_ID') {
     try {
       await emailjs.send(
         cfg.emailjsServiceId,
         cfg.emailjsTemplateId,
         {
-          to_email: registration.email,
+          to_email: cleanEmail,
           to_name: registration.fullName,
           subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
           message_html: html,
           reg_id: registration.id,
           dept: `${registration.department} — ${registration.year}`,
-          utr: registration.paymentUtr,
+          utr: registration.paymentUtr || 'VERIFIED',
         },
         cfg.emailjsPublicKey
       );
 
       return {
         success: true,
-        message: `✉️ [EmailJS] Invoice & QR Ticket sent directly to ${registration.email}!`,
+        message: `✉️ [EmailJS] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
         previewHtml: html,
         qrDataUrl,
       };
     } catch (err: any) {
       console.error('EmailJS send error:', err);
-      return {
-        success: false,
-        message: `⚠️ Email delivery notice: ${err?.text || err?.message || 'Check EmailJS API credentials'}. Preview shown below.`,
-        previewHtml: html,
-        qrDataUrl,
-      };
+      lastErrorNotice = `⚠️ Email delivery notice: ${err?.text || err?.message || 'Check EmailJS API credentials'}.`;
     }
   }
 
-  // 4. Preview mode (No API key added yet)
+  // 4. Preview / Direct Download Mode
   return {
     success: false,
-    message: lastErrorNotice || `📧 Email Preview Mode — Enter Resend Key (3k free/mo) or Brevo Key (9k free/mo) in Admin Portal → Cloud DB & Email Settings to auto-send to student inbox.`,
+    message: lastErrorNotice || `📧 Pass is ready! Students can download their official pass and QR code directly on the website.`,
     previewHtml: html,
     qrDataUrl,
   };

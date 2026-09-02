@@ -944,7 +944,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
               </p>
 
               <div className="pt-2 text-xs text-amber-800 font-semibold">
-                ⏱️ Estimated Verification: 1-2 Hours • Check back soon!
+                ⏱️ Estimated Verification: 1-2 Hours • Auto-refreshing live status every few seconds...
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+                  disabled={isSearching}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
+                  <span>{isSearching ? 'Checking Live Cloud Status...' : 'Check Live Approval Status Now'}</span>
+                </button>
               </div>
             </div>
           ) : searchResult?.approvalStatus === 'Pending_ID_Approval' || searchResult?.approvalStatus === 'Pending' ? (
