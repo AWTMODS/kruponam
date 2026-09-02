@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Registration } from './registrationService';
+import { type Registration, normalizeApprovalStatus } from './registrationService';
 
 const SUPABASE_URL_KEY = 'kruponam_supabase_url';
 const SUPABASE_ANON_KEY = 'kruponam_supabase_anon_key';
@@ -145,29 +145,34 @@ export const fetchRegistrationsFromSupabase = async (): Promise<Registration[] |
       return null;
     }
 
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      fullName: row.full_name || row.fullName,
-      email: row.email,
-      phone: row.phone,
-      department: row.department,
-      section: row.section || 'Section A',
-      year: row.year,
-      gender: row.gender,
-      ticketType: row.ticket_type || row.ticketType,
-      idCardUrl: row.id_card_url || row.idCardUrl,
-      paymentScreenshotUrl: row.payment_screenshot_url || row.paymentScreenshotUrl,
-      paymentAmount: Number(row.payment_amount || row.paymentAmount || 700),
-      paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
-      paymentUtr: row.payment_utr || row.paymentUtr || '',
-      approvalStatus: row.approval_status || row.approvalStatus || 'Pending_ID_Approval',
-      rejectionReason: row.rejection_reason || row.rejectionReason || '',
-      submittedAt: row.submitted_at || row.submittedAt,
-      approvedAt: row.approved_at || row.approvedAt,
-      updatedAt: row.updated_at || row.updatedAt,
-      isReported: Boolean(row.is_reported || row.isReported),
-      reportedAt: row.reported_at || row.reportedAt,
-    }));
+    return (data || []).map((row: any) => {
+      const normStatus = normalizeApprovalStatus(row.approval_status || row.approvalStatus || row.status);
+      const isApproved = normStatus === 'Approved' || normStatus === 'VIP' || normStatus === 'VIP_Pending';
+
+      return {
+        id: row.id,
+        fullName: row.full_name || row.fullName,
+        email: row.email,
+        phone: row.phone,
+        department: row.department,
+        section: row.section || 'Section A',
+        year: row.year,
+        gender: row.gender,
+        ticketType: row.ticket_type || row.ticketType,
+        idCardUrl: row.id_card_url || row.idCardUrl,
+        paymentScreenshotUrl: row.payment_screenshot_url || row.paymentScreenshotUrl,
+        paymentAmount: Number(row.payment_amount || row.paymentAmount || (isApproved ? 0 : 700)),
+        paymentStatus: row.payment_status || (isApproved ? 'Verified' : 'Pending'),
+        paymentUtr: row.payment_utr || row.paymentUtr || '',
+        approvalStatus: normStatus,
+        rejectionReason: row.rejection_reason || row.rejectionReason || '',
+        submittedAt: row.submitted_at || row.submittedAt,
+        approvedAt: row.approved_at || row.approvedAt,
+        updatedAt: row.updated_at || row.updatedAt,
+        isReported: Boolean(row.is_reported || row.isReported),
+        reportedAt: row.reported_at || row.reportedAt,
+      };
+    });
   } catch (err) {
     console.error('Supabase query exception:', err);
     return null;
@@ -227,6 +232,9 @@ export const findRegistrationInSupabase = async (queryStr: string): Promise<Regi
     if (error || !data || data.length === 0) return null;
 
     const row = data[0];
+    const normStatus = normalizeApprovalStatus(row.approval_status || row.approvalStatus || row.status);
+    const isApproved = normStatus === 'Approved' || normStatus === 'VIP' || normStatus === 'VIP_Pending';
+
     return {
       id: row.id,
       fullName: row.full_name || row.fullName,
@@ -239,10 +247,10 @@ export const findRegistrationInSupabase = async (queryStr: string): Promise<Regi
       ticketType: row.ticket_type || row.ticketType,
       idCardUrl: row.id_card_url || row.idCardUrl,
       paymentScreenshotUrl: row.payment_screenshot_url || row.paymentScreenshotUrl,
-      paymentAmount: Number(row.payment_amount || row.paymentAmount || 700),
-      paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
+      paymentAmount: Number(row.payment_amount || row.paymentAmount || (isApproved ? 0 : 700)),
+      paymentStatus: row.payment_status || (isApproved ? 'Verified' : 'Pending'),
       paymentUtr: row.payment_utr || row.paymentUtr || '',
-      approvalStatus: row.approval_status || row.approvalStatus || 'Pending_ID_Approval',
+      approvalStatus: normStatus,
       rejectionReason: row.rejection_reason || row.rejectionReason || '',
       submittedAt: row.submitted_at || row.submittedAt,
       approvedAt: row.approved_at || row.approvedAt,

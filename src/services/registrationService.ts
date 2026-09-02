@@ -19,6 +19,28 @@ import {
 
 export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending' | 'VIP_Pending' | 'VIP';
 
+export const normalizeApprovalStatus = (rawStatus?: any): ApprovalStatus => {
+  if (!rawStatus) return 'Pending_ID_Approval';
+  const clean = String(rawStatus).trim().toLowerCase().replace(/[\s-_]+/g, '_');
+  
+  if (clean.includes('vip')) {
+    return clean.includes('pending') ? 'VIP_Pending' : 'VIP';
+  }
+  if (clean === 'approved' || clean === 'verified' || clean === 'pass_approved' || clean === 'completed') {
+    return 'Approved';
+  }
+  if (clean === 'id_approved' || clean === 'idapproved' || clean === 'id_verified' || clean === 'pay_unlocked' || clean === 'unlocked') {
+    return 'ID_Approved';
+  }
+  if (clean === 'payment_pending' || clean === 'pay_pending' || clean === 'payment_submitted' || clean === 'utr_submitted') {
+    return 'Payment_Pending';
+  }
+  if (clean === 'rejected' || clean === 'declined') {
+    return 'Rejected';
+  }
+  return 'Pending_ID_Approval';
+};
+
 export interface Registration {
   id: string;
   fullName: string;

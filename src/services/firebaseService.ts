@@ -13,7 +13,7 @@ import {
   deleteDoc, 
   Firestore 
 } from 'firebase/firestore';
-import type { Registration } from './registrationService';
+import { type Registration, normalizeApprovalStatus } from './registrationService';
 import { downscaleBase64 } from '../utils/imageCompressor';
 
 const FIREBASE_CONFIG_KEY = 'kruponam_firebase_config_v1';
@@ -161,29 +161,34 @@ export const saveRegistrationToFirebase = async (reg: Registration): Promise<boo
   }
 };
 
-const mapFirebaseDoc = (data: any, docId: string): Registration => ({
-  id: String(data?.id || docId),
-  fullName: data?.fullName || data?.name || data?.studentName || '',
-  email: data?.email || '',
-  phone: data?.phone || data?.mobile || data?.phoneNumber || '',
-  department: data?.department || data?.dept || '',
-  section: data?.section || 'Section A',
-  year: data?.year || '1st Year',
-  gender: data?.gender || 'Other',
-  ticketType: data?.ticketType || 'General Pass',
-  idCardUrl: data?.idCardUrl || data?.idCard || '',
-  paymentScreenshotUrl: data?.paymentScreenshotUrl || data?.paymentScreenshot || '',
-  paymentAmount: data?.paymentAmount !== undefined ? Number(data.paymentAmount) : (data?.ticketType === 'VIP Pass' || data?.approvalStatus === 'VIP' || data?.approvalStatus === 'VIP_Pending' ? 0 : 700),
-  paymentStatus: data?.paymentStatus || (data?.status === 'Approved' || data?.status === 'VIP' || data?.status === 'VIP_Pending' || data?.approval_status === 'Approved' || data?.approvalStatus === 'Approved' ? 'Verified' : 'Pending'),
-  paymentUtr: data?.paymentUtr || data?.utr || '',
-  approvalStatus: data?.approvalStatus || data?.approval_status || data?.status || 'Pending_ID_Approval',
-  rejectionReason: data?.rejectionReason || '',
-  submittedAt: data?.submittedAt || data?.createdAt || '',
-  approvedAt: data?.approvedAt || '',
-  updatedAt: data?.updatedAt || '',
-  isReported: Boolean(data?.isReported || data?.checkedIn),
-  reportedAt: data?.reportedAt || '',
-});
+const mapFirebaseDoc = (data: any, docId: string): Registration => {
+  const normStatus = normalizeApprovalStatus(data?.approvalStatus || data?.approval_status || data?.status);
+  const isApproved = normStatus === 'Approved' || normStatus === 'VIP' || normStatus === 'VIP_Pending';
+
+  return {
+    id: String(data?.id || docId),
+    fullName: data?.fullName || data?.name || data?.studentName || '',
+    email: data?.email || '',
+    phone: data?.phone || data?.mobile || data?.phoneNumber || '',
+    department: data?.department || data?.dept || '',
+    section: data?.section || 'Section A',
+    year: data?.year || '1st Year',
+    gender: data?.gender || 'Other',
+    ticketType: data?.ticketType || 'General Pass',
+    idCardUrl: data?.idCardUrl || data?.idCard || '',
+    paymentScreenshotUrl: data?.paymentScreenshotUrl || data?.paymentScreenshot || '',
+    paymentAmount: data?.paymentAmount !== undefined ? Number(data.paymentAmount) : (isApproved ? 0 : 700),
+    paymentStatus: data?.paymentStatus || (isApproved ? 'Verified' : 'Pending'),
+    paymentUtr: data?.paymentUtr || data?.utr || '',
+    approvalStatus: normStatus,
+    rejectionReason: data?.rejectionReason || '',
+    submittedAt: data?.submittedAt || data?.createdAt || '',
+    approvedAt: data?.approvedAt || '',
+    updatedAt: data?.updatedAt || '',
+    isReported: Boolean(data?.isReported || data?.checkedIn),
+    reportedAt: data?.reportedAt || '',
+  };
+};
 
 /**
  * Superfast targeted single-record search directly in Firebase (takes ~50-200ms)
