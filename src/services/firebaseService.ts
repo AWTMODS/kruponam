@@ -247,6 +247,9 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
         last10,
         `+91${last10}`,
         `+91 ${last10}`,
+        `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`,
+        `${last10.slice(0, 5)} ${last10.slice(5)}`,
+        `${last10.slice(0, 5)}-${last10.slice(5)}`,
         `0${last10}`,
         digitsOnly,
         q,
@@ -259,6 +262,18 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
           return mapFirebaseDoc(phoneSnap.docs[0].data(), phoneSnap.docs[0].id);
         }
       }
+
+      // Fallback: Scan recent registrations in Firebase if exact where-query didn't match formatting
+      try {
+        const fallbackSnap = await getDocs(query(collection(db, 'registrations'), limit(150)));
+        for (const docSnap of fallbackSnap.docs) {
+          const d = docSnap.data();
+          const docPhone = String(d.phone || d.phoneNumber || '').replace(/\D/g, '');
+          if (docPhone && (docPhone === digitsOnly || docPhone.endsWith(last10) || digitsOnly.endsWith(docPhone))) {
+            return mapFirebaseDoc(d, docSnap.id);
+          }
+        }
+      } catch (_) {}
     }
 
     // 4. Fallback: Search by fullName

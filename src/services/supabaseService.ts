@@ -187,9 +187,13 @@ export const findRegistrationInSupabase = async (queryStr: string): Promise<Regi
   try {
     // Search by ID, Email, Phone, or Name
     const digitsOnly = lowerQ.replace(/\D/g, '');
+    const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
     let filterString = `id.ilike.%${q}%,email.ilike.%${lowerQ}%,full_name.ilike.%${q}%`;
     if (digitsOnly.length >= 6) {
       filterString += `,phone.ilike.%${digitsOnly}%`;
+      if (last10 && last10 !== digitsOnly) {
+        filterString += `,phone.ilike.%${last10}%`;
+      }
     }
 
     const { data, error } = await client
