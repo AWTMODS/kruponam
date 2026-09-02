@@ -152,10 +152,17 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   }, []);
 
   useEffect(() => {
-    if (searchResult && (searchResult.approvalStatus === 'Approved' || searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending')) {
-      generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr || 'VIP'}`).then((url) => {
-        setQrCodeUrl(url);
-      });
+    if (searchResult) {
+      if (searchResult.fullName) {
+        setResubmitName(searchResult.fullName);
+      }
+      if (searchResult.approvalStatus === 'Approved' || searchResult.approvalStatus === 'VIP' || searchResult.approvalStatus === 'VIP_Pending') {
+        generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr || 'VIP'}`).then((url) => {
+          setQrCodeUrl(url);
+        });
+      } else {
+        setQrCodeUrl('');
+      }
     } else {
       setQrCodeUrl('');
     }
