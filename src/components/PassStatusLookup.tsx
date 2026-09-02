@@ -735,12 +735,33 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         required
-                        maxLength={16}
-                        placeholder="e.g. 320918239012"
+                        maxLength={12}
+                        placeholder="e.g. 320918239012 (12 digits)"
                         value={paymentUtr}
-                        onChange={(e) => setPaymentUtr(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm outline-none transition-all ${
+                        onKeyDown={(e) => {
+                          if (
+                            !/[0-9]/.test(e.key) &&
+                            !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key) &&
+                            !e.ctrlKey &&
+                            !e.metaKey
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasteData = e.clipboardData.getData('text');
+                          const numericOnly = pasteData.replace(/\D/g, '').slice(0, 12);
+                          setPaymentUtr(numericOnly);
+                        }}
+                        onChange={(e) => {
+                          const numericOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+                          setPaymentUtr(numericOnly);
+                        }}
+                        className={`w-full px-4 py-3 rounded-xl border font-mono text-sm tracking-wider outline-none transition-all ${
                           utrDuplicateWarning 
                             ? 'border-rose-500 ring-2 ring-rose-300 bg-rose-50/40 text-rose-950' 
                             : 'border-slate-300 focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 bg-white'
@@ -758,14 +779,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
                         <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <span>{utrDuplicateWarning}</span>
                       </div>
-                    ) : paymentUtr.trim().length >= 6 ? (
+                    ) : paymentUtr.length === 12 ? (
                       <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>✓ UTR Valid & Available: {paymentUtr}</span>
+                        <span>✓ 12-Digit UTR Valid & Available: {paymentUtr}</span>
+                      </div>
+                    ) : paymentUtr.length > 0 ? (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-medium flex items-center justify-between">
+                        <span>🔢 Numbers only ({paymentUtr.length}/12 digits entered)</span>
+                        <span className="font-bold text-amber-800">{12 - paymentUtr.length} more needed</span>
                       </div>
                     ) : (
                       <p className="text-[11px] text-slate-500 italic">
-                        ℹ️ Enter the 12-digit UPI transaction UTR from GPay / PhonePe / Paytm.
+                        ℹ️ Numbers only: Enter the 12-digit numeric UPI transaction UTR from GPay / PhonePe / Paytm.
                       </p>
                     )}
                   </div>
