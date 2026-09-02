@@ -12,7 +12,7 @@ export interface SiteSettings {
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   showProgramsSchedule: false, // Default hidden
-  comingSoonMode: true,        // Default Coming Soon page active
+  comingSoonMode: false,        // Default Coming Soon page active
   ticketAmount: 700,           // Default ticket pass price in ₹
 };
 
@@ -27,7 +27,7 @@ export const getSiteSettings = (): SiteSettings => {
         ticketAmount: typeof parsed.ticketAmount === 'number' && parsed.ticketAmount >= 0 ? parsed.ticketAmount : DEFAULT_SITE_SETTINGS.ticketAmount,
       };
     }
-  } catch (_) {}
+  } catch (_) { }
   return { ...DEFAULT_SITE_SETTINGS };
 };
 
@@ -38,6 +38,6 @@ export const saveSiteSettings = (settings: Partial<SiteSettings>): SiteSettings 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     // Notify listeners across components
     window.dispatchEvent(new CustomEvent('kruponam-site-settings-changed', { detail: updated }));
-  } catch (_) {}
+  } catch (_) { }
   return updated;
 };
