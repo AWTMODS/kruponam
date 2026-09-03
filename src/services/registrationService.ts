@@ -457,11 +457,16 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     if (!existing) {
       localMap.set(r.id, r);
     } else {
-      const existingRank = STATUS_RANK[existing.approvalStatus] || 0;
-      const incomingRank = STATUS_RANK[r.approvalStatus] || 0;
+      const normalizedExisting = normalizeApprovalStatus(existing.approvalStatus);
+      const normalizedIncoming = normalizeApprovalStatus(r.approvalStatus);
+      const existingRank = STATUS_RANK[normalizedExisting] || 1;
+      const incomingRank = STATUS_RANK[normalizedIncoming] || 1;
 
-      // Higher approval status rank always wins! Never allow stale cloud data to downgrade an approved status.
-      const preferCloudStatus = incomingRank > existingRank || (incomingRank === existingRank && (r.updatedAt || '') >= (existing.updatedAt || ''));
+      // Higher approval status rank always wins, and cloud approvals/updates take priority over local pending
+      const preferCloudStatus = 
+        (normalizedIncoming !== 'Pending_ID_Approval' && normalizedExisting === 'Pending_ID_Approval') ||
+        incomingRank > existingRank || 
+        (incomingRank === existingRank && (r.updatedAt || '') >= (existing.updatedAt || ''));
 
       const mergedRecord: Registration = {
         ...existing,
@@ -469,7 +474,7 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
         idCardUrl: (r.idCardUrl && r.idCardUrl.length > 50) ? r.idCardUrl : (existing.idCardUrl || r.idCardUrl),
         paymentScreenshotUrl: (r.paymentScreenshotUrl && r.paymentScreenshotUrl.length > 50) ? r.paymentScreenshotUrl : (existing.paymentScreenshotUrl || r.paymentScreenshotUrl),
         paymentUtr: r.paymentUtr || existing.paymentUtr,
-        approvalStatus: preferCloudStatus ? r.approvalStatus : existing.approvalStatus,
+        approvalStatus: preferCloudStatus ? normalizedIncoming : normalizedExisting,
         paymentStatus: preferCloudStatus ? r.paymentStatus : existing.paymentStatus,
         approvedAt: r.approvedAt || existing.approvedAt,
         rejectionReason: r.rejectionReason || existing.rejectionReason,
@@ -482,14 +487,14 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     }
   };
 
-  // 1. Fetch remote cloud records from Firebase & Supabase in parallel with fast 2.5s timeout
+  // 1. Fetch remote cloud records from Firebase & Supabase in parallel with fast 5s timeout
   const cloudTasks: Promise<any>[] = [];
   
   if (isFirebaseConfigured()) {
     cloudTasks.push(
       Promise.race([
         fetchRegistrationsFromFirebase(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
       ]).then((fbRecords) => {
         if (fbRecords && fbRecords.length > 0) {
           fbRecords.forEach(mergeCloudRecord);
@@ -508,7 +513,7 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
     cloudTasks.push(
       Promise.race([
         fetchRegistrationsFromSupabase(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
       ]).then((cloudRecords) => {
         if (cloudRecords && cloudRecords.length > 0) {
           cloudRecords.forEach(mergeCloudRecord);
@@ -1566,6 +1571,7 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
   if (!query || !query.trim()) return undefined;
   const q = query.trim();
   const lowerQ = q.toLowerCase();
+  const digitsOnly = lowerQ.replace(/\D/g, '');
   
   const localList = getRegistrations();
   const localMatch = localList.find((r) => matchRecord(r, lowerQ));
@@ -1575,33 +1581,47 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     const cloudPromises: Promise<Registration | null>[] = [];
     if (isFirebaseConfigured()) {
       cloudPromises.push(findRegistrationInFirebase(q));
+      if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
+        cloudPromises.push(findRegistrationInFirebase(`KRP-${digitsOnly}`));
+      }
     }
     if (isSupabaseConfigured()) {
       cloudPromises.push(findRegistrationInSupabase(q));
+      if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
+        cloudPromises.push(findRegistrationInSupabase(`KRP-${digitsOnly}`));
+      }
     }
 
     if (cloudPromises.length > 0) {
       const results = await Promise.race([
         Promise.allSettled(cloudPromises),
-        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 3000)),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 6000)),
       ]);
 
       if (Array.isArray(results)) {
         for (const res of results) {
           if (res.status === 'fulfilled' && res.value) {
             const cloudReg = res.value as Registration;
+            const normCloudStatus = normalizeApprovalStatus(cloudReg.approvalStatus);
             
             // Merge with local match if exists
-            let mergedReg: Registration = cloudReg;
+            let mergedReg: Registration = {
+              ...cloudReg,
+              approvalStatus: normCloudStatus,
+            };
+
             if (localMatch) {
-              const localRank = STATUS_RANK[localMatch.approvalStatus] || 0;
-              const cloudRank = STATUS_RANK[cloudReg.approvalStatus] || 0;
-              const preferCloud = cloudRank >= localRank;
+              const localNorm = normalizeApprovalStatus(localMatch.approvalStatus);
+              const localRank = STATUS_RANK[localNorm] || 1;
+              const cloudRank = STATUS_RANK[normCloudStatus] || 1;
+              
+              // Cloud status takes absolute priority if it is approved, payment pending, approved pass, or rejected
+              const preferCloud = (normCloudStatus !== 'Pending_ID_Approval') || (cloudRank >= localRank);
 
               mergedReg = {
                 ...localMatch,
                 ...cloudReg,
-                approvalStatus: preferCloud ? cloudReg.approvalStatus : localMatch.approvalStatus,
+                approvalStatus: preferCloud ? normCloudStatus : localNorm,
                 paymentStatus: preferCloud ? cloudReg.paymentStatus : localMatch.paymentStatus,
                 idCardUrl: cloudReg.idCardUrl || localMatch.idCardUrl,
                 paymentScreenshotUrl: cloudReg.paymentScreenshotUrl || localMatch.paymentScreenshotUrl,

@@ -203,32 +203,34 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
   const digitsOnly = lowerQ.replace(/\D/g, '');
 
   try {
-    // 1. Direct document key lookup by ID (e.g. KRP-123456) - 10-30ms!
-    const docRef = doc(db, 'registrations', upperQ);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return mapFirebaseDoc(docSnap.data(), docSnap.id);
-    }
+    // 1. Direct document key lookups by ID variations
+    const directDocKeys = Array.from(new Set([
+      upperQ,
+      q,
+      lowerQ,
+      digitsOnly ? `KRP-${digitsOnly}` : '',
+      digitsOnly ? `krp-${digitsOnly}` : '',
+      digitsOnly ? `KRP${digitsOnly}` : '',
+      digitsOnly ? digitsOnly : '',
+    ])).filter(Boolean);
 
-    // Check if input is formatted like numeric ID (e.g. 953085 or krp 953085)
-    const krpMatch = q.match(/krp\s*[-_]?\s*(\d+)/i) || (digitsOnly.length === 6 ? [null, digitsOnly] : null);
-    if (krpMatch && krpMatch[1]) {
-      const formattedKrp = `KRP-${krpMatch[1]}`;
-      const krpSnap = await getDoc(doc(db, 'registrations', formattedKrp));
-      if (krpSnap.exists()) {
-        return mapFirebaseDoc(krpSnap.data(), krpSnap.id);
+    for (const key of directDocKeys) {
+      const docSnap = await getDoc(doc(db, 'registrations', key));
+      if (docSnap.exists()) {
+        return mapFirebaseDoc(docSnap.data(), docSnap.id);
       }
     }
 
-    // Also check as-is ID
-    if (upperQ !== q) {
-      const altSnap = await getDoc(doc(db, 'registrations', q));
-      if (altSnap.exists()) {
-        return mapFirebaseDoc(altSnap.data(), altSnap.id);
+    // 2. Collection Query by 'id' field for all ID variations (in case docId != reg.id)
+    for (const idVal of directDocKeys) {
+      const idQuery = query(collection(db, 'registrations'), where('id', '==', idVal), limit(1));
+      const idSnap = await getDocs(idQuery);
+      if (!idSnap.empty) {
+        return mapFirebaseDoc(idSnap.docs[0].data(), idSnap.docs[0].id);
       }
     }
 
-    // 2. Query by email (check lower, as-is, and trimmed)
+    // 3. Query by email (check lower, as-is, and trimmed)
     if (lowerQ.includes('@')) {
       const emailQuery = query(collection(db, 'registrations'), where('email', '==', lowerQ), limit(1));
       const emailSnap = await getDocs(emailQuery);
@@ -245,7 +247,7 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       }
     }
 
-    // 3. Query by phone number (check last10, +91, with spaces, digitsOnly, raw q)
+    // 4. Query by phone number (check last10, +91, with spaces, digitsOnly, raw q)
     if (digitsOnly.length >= 7) {
       const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
       const phoneVariations = Array.from(new Set([
@@ -267,21 +269,18 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
           return mapFirebaseDoc(phoneSnap.docs[0].data(), phoneSnap.docs[0].id);
         }
       }
-
-      // Fallback: Scan recent registrations in Firebase if exact where-query didn't match formatting
-      try {
-        const fallbackSnap = await getDocs(query(collection(db, 'registrations'), limit(150)));
-        for (const docSnap of fallbackSnap.docs) {
-          const d = docSnap.data();
-          const docPhone = String(d.phone || d.phoneNumber || '').replace(/\D/g, '');
-          if (docPhone && (docPhone === digitsOnly || docPhone.endsWith(last10) || digitsOnly.endsWith(docPhone))) {
-            return mapFirebaseDoc(d, docSnap.id);
-          }
-        }
-      } catch (_) {}
     }
 
-    // 4. Fallback: Search by fullName
+    // 5. Query by paymentUtr if numeric/alphanumeric with >= 6 chars
+    if (q.length >= 6) {
+      const utrQuery = query(collection(db, 'registrations'), where('paymentUtr', '==', q), limit(1));
+      const utrSnap = await getDocs(utrQuery);
+      if (!utrSnap.empty) {
+        return mapFirebaseDoc(utrSnap.docs[0].data(), utrSnap.docs[0].id);
+      }
+    }
+
+    // 6. Query by fullName
     if (q.length >= 3 && !q.includes('@')) {
       const nameQuery = query(collection(db, 'registrations'), where('fullName', '==', q), limit(1));
       const nameSnap = await getDocs(nameQuery);
@@ -289,6 +288,27 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
         return mapFirebaseDoc(nameSnap.docs[0].data(), nameSnap.docs[0].id);
       }
     }
+
+    // 7. Fallback scan for partial ID / Phone / Name match
+    try {
+      const fallbackSnap = await getDocs(query(collection(db, 'registrations'), limit(250)));
+      for (const docSnap of fallbackSnap.docs) {
+        const d = docSnap.data();
+        const docId = String(d.id || docSnap.id || '').toUpperCase();
+        const docPhone = String(d.phone || d.phoneNumber || '').replace(/\D/g, '');
+        const docName = String(d.fullName || d.name || '').toLowerCase();
+        
+        if (digitsOnly && docId.includes(digitsOnly)) {
+          return mapFirebaseDoc(d, docSnap.id);
+        }
+        if (digitsOnly && digitsOnly.length >= 7 && (docPhone === digitsOnly || docPhone.endsWith(digitsOnly.slice(-10)))) {
+          return mapFirebaseDoc(d, docSnap.id);
+        }
+        if (docName && q.length >= 3 && docName.includes(lowerQ)) {
+          return mapFirebaseDoc(d, docSnap.id);
+        }
+      }
+    } catch (_) {}
 
     return null;
   } catch (err) {
@@ -308,29 +328,7 @@ export const fetchRegistrationsFromFirebase = async (): Promise<Registration[] |
       const data = docSnap.data();
       const docId = data?.id || docSnap.id;
       if (data && docId) {
-        list.push({
-          id: String(docId),
-          fullName: data.fullName || data.name || data.studentName || '',
-          email: data.email || '',
-          phone: data.phone || data.mobile || data.phoneNumber || '',
-          department: data.department || data.dept || '',
-          section: data.section || 'Section A',
-          year: data.year || '1st Year',
-          gender: data.gender || 'Other',
-          ticketType: data.ticketType || 'General Pass',
-          idCardUrl: data.idCardUrl || data.idCard || '',
-          paymentScreenshotUrl: data.paymentScreenshotUrl || data.paymentScreenshot || '',
-          paymentAmount: data.paymentAmount !== undefined ? Number(data.paymentAmount) : (data.ticketType === 'VIP Pass' || data.approvalStatus === 'VIP' || data.approvalStatus === 'VIP_Pending' ? 0 : 700),
-          paymentStatus: data.paymentStatus || (data.status === 'Approved' || data.status === 'VIP' || data.status === 'VIP_Pending' ? 'Verified' : 'Pending'),
-          paymentUtr: data.paymentUtr || data.utr || '',
-          approvalStatus: data.approvalStatus || data.status || 'Pending_ID_Approval',
-          rejectionReason: data.rejectionReason || '',
-          submittedAt: data.submittedAt || data.createdAt || '',
-          approvedAt: data.approvedAt || '',
-          updatedAt: data.updatedAt || '',
-          isReported: Boolean(data.isReported || data.checkedIn),
-          reportedAt: data.reportedAt || '',
-        });
+        list.push(mapFirebaseDoc(data, String(docId)));
       }
     });
     return list;
@@ -366,29 +364,7 @@ export const listenToFirebaseRegistrations = (
         const data = docSnap.data();
         const docId = data?.id || docSnap.id;
         if (data && docId) {
-          list.push({
-            id: String(docId),
-            fullName: data.fullName || data.name || data.studentName || '',
-            email: data.email || '',
-            phone: data.phone || data.mobile || data.phoneNumber || '',
-            department: data.department || data.dept || '',
-            section: data.section || 'Section A',
-            year: data.year || '1st Year',
-            gender: data.gender || 'Other',
-            ticketType: data.ticketType || 'General Pass',
-            idCardUrl: data.idCardUrl || data.idCard || '',
-            paymentScreenshotUrl: data.paymentScreenshotUrl || data.paymentScreenshot || '',
-            paymentAmount: data.paymentAmount !== undefined ? Number(data.paymentAmount) : (data.ticketType === 'VIP Pass' || data.approvalStatus === 'VIP' || data.approvalStatus === 'VIP_Pending' ? 0 : 700),
-            paymentStatus: data.paymentStatus || (data.status === 'Approved' || data.status === 'VIP' || data.status === 'VIP_Pending' ? 'Verified' : 'Pending'),
-            paymentUtr: data.paymentUtr || data.utr || '',
-            approvalStatus: data.approvalStatus || data.status || 'Pending_ID_Approval',
-            rejectionReason: data.rejectionReason || '',
-            submittedAt: data.submittedAt || data.createdAt || '',
-            approvedAt: data.approvedAt || '',
-            updatedAt: data.updatedAt || '',
-            isReported: Boolean(data.isReported || data.checkedIn),
-            reportedAt: data.reportedAt || '',
-          });
+          list.push(mapFirebaseDoc(data, String(docId)));
         }
       });
       onUpdate(list);
