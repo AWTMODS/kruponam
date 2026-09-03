@@ -52,10 +52,15 @@ const DEFAULT_SETTINGS: MultiUpiSettings = {
   activeSlotIndex: 0,
 };
 
+let memoryCache: MultiUpiSettings | null = null;
+
 // ── Getters & Setters ─────────────────────────────────────────────────────────
 export const getMultiUpiSettings = (): MultiUpiSettings => {
+  if (memoryCache && memoryCache.slots && memoryCache.slots.length > 0) {
+    return memoryCache;
+  }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as MultiUpiSettings;
       if (parsed.slots && parsed.slots.length > 0) {
@@ -64,15 +69,26 @@ export const getMultiUpiSettings = (): MultiUpiSettings => {
           ...s,
           upiId: s.upiId === 'kruponam2026@upi' ? 'q062769226@ybl' : (s.upiId || 'q062769226@ybl'),
         }));
+        memoryCache = parsed;
         return parsed;
       }
     }
   } catch (_) {}
-  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  const defaults = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  memoryCache = defaults;
+  return defaults;
 };
 
 export const saveMultiUpiSettings = (settings: MultiUpiSettings): MultiUpiSettings => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  memoryCache = settings;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.warn('LocalStorage quota limit notice for UPI settings (falling back to memory/session/Firebase):', e);
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (_) {}
+  }
   pushActiveSlotToFirebase(settings);
   return settings;
 };

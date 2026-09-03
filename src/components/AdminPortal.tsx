@@ -551,36 +551,32 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
     setProcessingQrSlotId(slotId);
     try {
-      const compressed = await compressImageToDataUrl(file, {
-        maxSizeBytes: 120 * 1024,
-        initialMaxWidth: 800,
-        initialQuality: 0.85,
-        timeoutMs: 5000,
-      });
+      let dataUrl: string | null = null;
+      try {
+        dataUrl = await compressImageToDataUrl(file, {
+          maxSizeBytes: 90 * 1024,
+          initialMaxWidth: 600,
+          initialQuality: 0.8,
+          timeoutMs: 4000,
+        });
+      } catch (_) {
+        dataUrl = await readRawFileAsDataUrl(file);
+      }
 
-      const dataUrl = (compressed && compressed.length > 50) ? compressed : await readRawFileAsDataUrl(file);
+      if (!dataUrl) {
+        dataUrl = await readRawFileAsDataUrl(file);
+      }
+
       if (dataUrl) {
         const updated = updateUpiSlot(slotId, { qrImageDataUrl: dataUrl });
         setMultiUpi(updated);
-        saveMultiUpiSettings(updated);
-        addToast('✅ New QR Code image uploaded, optimized & synced to cloud!', 'success');
+        addToast('✅ New QR Code image uploaded & synced to cloud successfully!', 'success');
       } else {
-        addToast('⚠️ Could not process the uploaded QR image format.', 'error');
+        addToast('⚠️ Could not process this image format. Please select a JPG or PNG file.', 'error');
       }
-    } catch (err) {
-      try {
-        const raw = await readRawFileAsDataUrl(file);
-        if (raw) {
-          const updated = updateUpiSlot(slotId, { qrImageDataUrl: raw });
-          setMultiUpi(updated);
-          saveMultiUpiSettings(updated);
-          addToast('✅ QR Code image uploaded successfully!', 'success');
-        } else {
-          addToast('⚠️ Failed to read QR image file.', 'error');
-        }
-      } catch (_) {
-        addToast('⚠️ Error uploading QR code image.', 'error');
-      }
+    } catch (err: any) {
+      console.error('QR upload exception:', err);
+      addToast('⚠️ Error processing QR code image. Please try another image.', 'error');
     } finally {
       setProcessingQrSlotId(null);
       if (e.target) e.target.value = '';
