@@ -19,6 +19,7 @@ import { startLivePresenceHeartbeat } from './services/livePresenceService';
 export function App() {
   const [selectedPass, setSelectedPass] = useState<string>('Student Pass');
   const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin'>('main');
+  const [lookupQuery, setLookupQuery] = useState<string>('');
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
   const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
 
@@ -80,7 +81,8 @@ export function App() {
     setSelectedPass(passName);
   };
 
-  const handleOpenLookup = () => {
+  const handleOpenLookup = (query?: string) => {
+    setLookupQuery(typeof query === 'string' ? query : '');
     setActiveView('lookup');
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -97,7 +99,7 @@ export function App() {
         <div className="pt-24 min-h-screen">
           <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
           <div className="max-w-7xl mx-auto px-4">
-            <PassStatusLookup onClose={() => setActiveView('main')} />
+            <PassStatusLookup onClose={() => setActiveView('main')} initialQuery={lookupQuery} />
           </div>
           <Footer onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
         </div>

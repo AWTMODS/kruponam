@@ -1054,6 +1054,87 @@ export const issueVipPass = async (params: {
   return vipRecord;
 };
 
+export const issueManualTicket = async (params: {
+  id?: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  department?: string;
+  section?: string;
+  year?: string;
+  gender?: string;
+  ticketType?: string;
+  paymentAmount?: number;
+  paymentMode?: string;
+  paymentStatus?: 'Verified' | 'Pending' | 'Failed';
+  paymentUtr?: string;
+  approvalStatus?: ApprovalStatus;
+  idCardUrl?: string;
+  paymentScreenshotUrl?: string;
+}): Promise<Registration> => {
+  const allCurrent = getRegistrations();
+  const cleanId = (params.id && params.id.trim()) ? params.id.trim().toUpperCase() : generateUniqueRegistrationId();
+  const nowFormatted = new Date().toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const existing = allCurrent.find((r) => r.id.toUpperCase() === cleanId.toUpperCase());
+  const status: ApprovalStatus = params.approvalStatus || 'Approved';
+  const payStatus = params.paymentStatus || (status === 'Approved' ? 'Verified' : 'Pending');
+  const payAmt = params.paymentAmount !== undefined ? Number(params.paymentAmount) : 700;
+  const payMode = params.paymentMode || 'Cash';
+  const defaultUtr = `MANUAL-${payMode.toUpperCase().replace(/\s+/g, '_')}-${payAmt}`;
+
+  let manualRecord: Registration;
+  if (existing) {
+    manualRecord = {
+      ...existing,
+      fullName: params.fullName.trim() || existing.fullName,
+      email: params.email ? params.email.trim() : existing.email,
+      phone: params.phone ? params.phone.trim() : existing.phone,
+      department: params.department?.trim() || existing.department || 'BCA',
+      section: params.section?.trim() || existing.section || 'Section A',
+      year: params.year?.trim() || existing.year || '1st Year',
+      gender: params.gender || existing.gender || 'Other',
+      ticketType: params.ticketType || existing.ticketType || 'Student Pass',
+      idCardUrl: params.idCardUrl || existing.idCardUrl || getAssetUrl('images/hero_poster.jpg'),
+      paymentScreenshotUrl: params.paymentScreenshotUrl || existing.paymentScreenshotUrl || '',
+      paymentAmount: payAmt,
+      paymentStatus: payStatus,
+      paymentUtr: params.paymentUtr?.trim() ? params.paymentUtr.trim() : (existing.paymentUtr || defaultUtr),
+      approvalStatus: status,
+      approvedAt: status === 'Approved' ? (existing.approvedAt || nowFormatted) : existing.approvedAt,
+      updatedAt: new Date().toISOString(),
+    };
+  } else {
+    manualRecord = {
+      id: cleanId,
+      fullName: params.fullName.trim(),
+      email: (params.email || '').trim(),
+      phone: (params.phone || '').trim(),
+      department: (params.department || 'BCA').trim(),
+      section: (params.section || 'Section A').trim(),
+      year: (params.year || '1st Year').trim(),
+      gender: params.gender || 'Other',
+      ticketType: params.ticketType || 'Student Pass',
+      idCardUrl: params.idCardUrl || getAssetUrl('images/hero_poster.jpg'),
+      paymentScreenshotUrl: params.paymentScreenshotUrl || '',
+      paymentAmount: payAmt,
+      paymentStatus: payStatus,
+      paymentUtr: params.paymentUtr?.trim() ? params.paymentUtr.trim() : defaultUtr,
+      approvalStatus: status,
+      submittedAt: nowFormatted,
+      approvedAt: status === 'Approved' ? nowFormatted : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  await saveRegistrationAsync(manualRecord);
+  return manualRecord;
+};
+
 export const convertToOfficialVip = async (id: string, fallbackRecord?: Registration): Promise<Registration | null> => {
   const cleanId = (id || '').trim();
   const allCurrent = getRegistrations();

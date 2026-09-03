@@ -9,9 +9,10 @@ import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageComp
 
 interface LookupProps {
   onClose?: () => void;
+  initialQuery?: string;
 }
 
-export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
+export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     };
   }, []);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const [searchResult, setSearchResult] = useState<Registration | null | undefined>(undefined);
   const [hasSearched, setHasSearched] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -239,13 +240,13 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     return () => clearInterval(pollInterval);
   }, [searchResult, searchQuery]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
+  const performSearch = async (queryText: string) => {
+    const q = queryText.trim();
     if (!q) return;
 
     setPaymentError(null);
     setHasSearched(true);
+    setSearchQuery(q);
 
     // 1. Instant 0ms response from local memory / IndexedDB cache
     const instantMatch = findRegistration(q);
@@ -274,6 +275,18 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim()) {
+      setSearchQuery(initialQuery.trim());
+      performSearch(initialQuery.trim());
+    }
+  }, [initialQuery]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    performSearch(searchQuery);
   };
 
   const handlePaymentScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

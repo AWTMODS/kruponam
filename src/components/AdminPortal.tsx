@@ -3,11 +3,12 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown, Loader2
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown, Loader2,
+  Ticket, Printer, Building2
 } from 'lucide-react';
 import { 
   getRegistrations, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
-  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, type Registration, type ApprovalStatus 
+  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, issueManualTicket, generateUniqueRegistrationId, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
@@ -242,7 +243,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
   };
 
-  // Manual Add / Restore Registration State
+  // ── Manual Spot Ticket Creation & Admin Booking State ──
+  const [showManualTicketModal, setShowManualTicketModal] = useState(false);
+  const [manualTicketId, setManualTicketId] = useState('');
+  const [manualFullName, setManualFullName] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualDepartment, setManualDepartment] = useState('BCA');
+  const [manualCustomDept, setManualCustomDept] = useState('');
+  const [manualSection, setManualSection] = useState('Section A');
+  const [manualYear, setManualYear] = useState('1st Year');
+  const [manualGender, setManualGender] = useState('Male');
+  const [manualTicketType, setManualTicketType] = useState('Student Pass');
+  const [manualPaymentAmount, setManualPaymentAmount] = useState<number>(() => getSiteSettings().ticketAmount || 700);
+  const [manualPaymentMode, setManualPaymentMode] = useState<'Cash' | 'UPI' | 'Card' | 'Free' | 'Bank'>('Cash');
+  const [manualPaymentStatus, setManualPaymentStatus] = useState<'Verified' | 'Pending'>('Verified');
+  const [manualPaymentUtr, setManualPaymentUtr] = useState('');
+  const [manualApprovalStatus, setManualApprovalStatus] = useState<ApprovalStatus>('Approved');
+  const [manualSendEmail, setManualSendEmail] = useState(true);
+  const [manualIdCardUrl, setManualIdCardUrl] = useState('');
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [issuedTicketSuccess, setIssuedTicketSuccess] = useState<Registration | null>(null);
+  const manualIdFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Legacy manual restore compatibility state
   const [showAddModal, setShowAddModal] = useState(false);
   const [manualIdInput, setManualIdInput] = useState('KRP-865167');
   const [manualNameInput, setManualNameInput] = useState('');
@@ -253,6 +277,205 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [manualYearInput, setManualYearInput] = useState('2nd Year');
   const [manualStatusInput, setManualStatusInput] = useState<ApprovalStatus>('Pending_ID_Approval');
   const [supabaseConnNotice, setSupabaseConnNotice] = useState<string | null>(null);
+
+  const handleOpenManualTicketModal = () => {
+    const newId = generateUniqueRegistrationId();
+    const currentPrice = getSiteSettings().ticketAmount || 700;
+    setManualTicketId(newId);
+    setManualFullName('');
+    setManualEmail('');
+    setManualPhone('');
+    setManualDepartment('BCA');
+    setManualCustomDept('');
+    setManualSection('Section A');
+    setManualYear('1st Year');
+    setManualGender('Male');
+    setManualTicketType('Student Pass');
+    setManualPaymentAmount(currentPrice);
+    setManualPaymentMode('Cash');
+    setManualPaymentStatus('Verified');
+    setManualPaymentUtr(`CASH-DESK-${currentPrice}`);
+    setManualApprovalStatus('Approved');
+    setManualSendEmail(true);
+    setManualIdCardUrl('');
+    setIssuedTicketSuccess(null);
+    setShowManualTicketModal(true);
+  };
+
+  const handleGenerateNewId = () => {
+    const newId = generateUniqueRegistrationId();
+    setManualTicketId(newId);
+  };
+
+  const handlePaymentModeChange = (mode: 'Cash' | 'UPI' | 'Card' | 'Free' | 'Bank') => {
+    setManualPaymentMode(mode);
+    const currentPrice = getSiteSettings().ticketAmount || 700;
+    if (mode === 'Free') {
+      setManualPaymentAmount(0);
+      setManualPaymentUtr('COMPLIMENTARY-PASS');
+      setManualPaymentStatus('Verified');
+    } else if (mode === 'Cash') {
+      const amt = manualPaymentAmount === 0 ? currentPrice : manualPaymentAmount;
+      setManualPaymentAmount(amt);
+      setManualPaymentUtr(`CASH-DESK-${amt}`);
+      setManualPaymentStatus('Verified');
+    } else if (mode === 'UPI') {
+      const amt = manualPaymentAmount === 0 ? currentPrice : manualPaymentAmount;
+      setManualPaymentAmount(amt);
+      setManualPaymentUtr(`UPI-DESK-${Date.now().toString().slice(-6)}`);
+      setManualPaymentStatus('Verified');
+    } else if (mode === 'Card') {
+      const amt = manualPaymentAmount === 0 ? currentPrice : manualPaymentAmount;
+      setManualPaymentAmount(amt);
+      setManualPaymentUtr(`POS-CARD-${amt}`);
+      setManualPaymentStatus('Verified');
+    } else if (mode === 'Bank') {
+      const amt = manualPaymentAmount === 0 ? currentPrice : manualPaymentAmount;
+      setManualPaymentAmount(amt);
+      setManualPaymentUtr(`BANK-TRF-${amt}`);
+      setManualPaymentStatus('Verified');
+    }
+  };
+
+  const handleManualIdPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressImageToDataUrl(file);
+      setManualIdCardUrl(dataUrl);
+      addToast('✅ Photo attached successfully!', 'success');
+    } catch {
+      addToast('Failed to process image file.', 'error');
+    }
+  };
+
+  const handleIssueManualTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualFullName.trim()) {
+      addToast('⚠️ Attendee Full Name is required.', 'error');
+      return;
+    }
+
+    const cleanId = (manualTicketId.trim() || generateUniqueRegistrationId()).toUpperCase();
+    const finalDept = manualDepartment === 'Other' && manualCustomDept.trim() ? manualCustomDept.trim() : manualDepartment;
+
+    setManualSubmitting(true);
+    try {
+      const newReg = await issueManualTicket({
+        id: cleanId,
+        fullName: manualFullName.trim(),
+        email: manualEmail.trim() || `${cleanId.toLowerCase()}@kruponam.edu.in`,
+        phone: manualPhone.trim() || '9876543210',
+        department: finalDept,
+        section: manualSection,
+        year: manualYear,
+        gender: manualGender,
+        ticketType: manualTicketType,
+        paymentAmount: Number(manualPaymentAmount) || 0,
+        paymentMode: manualPaymentMode,
+        paymentStatus: manualPaymentStatus,
+        paymentUtr: manualPaymentUtr.trim() || `MANUAL-${manualPaymentMode.toUpperCase()}-${manualPaymentAmount}`,
+        approvalStatus: manualApprovalStatus,
+        idCardUrl: manualIdCardUrl || undefined,
+      });
+
+      let emailSentSuccess = false;
+      if (manualSendEmail && manualEmail.trim() && manualEmail.includes('@') && (manualApprovalStatus === 'Approved' || manualApprovalStatus === 'VIP')) {
+        try {
+          const emailRes = await sendApprovalEmail(newReg);
+          if (emailRes.success) {
+            emailSentSuccess = true;
+          }
+        } catch (e) {
+          console.warn('Manual ticket email send notice:', e);
+        }
+      }
+
+      await loadData();
+      setManualSubmitting(false);
+      setShowManualTicketModal(false);
+      setIssuedTicketSuccess(newReg);
+
+      addToast(
+        `🎟️ Ticket ${newReg.id} issued for ${newReg.fullName}!` + (emailSentSuccess ? ' Pass email sent.' : ''),
+        'success'
+      );
+    } catch (err: any) {
+      setManualSubmitting(false);
+      addToast('Failed to issue manual ticket: ' + (err.message || 'Unknown error'), 'error');
+    }
+  };
+
+  const handlePrintTicket = (ticket: Registration) => {
+    const printWindow = window.open('', '_blank', 'width=650,height=850');
+    if (!printWindow) {
+      addToast('Please allow popups to print ticket.', 'error');
+      return;
+    }
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(ticket.id)}&color=0D472B&bgcolor=FFFBF0`;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Kruponam 2026 Pass - ${ticket.id}</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #FAF7F0; margin: 0; padding: 24px; display: flex; justify-content: center; }
+            .ticket-card { width: 440px; background: #fff; border: 2px solid #D4AF37; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+            .header { background: linear-gradient(135deg, #0D472B, #1B5E20); color: #D4AF37; padding: 24px 20px; text-align: center; }
+            .header h1 { margin: 0; font-size: 22px; letter-spacing: 2px; font-weight: 800; }
+            .header p { margin: 4px 0 0; font-size: 11px; color: #A8D5B5; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+            .body { padding: 24px 20px; text-align: center; }
+            .qr-box { margin: 12px auto; display: inline-block; padding: 12px; background: #FFFBF0; border: 1.5px solid #D4AF37; border-radius: 14px; }
+            .qr-box img { width: 170px; height: 170px; display: block; }
+            .pass-id { font-size: 22px; font-weight: 900; color: #0D472B; margin: 8px 0; font-family: monospace; letter-spacing: 1px; }
+            .badge { display: inline-block; background: #E8F5E9; color: #1B5E20; padding: 5px 14px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+            .info-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; margin-top: 16px; border-top: 1px dashed #E2E8F0; }
+            .info-table td { padding: 7px 10px; border-bottom: 1px solid #F1F5F9; }
+            .info-table td.label { font-weight: 700; color: #64748B; width: 38%; }
+            .info-table td.val { color: #0F172A; font-weight: 700; }
+            .footer { background: #FFF8E7; padding: 12px; text-align: center; font-size: 11px; color: #854D0E; font-weight: 800; border-top: 1px solid #FEF08A; }
+            @media print {
+              body { background: white; padding: 0; }
+              .ticket-card { box-shadow: none; border-color: #333; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="ticket-card">
+            <div class="header">
+              <h1>👑 KRUPONAM 2026</h1>
+              <p>Krupanidhi Degree College • Entry Pass</p>
+            </div>
+            <div class="body">
+              <div class="badge">OFFICIAL EVENT ADMISSION PASS</div>
+              <div class="qr-box">
+                <img src="${qrUrl}" alt="QR Pass" />
+              </div>
+              <div class="pass-id">${ticket.id}</div>
+              <table class="info-table">
+                <tr><td class="label">Attendee Name</td><td class="val">${ticket.fullName}</td></tr>
+                <tr><td class="label">Pass Type</td><td class="val">${ticket.ticketType || 'Student Pass'}</td></tr>
+                <tr><td class="label">Department</td><td class="val">${ticket.department}</td></tr>
+                <tr><td class="label">Section / Year</td><td class="val">${ticket.section || 'N/A'} • ${ticket.year}</td></tr>
+                <tr><td class="label">Amount Paid</td><td class="val">₹${ticket.paymentAmount} (${ticket.paymentStatus})</td></tr>
+                <tr><td class="label">Payment Mode / Ref</td><td class="val">${ticket.paymentUtr || 'ADMIN-DESK'}</td></tr>
+              </table>
+            </div>
+            <div class="footer">
+              Valid for Entry • Scan at Gate Security Scanner
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   const handleOpenEditModal = (reg: Registration) => {
     setEditItem(reg);
@@ -1006,6 +1229,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
           {isAuthenticated && (
             <>
+              <button
+                onClick={handleOpenManualTicketModal}
+                title="Take & Issue Manual Spot Ticket / Instant Event Pass"
+                className="px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-gold-glow flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] animate-fadeIn"
+              >
+                <Ticket className="w-3.5 h-3.5 text-slate-950" />
+                <span>Take Manual Ticket</span>
+              </button>
+
               {isVipUnlocked && (
                 <button
                   onClick={() => setShowVipModal(true)}
@@ -3027,6 +3259,540 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Yes, Delete Request</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Take Manual Ticket / Spot Entry Pass Modal ─────────────────── */}
+      {showManualTicketModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 border border-amber-500/50 shadow-2xl space-y-6 animate-fadeIn my-auto max-h-[92vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center pb-4 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 via-gold-royal/30 to-amber-500/10 border border-amber-500/50 text-amber-300 flex items-center justify-center font-bold shadow-gold-glow">
+                  <Ticket className="w-6 h-6 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                    <span>Take Manual Ticket</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono uppercase tracking-wider">
+                      Spot / Admin Entry
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">Directly issue & verify an official event admission pass at the desk or offline counter</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowManualTicketModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Content */}
+            <form onSubmit={handleIssueManualTicketSubmit} className="space-y-5 overflow-y-auto pr-1 flex-1">
+              
+              {/* Pass ID Banner & Auto Generator */}
+              <div className="p-4 rounded-2xl bg-slate-950/90 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-inner">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">
+                    Generated Pass Reference ID
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-lg font-mono font-black text-white tracking-wider">
+                      {manualTicketId || 'Generating...'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                      Scanner Ready
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    value={manualTicketId}
+                    onChange={(e) => setManualTicketId(e.target.value.toUpperCase())}
+                    placeholder="Custom ID"
+                    className="w-full sm:w-32 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs outline-none focus:border-gold-royal font-bold text-center uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateNewId}
+                    title="Generate New Randomized Pass ID"
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-bold transition-all flex items-center gap-1 shrink-0"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>New ID</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Section 1: Attendee Information */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-gold-royal" />
+                  <span>Attendee / Student Details</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul Sharma"
+                      value={manualFullName}
+                      onChange={(e) => setManualFullName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal focus:ring-1 focus:ring-gold-royal/30 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Phone Number (10 Digits)
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="e.g. 9876543210"
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Email Address (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="e.g. attendee@gmail.com"
+                      value={manualEmail}
+                      onChange={(e) => setManualEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Gender
+                    </label>
+                    <select
+                      value={manualGender}
+                      onChange={(e) => setManualGender(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Department & Academic Details */}
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-gold-royal" />
+                  <span>College / Department & Pass Type</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Department
+                    </label>
+                    <select
+                      value={manualDepartment}
+                      onChange={(e) => setManualDepartment(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                    >
+                      <option value="BCA">Computer Applications (BCA)</option>
+                      <option value="B.Com">Commerce (B.Com)</option>
+                      <option value="BBA">Business Administration (BBA)</option>
+                      <option value="B.Sc">Science (B.Sc)</option>
+                      <option value="BA">Humanities & Arts (BA)</option>
+                      <option value="Pharmacy">Pharmacy (B.Pharm / D.Pharm)</option>
+                      <option value="Nursing">Nursing (B.Sc Nursing / GNM)</option>
+                      <option value="MBA / MCA">Post Graduate (MBA / MCA)</option>
+                      <option value="Staff / Faculty">Staff / Faculty</option>
+                      <option value="Guest / External">Guest / External</option>
+                      <option value="Other">Other (Custom)</option>
+                    </select>
+                  </div>
+
+                  {manualDepartment === 'Other' && (
+                    <div>
+                      <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                        Custom Department
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Enter department name"
+                        value={manualCustomDept}
+                        onChange={(e) => setManualCustomDept(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Section
+                    </label>
+                    <select
+                      value={manualSection}
+                      onChange={(e) => setManualSection(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold"
+                    >
+                      <option value="Section A">Section A</option>
+                      <option value="Section B">Section B</option>
+                      <option value="Section C">Section C</option>
+                      <option value="Section D">Section D</option>
+                      <option value="Section E">Section E</option>
+                      <option value="Section F">Section F</option>
+                      <option value="N/A">N/A / General</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Academic Year
+                    </label>
+                    <select
+                      value={manualYear}
+                      onChange={(e) => setManualYear(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-medium"
+                    >
+                      <option value="1st Year">1st Year</option>
+                      <option value="2nd Year">2nd Year</option>
+                      <option value="3rd Year">3rd Year</option>
+                      <option value="4th Year">4th Year</option>
+                      <option value="PG / Alumni">PG / Alumni</option>
+                      <option value="Faculty / Staff">Faculty / Staff</option>
+                      <option value="VIP Guest">VIP Guest</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Pass / Ticket Type
+                    </label>
+                    <select
+                      value={manualTicketType}
+                      onChange={(e) => setManualTicketType(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold text-amber-300"
+                    >
+                      <option value="Student Pass">Student Pass</option>
+                      <option value="VIP Pass">VIP Pass</option>
+                      <option value="Faculty Pass">Faculty Pass</option>
+                      <option value="Alumni Pass">Alumni Pass</option>
+                      <option value="Guest Pass">Guest Pass</option>
+                      <option value="Spot Registration">Spot Registration Pass</option>
+                      <option value="General Pass">General Pass</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Payment & Accounting */}
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Payment Mode & Accounting</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Default Fee: ₹{getSiteSettings().ticketAmount || 700}
+                  </span>
+                </h4>
+
+                {/* Quick Payment Mode Selector Tabs */}
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {[
+                    { id: 'Cash', label: '💵 Cash', desc: 'Desk Cash' },
+                    { id: 'UPI', label: '📱 Direct UPI', desc: 'GPay/PhonePe' },
+                    { id: 'Card', label: '💳 POS Card', desc: 'Card Machine' },
+                    { id: 'Free', label: '🎁 Free / Pass', desc: 'Complimentary' },
+                    { id: 'Bank', label: '🏦 Bank Trf', desc: 'IMPS/NEFT' },
+                  ].map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => handlePaymentModeChange(mode.id as any)}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        manualPaymentMode === mode.id
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-black shadow-gold-glow'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold leading-none">{mode.label}</div>
+                      <div className="text-[9px] text-slate-500 mt-1">{mode.desc}</div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Amount Collected (₹)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={manualPaymentAmount}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setManualPaymentAmount(val);
+                          setManualPaymentUtr(`MANUAL-${manualPaymentMode.toUpperCase()}-${val}`);
+                        }}
+                        className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs outline-none focus:border-gold-royal font-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Payment Status
+                    </label>
+                    <select
+                      value={manualPaymentStatus}
+                      onChange={(e) => setManualPaymentStatus(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold text-emerald-400"
+                    >
+                      <option value="Verified">Verified & Received</option>
+                      <option value="Pending">Payment Pending</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Reference / Receipt Note
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CASH-DESK-700"
+                      value={manualPaymentUtr}
+                      onChange={(e) => setManualPaymentUtr(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs outline-none focus:border-gold-royal font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Pass Status & Delivery Options */}
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center">
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Pass Activation Status
+                    </label>
+                    <select
+                      value={manualApprovalStatus}
+                      onChange={(e) => setManualApprovalStatus(e.target.value as ApprovalStatus)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-300 text-xs outline-none focus:border-gold-royal font-bold"
+                    >
+                      <option value="Approved">Approved (Immediate Gate Entry Active)</option>
+                      <option value="ID_Approved">ID Approved (Pay Pending)</option>
+                      <option value="Payment_Pending">Payment Submitted</option>
+                      <option value="Pending_ID_Approval">Pending Verification</option>
+                    </select>
+                  </div>
+
+                  {/* ID / Photo Upload Option */}
+                  <div>
+                    <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
+                      Attendee Photo / ID (Optional)
+                    </label>
+                    <input
+                      type="file"
+                      ref={manualIdFileInputRef}
+                      accept="image/*"
+                      onChange={handleManualIdPhotoUpload}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => manualIdFileInputRef.current?.click()}
+                        className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800 flex items-center justify-center gap-1.5 truncate"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-gold-royal" />
+                        <span>{manualIdCardUrl ? 'Change Photo' : 'Attach Photo / ID'}</span>
+                      </button>
+                      {manualIdCardUrl && (
+                        <div className="relative group">
+                          <img
+                            src={manualIdCardUrl}
+                            alt="Preview"
+                            className="w-9 h-9 rounded-lg object-cover border border-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setManualIdCardUrl('')}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Delivery Toggle */}
+                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800 cursor-pointer hover:border-slate-700 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={manualSendEmail}
+                    onChange={(e) => setManualSendEmail(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 focus:ring-0 focus:ring-offset-0 bg-slate-900 border-slate-700"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-slate-200">Send QR Pass & invoice confirmation email</span>
+                    <span className="text-slate-400 block text-[11px]">
+                      {manualEmail.trim() ? `Will send email to ${manualEmail.trim()}` : 'Enter student email above to enable delivery'}
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="pt-4 flex flex-col sm:flex-row justify-end items-center gap-3 border-t border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowManualTicketModal(false)}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={manualSubmitting}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-gold-royal to-amber-400 hover:from-amber-400 hover:to-gold-light text-slate-950 font-black text-xs uppercase tracking-wider shadow-gold-glow flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {manualSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Issuing Pass...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ticket className="w-4 h-4 text-slate-950" />
+                      <span>🎟️ Issue & Activate Ticket</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Issued Ticket Success & Instant Print / Preview Modal ──────── */}
+      {issuedTicketSuccess && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 sm:p-8 border border-emerald-500/60 shadow-2xl space-y-6 animate-fadeIn text-center">
+            
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/50">
+              <CheckCircle2 className="w-9 h-9 text-emerald-400" />
+            </div>
+
+            <div>
+              <span className="px-3 py-1 rounded-full bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-[11px] font-extrabold uppercase tracking-wider">
+                Pass Active & Scanner Ready
+              </span>
+              <h3 className="font-serif text-2xl font-bold text-white mt-2">
+                Ticket Successfully Issued!
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Pass record has been saved locally and synchronized with the cloud database.
+              </p>
+            </div>
+
+            {/* Ticket Card Preview */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-gold-royal/40 space-y-3 text-left shadow-inner">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Attendee Name</span>
+                  <span className="text-sm font-bold text-white">{issuedTicketSuccess.fullName}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Pass ID</span>
+                  <span className="text-sm font-mono font-black text-amber-400">{issuedTicketSuccess.id}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 py-1">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(issuedTicketSuccess.id)}&color=0D472B&bgcolor=FFFBF0`}
+                  alt="QR Code"
+                  className="w-20 h-20 rounded-xl border border-amber-500/40 bg-[#FFFBF0] p-1 shrink-0"
+                />
+                <div className="space-y-1 text-xs">
+                  <div>
+                    <span className="text-slate-400">Department: </span>
+                    <span className="font-bold text-slate-200">{issuedTicketSuccess.department} ({issuedTicketSuccess.section || 'N/A'})</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Type: </span>
+                    <span className="font-bold text-amber-300">{issuedTicketSuccess.ticketType || 'Student Pass'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Amount: </span>
+                    <span className="font-bold text-emerald-400 font-mono">₹{issuedTicketSuccess.paymentAmount} ({issuedTicketSuccess.paymentStatus})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(issuedTicketSuccess.id);
+                  addToast(`📋 Copied Pass ID: ${issuedTicketSuccess.id}`, 'success');
+                }}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Pass ID</span>
+              </button>
+
+              <button
+                onClick={() => handlePrintTicket(issuedTicketSuccess)}
+                className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Ticket</span>
+              </button>
+            </div>
+
+            <div className="flex gap-2.5">
+              <button
+                onClick={handleOpenManualTicketModal}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-gold-royal hover:from-amber-400 hover:to-gold-light text-slate-950 text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-gold-glow"
+              >
+                <Plus className="w-3.5 h-3.5 text-slate-950" />
+                <span>Take Another Ticket</span>
+              </button>
+
+              <button
+                onClick={() => setIssuedTicketSuccess(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>
