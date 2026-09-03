@@ -3,7 +3,7 @@ import {
   Lock, LogOut, CheckCircle2, Eye, EyeOff, Search, DollarSign, Users, Clock, 
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
-  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown
+  Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown, Loader2
 } from 'lucide-react';
 import { 
   getRegistrations, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
@@ -16,6 +16,7 @@ import { getFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseC
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, setActiveSlotManually, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
 import { getLiveActiveCount } from '../services/livePresenceService';
+import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageCompressor';
 import { AdminQrScanner } from './AdminQrScanner';
 
 interface AdminPortalProps {
@@ -151,6 +152,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [upiSaving, setUpiSaving] = useState(false);
   const [upiSaved, setUpiSaved] = useState(false);
   const [expandedSlotId, setExpandedSlotId] = useState<string | null>(null);
+  const [processingQrSlotId, setProcessingQrSlotId] = useState<string | null>(null);
 
   // Live Active Visitors State
   const [activeVisitors, setActiveVisitors] = useState<number>(() => getLiveActiveCount());
@@ -543,14 +545,53 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     addToast(`✅ "${label}" is now the active payment slot!`, 'success');
   };
 
-  const handleQrImageUpload = (slotId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQrImageUpload = async (slotId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      handleUpdateSlot(slotId, { qrImageDataUrl: ev.target?.result as string });
-    };
-    reader.readAsDataURL(file);
+
+    setProcessingQrSlotId(slotId);
+    try {
+      const compressed = await compressImageToDataUrl(file, {
+        maxSizeBytes: 120 * 1024,
+        initialMaxWidth: 800,
+        initialQuality: 0.85,
+        timeoutMs: 5000,
+      });
+
+      const dataUrl = (compressed && compressed.length > 50) ? compressed : await readRawFileAsDataUrl(file);
+      if (dataUrl) {
+        const updated = updateUpiSlot(slotId, { qrImageDataUrl: dataUrl });
+        setMultiUpi(updated);
+        saveMultiUpiSettings(updated);
+        addToast('✅ New QR Code image uploaded, optimized & synced to cloud!', 'success');
+      } else {
+        addToast('⚠️ Could not process the uploaded QR image format.', 'error');
+      }
+    } catch (err) {
+      try {
+        const raw = await readRawFileAsDataUrl(file);
+        if (raw) {
+          const updated = updateUpiSlot(slotId, { qrImageDataUrl: raw });
+          setMultiUpi(updated);
+          saveMultiUpiSettings(updated);
+          addToast('✅ QR Code image uploaded successfully!', 'success');
+        } else {
+          addToast('⚠️ Failed to read QR image file.', 'error');
+        }
+      } catch (_) {
+        addToast('⚠️ Error uploading QR code image.', 'error');
+      }
+    } finally {
+      setProcessingQrSlotId(null);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleRemoveQrImage = (slotId: string) => {
+    const updated = updateUpiSlot(slotId, { qrImageDataUrl: null });
+    setMultiUpi(updated);
+    saveMultiUpiSettings(updated);
+    addToast('🗑️ Custom QR image removed (reverted to auto-generated QR code).', 'info');
   };
 
   const handleSaveAllUpi = () => {
@@ -1958,35 +1999,66 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
                           <div className="space-y-4">
                             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                              QR Code Image Asset
+                              QR Code Image Asset (Custom Merchant QR)
                             </label>
                             
                             <label
                               htmlFor={`qr-upload-${slot.id}`}
-                              className="flex flex-col items-center justify-center gap-2 w-full p-6 rounded-2xl border-2 border-dashed border-slate-700 hover:border-gold-royal cursor-pointer transition-colors bg-slate-900 text-center group"
+                              className={`flex flex-col items-center justify-center gap-2 w-full p-6 rounded-2xl border-2 border-dashed transition-all bg-slate-900 text-center cursor-pointer group ${
+                                processingQrSlotId === slot.id 
+                                  ? 'border-amber-400 bg-amber-950/20 pointer-events-none' 
+                                  : slot.qrImageDataUrl 
+                                    ? 'border-emerald-500/50 hover:border-gold-royal' 
+                                    : 'border-slate-700 hover:border-gold-royal'
+                              }`}
                             >
-                              <Upload className="w-6 h-6 text-slate-500 group-hover:text-gold-royal transition-colors" />
-                              <span className="text-xs text-slate-300 group-hover:text-white font-medium">
-                                {slot.qrImageDataUrl ? '✓ QR Image Uploaded — Click to Replace' : 'Upload QR Code Image'}
-                              </span>
+                              {processingQrSlotId === slot.id ? (
+                                <>
+                                  <Loader2 className="w-6 h-6 text-gold-royal animate-spin" />
+                                  <span className="text-xs text-amber-300 font-bold">
+                                    Optimizing & Uploading QR Image...
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6 text-slate-500 group-hover:text-gold-royal transition-colors" />
+                                  <span className="text-xs text-slate-300 group-hover:text-white font-medium">
+                                    {slot.qrImageDataUrl ? '✓ Custom QR Uploaded — Tap to Change' : 'Upload QR Code Image (JPG / PNG)'}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    Auto-compressed & synced to live cloud for all students
+                                  </span>
+                                </>
+                              )}
                             </label>
                             <input
                               id={`qr-upload-${slot.id}`}
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.jpg,.jpeg,.png,.webp"
+                              disabled={processingQrSlotId === slot.id}
                               onChange={(e) => handleQrImageUpload(slot.id, e)}
                               className="hidden"
                             />
 
                             <div className="flex flex-col items-center gap-2 pt-2">
-                              <div className="w-32 h-32 bg-white p-2 rounded-2xl border-2 border-gold-royal flex items-center justify-center overflow-hidden shadow-lg">
+                              <div className="w-36 h-36 bg-white p-2 rounded-2xl border-2 border-gold-royal flex items-center justify-center overflow-hidden shadow-lg relative group">
                                 {slot.qrImageDataUrl ? (
                                   <img src={slot.qrImageDataUrl} alt="QR" className="w-full h-full object-contain rounded-lg" />
                                 ) : (
-                                  <QrCode className="w-full h-full text-slate-900" />
+                                  <QrCode className="w-full h-full text-slate-900 animate-pulse" />
                                 )}
                               </div>
                               <span className="text-xs font-mono text-slate-400">{slot.upiId || 'No UPI ID'}</span>
+
+                              {slot.qrImageDataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveQrImage(slot.id)}
+                                  className="text-[11px] text-rose-400 hover:text-rose-300 underline font-bold transition-colors cursor-pointer"
+                                >
+                                  Remove Custom Image (Use Dynamic QR from UPI ID)
+                                </button>
+                              )}
                             </div>
                           </div>
 

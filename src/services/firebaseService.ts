@@ -383,13 +383,18 @@ export const listenToFirebaseRegistrations = (
 export const saveUpiSettingsToFirebase = async (payload: {
   upiId: string;
   merchantName: string;
+  qrImageDataUrl?: string | null;
   activeSlotIndex: number;
   updatedAt: string;
 }): Promise<boolean> => {
   const db = getFirebaseDb();
   if (!db) return false;
   try {
-    await setDoc(doc(db, 'settings', 'upi'), payload, { merge: true });
+    let safePayload = { ...payload };
+    if (safePayload.qrImageDataUrl && safePayload.qrImageDataUrl.startsWith('data:image') && safePayload.qrImageDataUrl.length > 200 * 1024) {
+      safePayload.qrImageDataUrl = await downscaleBase64(safePayload.qrImageDataUrl, 120 * 1024);
+    }
+    await setDoc(doc(db, 'settings', 'upi'), safePayload, { merge: true });
     return true;
   } catch (err) {
     console.warn('Firebase UPI settings save notice:', err);
@@ -400,6 +405,7 @@ export const saveUpiSettingsToFirebase = async (payload: {
 export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
   upiId: string;
   merchantName: string;
+  qrImageDataUrl?: string | null;
 } | null> => {
   const db = getFirebaseDb();
   if (!db) return null;
@@ -410,6 +416,7 @@ export const fetchActiveUpiSlotFromFirebase = async (): Promise<{
       return {
         upiId: d.upiId || '',
         merchantName: d.merchantName || '',
+        qrImageDataUrl: d.qrImageDataUrl || null,
       };
     }
     return null;

@@ -140,11 +140,11 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose }) => {
   // Fetch live active UPI slot from Firebase so students always get the latest QR
   useEffect(() => {
     fetchActiveUpiSlotFromFirebase().then((liveSlot) => {
-      if (liveSlot && liveSlot.upiId) {
+      if (liveSlot && (liveSlot.upiId || liveSlot.qrImageDataUrl)) {
         setUpiSettings({
-          upiId: liveSlot.upiId,
+          upiId: liveSlot.upiId || 'q062769226@ybl',
           merchantName: liveSlot.merchantName,
-          qrImageDataUrl: null, // QR generated client-side from upiId
+          qrImageDataUrl: liveSlot.qrImageDataUrl || null,
           amount: getSiteSettings().ticketAmount,
         });
       }
