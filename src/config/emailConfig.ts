@@ -41,9 +41,9 @@ export const getEmailConfig = (): EmailConfig => {
     };
   }
 
-  const resendKey = localStorage.getItem('kruponam_resend_api_key') || import.meta.env.VITE_RESEND_API_KEY || '';
-  const resendFromEmail = localStorage.getItem('kruponam_resend_from_email') || import.meta.env.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 Pass <pass@lifestack.in>';
-  const brevoKey = localStorage.getItem('kruponam_brevo_api_key') || import.meta.env.VITE_BREVO_API_KEY || '';
+  const resendKey = localStorage.getItem('kruponam_resend_api_key') || '';
+  const resendFromEmail = localStorage.getItem('kruponam_resend_from_email') || 'Kruponam 2026 Pass <pass@lifestack.in>';
+  const brevoKey = localStorage.getItem('kruponam_brevo_api_key') || '';
   
   const emailjsServiceId = localStorage.getItem('kruponam_emailjs_service_id') || import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
   const emailjsTemplateId = localStorage.getItem('kruponam_emailjs_template_id') || import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';

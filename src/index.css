@@ -80,3 +80,32 @@
   border: 1px dashed rgba(212, 175, 55, 0.6);
   pointer-events: none;
 }
+
+/* Print Stylesheet for Clean Event Pass Printing */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-ticket-badge, .printable-ticket-badge * {
+    visibility: visible;
+  }
+  .printable-ticket-badge {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: 2px solid #D4AF37 !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #FFFFFF !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+}
+

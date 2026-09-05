@@ -1,12 +1,21 @@
-import emailjs from '@emailjs/browser';
-import { getEmailConfig } from '../config/emailConfig';
+import QRCode from 'qrcode';
 import type { Registration } from './registrationService';
 
-// ── QR Code Generator (Gmail & Outlook Mobile Compatible) ─────────────
+// ── QR Code Generator (Local offline generation with high contrast) ─────────────
 export const generateQrCode = async (text: string): Promise<string> => {
-  // Use public HTTPS QR Code API so Gmail, Outlook, Apple Mail, and Web Browsers render the image sharply.
-  // (Gmail mobile app strictly blocks inline base64 data URIs).
-  return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}&color=0D472B&bgcolor=FFFBF0`;
+  try {
+    return await QRCode.toDataURL(text, {
+      width: 250,
+      margin: 2,
+      color: {
+        dark: '#0D472B',
+        light: '#FFFBF0',
+      },
+    });
+  } catch (err) {
+    console.warn('Local QR code generation fallback:', err);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}&color=0D472B&bgcolor=FFFBF0`;
+  }
 };
 
 // ── Kerala-themed HTML Email Template ─────────────────────────────
@@ -225,25 +234,6 @@ export interface EmailResult {
   qrDataUrl: string;
 }
 
-let resendKeyIndex = 0;
-let brevoKeyIndex = 0;
-
-const getActiveResendKey = (rawKeys: string): string => {
-  const keys = rawKeys.split(/[\s,]+/).map(k => k.trim()).filter(k => k.length > 5);
-  if (keys.length === 0) return rawKeys;
-  const key = keys[resendKeyIndex % keys.length];
-  resendKeyIndex++;
-  return key;
-};
-
-const getActiveBrevoKey = (rawKeys: string): string => {
-  const keys = rawKeys.split(/[\s,]+/).map(k => k.trim()).filter(Boolean);
-  if (keys.length === 0) return rawKeys;
-  const key = keys[brevoKeyIndex % keys.length];
-  brevoKeyIndex++;
-  return key;
-};
-
 // ── Main Send Function ──────────────────────────────────────────────
 export const sendApprovalEmail = async (registration: Registration): Promise<EmailResult> => {
   const cleanEmail = registration.email ? registration.email.trim().toLowerCase() : '';
@@ -262,118 +252,43 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
     };
   }
 
-  const cfg = getEmailConfig();
-  let lastErrorNotice = '';
+  // Serverless Backend Dispatch (/api/send-approval-email)
+  try {
+    const serverlessRes = await fetch('/api/send-approval-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        registration,
+        qrDataUrl,
+        html,
+      }),
+    });
 
-  // 3A. Try Resend API first (3,000 Free Emails / Month with verified lifestack.in domain)
-  if (cfg.resendApiKey) {
-    const apiKey = getActiveResendKey(cfg.resendApiKey);
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: cfg.resendFromEmail || 'Kruponam 2026 Pass <pass@lifestack.in>',
-          to: [cleanEmail],
-          subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
-          html: html,
-        }),
-      });
+    const data = await serverlessRes.json().catch(() => ({}));
 
-      if (res.ok) {
-        return {
-          success: true,
-          message: `✉️ [Resend API] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
-          previewHtml: html,
-          qrDataUrl,
-        };
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        if (res.status === 403 && errorData.message?.includes('testing emails')) {
-          lastErrorNotice = `⚠️ Resend Restriction: Free test account can only send to account owner. Falling back to next email provider...`;
-        } else {
-          lastErrorNotice = `⚠️ Resend API Notice (${res.status}): ${errorData.message || res.statusText}`;
-        }
-        console.warn('Resend API notice:', lastErrorNotice);
-      }
-    } catch (err: any) {
-      console.error('Resend API send error:', err);
-    }
-  }
-
-  // 3B. Try Brevo API second (9,000 Free Emails / Month)
-  if (cfg.brevoApiKey && cfg.brevoApiKey.startsWith('xkeysib')) {
-    const apiKey = getActiveBrevoKey(cfg.brevoApiKey);
-    try {
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'api-key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
-          to: [{ email: cleanEmail, name: registration.fullName }],
-          subject: `🎟️ Kruponam 2026 Official Pass [Sep 14, 2026] & Invoice (${registration.id})`,
-          htmlContent: html,
-        }),
-      });
-
-      if (res.ok) {
-        return {
-          success: true,
-          message: `✉️ [Brevo API] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
-          previewHtml: html,
-          qrDataUrl,
-        };
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        lastErrorNotice = `⚠️ Brevo API Notice (${res.status}): ${errorData.message || res.statusText}`;
-        console.warn('Brevo API notice:', lastErrorNotice);
-      }
-    } catch (err: any) {
-      console.error('Brevo API send error:', err);
-    }
-  }
-
-  // 3C. Send via EmailJS API (Free 200 emails / mo)
-  if (cfg.emailjsServiceId && cfg.emailjsTemplateId && cfg.emailjsPublicKey && cfg.emailjsServiceId !== 'YOUR_EMAILJS_SERVICE_ID') {
-    try {
-      await emailjs.send(
-        cfg.emailjsServiceId,
-        cfg.emailjsTemplateId,
-        {
-          to_email: cleanEmail,
-          to_name: registration.fullName,
-          subject: `✅ Kruponam 2026 — Pass Approved! Your Invoice & QR Ticket (${registration.id})`,
-          message_html: html,
-          reg_id: registration.id,
-          dept: `${registration.department} — ${registration.year}`,
-          utr: registration.paymentUtr || 'VERIFIED',
-        },
-        cfg.emailjsPublicKey
-      );
-
+    if (serverlessRes.ok && data.success) {
       return {
         success: true,
-        message: `✉️ [EmailJS] Invoice & QR Ticket sent directly to ${cleanEmail}!`,
+        message: data.message || `✉️ Official Pass & Invoice emailed directly to ${cleanEmail}!`,
         previewHtml: html,
         qrDataUrl,
       };
-    } catch (err: any) {
-      console.error('EmailJS send error:', err);
-      lastErrorNotice = `⚠️ Email delivery notice: ${err?.text || err?.message || 'Check EmailJS API credentials'}.`;
+    } else {
+      return {
+        success: false,
+        message: data.message || `Email delivery failed (${serverlessRes.status}). Students can download their pass directly from the status page.`,
+        previewHtml: html,
+        qrDataUrl,
+      };
     }
+  } catch (networkErr: any) {
+    return {
+      success: false,
+      message: `Email dispatch service unreachable: ${networkErr?.message || 'Network error'}. Pass is saved and accessible on student dashboard.`,
+      previewHtml: html,
+      qrDataUrl,
+    };
   }
-
-  // 4. Preview / Direct Download Mode
-  return {
-    success: false,
-    message: lastErrorNotice || `📧 Pass is ready! Students can download their official pass and QR code directly on the website.`,
-    previewHtml: html,
-    qrDataUrl,
-  };
 };
+
+

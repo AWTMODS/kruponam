@@ -621,36 +621,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Instant 0ms local state update in React
-    setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? approvedRecord : r))
-    );
-    if (inspectItem?.id === id) {
-      setInspectItem(approvedRecord);
-    }
-    addToast(`✅ ${approvedRecord.fullName}'s pass approved!`, 'success');
+    try {
+      // 1. Authoritative Database persistence with cloud synchronization
+      const saved = await approveRegistration(id, approvedRecord);
+      
+      // 2. Update local state
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === id ? (saved || approvedRecord) : r))
+      );
+      if (inspectItem?.id === id) {
+        setInspectItem(saved || approvedRecord);
+      }
+      addToast(`✅ ${approvedRecord.fullName}'s pass approved & saved!`, 'success');
 
-    // 2. Database persistence with cloud synchronization
-    const saved = await approveRegistration(id, approvedRecord);
-    if (saved && inspectItem?.id === id) {
-      setInspectItem(saved);
-    }
-
-    // 3. Asynchronous background email ticket dispatch with immediate toast
-    if (approvedRecord.email) {
-      setSendingEmail(id);
-      sendApprovalEmail(approvedRecord).then((result) => {
-        setSendingEmail(null);
-        if (result.success) {
-          addToast(`✉️ Invoice & QR Pass emailed to ${approvedRecord.email}`, 'success');
-        } else {
-          addToast(`📧 Preview Mode: ${result.message}`, 'info');
-        }
-        setEmailPreview(result);
-      }).catch((err) => {
-        setSendingEmail(null);
-        console.warn('Email dispatch notice:', err);
-      });
+      // 3. Asynchronous background email ticket dispatch with real delivery status
+      if (approvedRecord.email) {
+        setSendingEmail(id);
+        sendApprovalEmail(approvedRecord).then((result) => {
+          setSendingEmail(null);
+          if (result.success) {
+            addToast(`✉️ Invoice & QR Pass emailed to ${approvedRecord.email}`, 'success');
+          } else {
+            addToast(`⚠️ Pass approved! Email notice: ${result.message}`, 'info');
+          }
+          setEmailPreview(result);
+        }).catch((err) => {
+          setSendingEmail(null);
+          addToast(`⚠️ Email dispatch failed: ${err?.message || 'Network error'}`, 'error');
+        });
+      }
+    } catch (err: any) {
+      addToast(`❌ Cloud database update failed: ${err?.message || 'Check database connection'}`, 'error');
     }
   };
 
@@ -677,17 +678,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? updated : r))
-    );
-    if (inspectItem?.id === id) {
-      setInspectItem(updated);
-    }
-    addToast('✅ Student ID Card Approved! Payment QR code unlocked for student.', 'success');
-
-    const res = await approveIdCard(id, updated);
-    if (res && inspectItem?.id === id) {
-      setInspectItem(res);
+    try {
+      const res = await approveIdCard(id, updated);
+      
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === id ? (res || updated) : r))
+      );
+      if (inspectItem?.id === id) {
+        setInspectItem(res || updated);
+      }
+      addToast('✅ Student ID Card Approved & Synced to Cloud! Payment QR code unlocked for student.', 'success');
+    } catch (err: any) {
+      addToast(`❌ Cloud update failed: ${err?.message || 'Failed to save to database'}`, 'error');
     }
   };
 
@@ -710,15 +712,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       updatedAt: new Date().toISOString(),
     };
 
-    setRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? updated : r))
-    );
-    setShowRejectModal(null);
-    setRejectionReasonInput('');
-    if (inspectItem?.id === id) setInspectItem(null);
-    addToast('❌ Application rejected and student notified.', 'error');
-
-    await rejectRegistration(id, reason, updated);
+    try {
+      const res = await rejectRegistration(id, reason, updated);
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === id ? (res || updated) : r))
+      );
+      setShowRejectModal(null);
+      setRejectionReasonInput('');
+      if (inspectItem?.id === id) setInspectItem(res || updated);
+      addToast('❌ Application rejected and updated in database.', 'error');
+    } catch (err: any) {
+      addToast(`❌ Cloud rejection update failed: ${err?.message || 'Database error'}`, 'error');
+    }
   };
 
   const handleMarkReportedDirect = (id: string) => {

@@ -375,6 +375,189 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
     }
   };
 
+  const [isGeneratingPng, setIsGeneratingPng] = useState(false);
+
+  const handleDownloadPassPng = async () => {
+    if (!searchResult) return;
+    setIsGeneratingPng(true);
+
+    try {
+      const qrData = qrCodeUrl || await generateQrCode(`KRUPONAM2026|TOKEN:${searchResult.id}|NAME:${searchResult.fullName}|DEPT:${searchResult.department}|UTR:${searchResult.paymentUtr || 'VERIFIED'}`);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 650;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context unavailable');
+
+      // Background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 1200, 650);
+      bgGrad.addColorStop(0, '#0D472B');
+      bgGrad.addColorStop(0.5, '#125B37');
+      bgGrad.addColorStop(1, '#082E1C');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1200, 650);
+
+      // Gold frame borders
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = '#D4AF37';
+      ctx.strokeRect(16, 16, 1168, 618);
+
+      // Inner dashed decorative border
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.6)';
+      ctx.strokeRect(28, 28, 1144, 594);
+      ctx.setLineDash([]);
+
+      // Header top bar
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 36px "Cinzel", Georgia, serif';
+      ctx.fillText('🌸 KRUPONAM 2026', 60, 85);
+
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.fillText('KRUPANIDHI DEGREE COLLEGE • BENGALURU', 60, 115);
+
+      // Badge tag
+      ctx.fillStyle = '#D4AF37';
+      ctx.beginPath();
+      ctx.roundRect(850, 55, 290, 48, 24);
+      ctx.fill();
+
+      ctx.fillStyle = '#0D472B';
+      ctx.font = 'bold 20px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        (searchResult.ticketType === 'VIP Pass' ? 'STUDENT PASS' : (searchResult.ticketType || 'STUDENT PASS')).toUpperCase(),
+        995,
+        87
+      );
+      ctx.textAlign = 'left';
+
+      // Horizontal separator line
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(60, 145);
+      ctx.lineTo(1140, 145);
+      ctx.stroke();
+
+      // Attendee Section
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('ATTENDEE NAME', 60, 190);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 38px "Segoe UI", Georgia, serif';
+      ctx.fillText(searchResult.fullName, 60, 235);
+
+      // Details Columns
+      // Col 1: Dept & Section
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('DEPARTMENT & SECTION', 60, 295);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillText(`${searchResult.department} — ${searchResult.section || 'Section A'}`, 60, 325);
+
+      // Col 2: Academic Year
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('ACADEMIC YEAR', 420, 295);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillText(searchResult.year, 420, 325);
+
+      // Col 1 Row 2: Event Date
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('EVENT DATE & TIME', 60, 385);
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 22px "Segoe UI", sans-serif';
+      ctx.fillText('Monday, 14 Sep 2026 • 8:00 AM', 60, 415);
+
+      // Col 2 Row 2: Venue
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('VENUE LOCATION', 420, 385);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 20px "Segoe UI", sans-serif';
+      ctx.fillText('PSR Convention Centre, Bengaluru', 420, 415);
+
+      // Payment & Token Info Row
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('PASS TOKEN ID', 60, 475);
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(searchResult.id, 60, 505);
+
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = 'bold 14px "Segoe UI", sans-serif';
+      ctx.fillText('PAYMENT STATUS', 420, 475);
+      ctx.fillStyle = '#4ADE80';
+      ctx.font = 'bold 20px "Segoe UI", sans-serif';
+      ctx.fillText(`✓ ₹700 Paid (${searchResult.paymentUtr || 'Verified'})`, 420, 505);
+
+      // Bottom Footer Bar
+      ctx.fillStyle = 'rgba(13, 71, 43, 0.8)';
+      ctx.fillRect(40, 560, 1120, 50);
+
+      ctx.fillStyle = '#A8D5B5';
+      ctx.font = '13px "Segoe UI", sans-serif';
+      ctx.fillText('✓ Student ID Approved  |  ✓ Entry Badge Validated  |  🌸 Onasadya Feast Token: VALID', 60, 592);
+
+      // Draw QR Code onto Canvas
+      const qrImg = new Image();
+      qrImg.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
+        qrImg.onload = () => resolve();
+        qrImg.onerror = () => reject(new Error('Failed to load QR image'));
+        qrImg.src = qrData;
+      });
+
+      // QR Code container box on right
+      ctx.fillStyle = '#FFFBF0';
+      ctx.beginPath();
+      ctx.roundRect(870, 180, 260, 320, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.drawImage(qrImg, 890, 200, 220, 220);
+
+      ctx.fillStyle = '#0D472B';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`TOKEN: ${searchResult.id}`, 1000, 450);
+
+      ctx.fillStyle = '#666666';
+      ctx.font = 'bold 11px "Segoe UI", sans-serif';
+      ctx.fillText('SCAN AT VENUE GATE', 1000, 475);
+      ctx.textAlign = 'left';
+
+      // Export Canvas to Blob & Trigger Download
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Kruponam2026_Pass_${searchResult.id}.png`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setIsGeneratingPng(false);
+      }, 'image/png');
+    } catch (err) {
+      console.error('PNG Pass export error:', err);
+      setIsGeneratingPng(false);
+      window.print();
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -525,9 +708,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                 </div>
               </div>
 
-              {/* Digital Pass Card (Light & Dark Mode Optimized) */}
+              {/* Digital Pass Card (Light & Dark Mode Optimized + Print Isolated) */}
               <div
-                className={`rounded-3xl overflow-hidden shadow-2xl border-2 transition-all duration-300 p-6 sm:p-8 relative ${
+                className={`printable-ticket-badge rounded-3xl overflow-hidden shadow-2xl border-2 transition-all duration-300 p-6 sm:p-8 relative ${
                   ticketTheme === 'dark'
                     ? 'bg-slate-950 text-slate-100 border-gold-royal/80 shadow-gold-glow'
                     : 'kasavu-card border-gold-royal bg-gradient-to-b from-white via-cream-warm to-white text-slate-800'
@@ -652,11 +835,29 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
 
               <div className="flex flex-wrap justify-center gap-3 pt-2">
                 <button
-                  onClick={handlePrint}
-                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-kerala-deep text-white text-xs font-bold uppercase tracking-wider hover:bg-kerala-emerald shadow-lg transition-all"
+                  onClick={handleDownloadPassPng}
+                  disabled={isGeneratingPng}
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-kerala-deep text-white text-xs font-bold uppercase tracking-wider hover:bg-kerala-emerald shadow-lg transition-all disabled:opacity-50 hover:scale-105 active:scale-95 cursor-pointer"
                 >
-                  <Download className="w-4 h-4 text-gold-royal" />
-                  <span>Download / Print Official Pass</span>
+                  {isGeneratingPng ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 text-gold-royal animate-spin" />
+                      <span>Generating High-Res Pass...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-gold-royal" />
+                      <span>Download Pass (PNG File)</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-slate-800 text-white text-xs font-bold uppercase tracking-wider hover:bg-slate-900 shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-slate-300" />
+                  <span>Print / Save as PDF</span>
                 </button>
 
                 <button
@@ -669,7 +870,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                     setEmailNotice(res.message);
                   }}
                   disabled={isSendingEmail}
-                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-gold-royal text-kerala-dark text-xs font-bold uppercase tracking-wider hover:bg-gold-light shadow-lg transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-gold-royal text-kerala-dark text-xs font-bold uppercase tracking-wider hover:bg-gold-light shadow-lg transition-all disabled:opacity-50 hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   {isSendingEmail ? (
                     <>
@@ -679,7 +880,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                   ) : (
                     <>
                       <Mail className="w-4 h-4" />
-                      <span>Email Ticket Pass To Me</span>
+                      <span>Email Pass To Me</span>
                     </>
                   )}
                 </button>

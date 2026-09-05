@@ -332,14 +332,14 @@ export const getRegistrations = (): Registration[] => {
 };
 
 const STATUS_RANK: Record<string, number> = {
-  'Rejected': 0,
-  'Pending': 1,
   'Pending_ID_Approval': 1,
-  'ID_Approved': 2,
-  'Payment_Pending': 3,
-  'Approved': 4,
-  'VIP_Pending': 4,
-  'VIP': 5,
+  'Pending': 1,
+  'Rejected': 2,
+  'ID_Approved': 3,
+  'Payment_Pending': 4,
+  'Approved': 5,
+  'VIP_Pending': 5,
+  'VIP': 6,
 };
 
 export const deduplicateRegistrations = (list: Registration[]): Registration[] => {
@@ -369,13 +369,10 @@ export const deduplicateRegistrations = (list: Registration[]): Registration[] =
     if (group.length === 1) {
       mergedList.push(group[0]);
     } else {
-      // Sort group to select the primary record (prioritizes KRP-531657, best status, has UTR/ID, latest)
+      // Sort group to select the primary record (prioritizes highest valid status, has UTR/ID, and latest timestamp)
       group.sort((a, b) => {
-        if (a.id.toUpperCase() === 'KRP-531657' || a.id.toUpperCase() === 'KRP-558620' || a.id.toUpperCase() === 'KRP-953085') return -1;
-        if (b.id.toUpperCase() === 'KRP-531657' || b.id.toUpperCase() === 'KRP-558620' || b.id.toUpperCase() === 'KRP-953085') return 1;
-
-        const rankA = STATUS_RANK[a.approvalStatus] || 0;
-        const rankB = STATUS_RANK[b.approvalStatus] || 0;
+        const rankA = STATUS_RANK[a.approvalStatus] || 1;
+        const rankB = STATUS_RANK[b.approvalStatus] || 1;
         if (rankA !== rankB) return rankB - rankA;
 
         const hasUtrA = (a.paymentUtr && a.paymentUtr.trim()) ? 1 : 0;
@@ -393,8 +390,8 @@ export const deduplicateRegistrations = (list: Registration[]): Registration[] =
       const duplicates = group.slice(1);
 
       duplicates.forEach((dup) => {
-        const dupRank = STATUS_RANK[dup.approvalStatus] || 0;
-        const primaryRank = STATUS_RANK[primary.approvalStatus] || 0;
+        const dupRank = STATUS_RANK[dup.approvalStatus] || 1;
+        const primaryRank = STATUS_RANK[primary.approvalStatus] || 1;
         if (dupRank > primaryRank) {
           primary.approvalStatus = dup.approvalStatus;
           primary.paymentStatus = dup.paymentStatus;
@@ -416,7 +413,7 @@ export const deduplicateRegistrations = (list: Registration[]): Registration[] =
     }
   });
 
-  // Purge duplicate IDs from local & cloud storage
+  // Purge duplicate IDs from local storage
   if (idsToRemove.length > 0) {
     idsToRemove.forEach((id) => {
       markIdAsDeleted(id);
@@ -887,6 +884,23 @@ export const approveIdCard = async (id: string, fallbackRecord?: Registration): 
       updatedAt: new Date().toISOString(),
     };
 
+    // Save to active cloud databases
+    const cloudWrites: Promise<boolean>[] = [];
+    if (isFirebaseConfigured()) {
+      cloudWrites.push(saveRegistrationToFirebase(updatedRecord));
+    }
+    if (isSupabaseConfigured()) {
+      cloudWrites.push(saveRegistrationToSupabase(updatedRecord));
+    }
+
+    if (cloudWrites.length > 0) {
+      const results = await Promise.allSettled(cloudWrites);
+      const atLeastOneSuccess = results.some(r => r.status === 'fulfilled' && r.value === true);
+      if (!atLeastOneSuccess) {
+        throw new Error('Failed to update student ID status in cloud database. Please verify internet connection and database permissions.');
+      }
+    }
+
     const remaining = allCurrent.filter((r) => r.id !== target.id);
     const newList = [updatedRecord, ...remaining];
 
@@ -896,11 +910,6 @@ export const approveIdCard = async (id: string, fallbackRecord?: Registration): 
       console.warn('LocalStorage quota notice:', e);
     }
     syncToIndexedDB(updatedRecord);
-
-    await Promise.allSettled([
-      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
-      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]);
 
     return updatedRecord;
   }
@@ -1239,6 +1248,23 @@ export const approveRegistration = async (id: string, fallbackRecord?: Registrat
       updatedAt: new Date().toISOString(),
     };
 
+    // Save to active cloud databases
+    const cloudWrites: Promise<boolean>[] = [];
+    if (isFirebaseConfigured()) {
+      cloudWrites.push(saveRegistrationToFirebase(updatedRecord));
+    }
+    if (isSupabaseConfigured()) {
+      cloudWrites.push(saveRegistrationToSupabase(updatedRecord));
+    }
+
+    if (cloudWrites.length > 0) {
+      const results = await Promise.allSettled(cloudWrites);
+      const atLeastOneSuccess = results.some(r => r.status === 'fulfilled' && r.value === true);
+      if (!atLeastOneSuccess) {
+        throw new Error('Failed to update ticket approval status in cloud database. Please verify internet connection and database permissions.');
+      }
+    }
+
     const remaining = allCurrent.filter((r) => r.id !== target.id);
     const newList = [updatedRecord, ...remaining];
 
@@ -1248,11 +1274,6 @@ export const approveRegistration = async (id: string, fallbackRecord?: Registrat
       console.warn('LocalStorage quota notice:', e);
     }
     syncToIndexedDB(updatedRecord);
-
-    await Promise.allSettled([
-      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
-      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]);
 
     return updatedRecord;
   }
@@ -1284,6 +1305,23 @@ export const rejectRegistration = async (id: string, reason: string, fallbackRec
       updatedAt: new Date().toISOString(),
     };
 
+    // Save to active cloud databases
+    const cloudWrites: Promise<boolean>[] = [];
+    if (isFirebaseConfigured()) {
+      cloudWrites.push(saveRegistrationToFirebase(updatedRecord));
+    }
+    if (isSupabaseConfigured()) {
+      cloudWrites.push(saveRegistrationToSupabase(updatedRecord));
+    }
+
+    if (cloudWrites.length > 0) {
+      const results = await Promise.allSettled(cloudWrites);
+      const atLeastOneSuccess = results.some(r => r.status === 'fulfilled' && r.value === true);
+      if (!atLeastOneSuccess) {
+        throw new Error('Failed to update rejection status in cloud database. Please verify internet connection and database permissions.');
+      }
+    }
+
     const remaining = allCurrent.filter((r) => r.id !== target.id);
     const newList = [updatedRecord, ...remaining];
 
@@ -1293,11 +1331,6 @@ export const rejectRegistration = async (id: string, reason: string, fallbackRec
       console.warn('LocalStorage quota notice:', e);
     }
     syncToIndexedDB(updatedRecord);
-
-    await Promise.allSettled([
-      isFirebaseConfigured() ? saveRegistrationToFirebase(updatedRecord) : Promise.resolve(false),
-      isSupabaseConfigured() ? saveRegistrationToSupabase(updatedRecord) : Promise.resolve(false),
-    ]);
 
     return updatedRecord;
   }
@@ -1685,32 +1718,18 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
             const cloudReg = res.value as Registration;
             const normCloudStatus = normalizeApprovalStatus(cloudReg.approvalStatus);
             
-            // Merge with local match if exists
-            let mergedReg: Registration = {
+            // Cloud record is authoritative across all devices!
+            const mergedReg: Registration = {
+              ...(localMatch || {}),
               ...cloudReg,
               approvalStatus: normCloudStatus,
+              paymentStatus: cloudReg.paymentStatus || (normCloudStatus === 'Approved' || normCloudStatus === 'VIP' || normCloudStatus === 'VIP_Pending' ? 'Verified' : (localMatch?.paymentStatus || 'Pending')),
+              idCardUrl: (cloudReg.idCardUrl && cloudReg.idCardUrl.length > 50) ? cloudReg.idCardUrl : (localMatch?.idCardUrl || cloudReg.idCardUrl),
+              paymentScreenshotUrl: (cloudReg.paymentScreenshotUrl && cloudReg.paymentScreenshotUrl.length > 50) ? cloudReg.paymentScreenshotUrl : (localMatch?.paymentScreenshotUrl || cloudReg.paymentScreenshotUrl),
+              paymentUtr: cloudReg.paymentUtr || localMatch?.paymentUtr || '',
+              rejectionReason: cloudReg.rejectionReason !== undefined ? cloudReg.rejectionReason : localMatch?.rejectionReason,
+              updatedAt: cloudReg.updatedAt || localMatch?.updatedAt || new Date().toISOString(),
             };
-
-            if (localMatch) {
-              const localNorm = normalizeApprovalStatus(localMatch.approvalStatus);
-              const localRank = STATUS_RANK[localNorm] || 1;
-              const cloudRank = STATUS_RANK[normCloudStatus] || 1;
-              
-              // Cloud status takes absolute priority if it is approved, payment pending, approved pass, or rejected
-              const preferCloud = (normCloudStatus !== 'Pending_ID_Approval') || (cloudRank >= localRank);
-
-              mergedReg = {
-                ...localMatch,
-                ...cloudReg,
-                approvalStatus: preferCloud ? normCloudStatus : localNorm,
-                paymentStatus: preferCloud ? cloudReg.paymentStatus : localMatch.paymentStatus,
-                idCardUrl: cloudReg.idCardUrl || localMatch.idCardUrl,
-                paymentScreenshotUrl: cloudReg.paymentScreenshotUrl || localMatch.paymentScreenshotUrl,
-                paymentUtr: cloudReg.paymentUtr || localMatch.paymentUtr,
-                rejectionReason: cloudReg.rejectionReason !== undefined ? cloudReg.rejectionReason : localMatch.rejectionReason,
-                updatedAt: cloudReg.updatedAt || localMatch.updatedAt || new Date().toISOString(),
-              };
-            }
 
             // Update local memory / storage so future lookups are instant
             saveRegistration(mergedReg);
