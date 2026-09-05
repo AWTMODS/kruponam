@@ -307,6 +307,55 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setManualTicketId(newId);
   };
 
+  const handleManualTicketTypeChange = (type: string) => {
+    setManualTicketType(type);
+    const currentPrice = getSiteSettings().ticketAmount || 700;
+
+    if (type === 'Vehicle Driver Pass' || type === 'Bus Driver Pass') {
+      setManualDepartment('Transport & Logistics');
+      setManualSection('Transport Team');
+      setManualYear('Driver / Transport Staff');
+      setManualPaymentMode('Free');
+      setManualPaymentAmount(0);
+      setManualPaymentStatus('Verified');
+      setManualPaymentUtr(`DRIVER-PASS-COMPLIMENTARY`);
+    } else if (type === 'VIP Pass' || type === 'Guest Pass') {
+      setManualDepartment('Guest / External');
+      setManualSection('Honored Guest');
+      setManualYear('VIP Guest');
+      setManualPaymentMode('Free');
+      setManualPaymentAmount(0);
+      setManualPaymentStatus('Verified');
+      setManualPaymentUtr(`VIP-COMPLIMENTARY-PASS`);
+    } else if (type === 'Faculty Pass') {
+      setManualDepartment('Staff / Faculty');
+      setManualSection('Faculty');
+      setManualYear('Faculty / Staff');
+      setManualPaymentMode('Free');
+      setManualPaymentAmount(0);
+      setManualPaymentStatus('Verified');
+      setManualPaymentUtr(`FACULTY-COMPLIMENTARY-PASS`);
+    } else if (type === 'Volunteer Pass') {
+      setManualDepartment('Event Crew & Logistics');
+      setManualSection('Event Volunteer');
+      setManualYear('Volunteer / Crew');
+      setManualPaymentMode('Free');
+      setManualPaymentAmount(0);
+      setManualPaymentStatus('Verified');
+      setManualPaymentUtr(`VOLUNTEER-CREW-PASS`);
+    } else if (type === 'Student Pass') {
+      if (manualDepartment === 'Transport & Logistics' || manualDepartment === 'Event Crew & Logistics') {
+        setManualDepartment('BCA');
+        setManualSection('Section A');
+        setManualYear('1st Year');
+      }
+      setManualPaymentMode('Cash');
+      setManualPaymentAmount(currentPrice);
+      setManualPaymentStatus('Verified');
+      setManualPaymentUtr(`CASH-DESK-${currentPrice}`);
+    }
+  };
+
   const handlePaymentModeChange = (mode: 'Cash' | 'UPI' | 'Card' | 'Free' | 'Bank') => {
     setManualPaymentMode(mode);
     const currentPrice = getSiteSettings().ticketAmount || 700;
@@ -3413,7 +3462,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
                     <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
-                      Department
+                      Department / Unit
                     </label>
                     <select
                       value={manualDepartment}
@@ -3428,8 +3477,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       <option value="Pharmacy">Pharmacy (B.Pharm / D.Pharm)</option>
                       <option value="Nursing">Nursing (B.Sc Nursing / GNM)</option>
                       <option value="MBA / MCA">Post Graduate (MBA / MCA)</option>
-                      <option value="Staff / Faculty">Staff / Faculty</option>
-                      <option value="Guest / External">Guest / External</option>
+                      <option value="Transport & Logistics">🚗 Transport & Logistics (Driver / Transport)</option>
+                      <option value="Event Crew & Logistics">🛠️ Event Crew & Logistics</option>
+                      <option value="Staff / Faculty">👨‍🏫 Staff / Faculty</option>
+                      <option value="Guest / External">👑 Guest / External</option>
                       <option value="Other">Other (Custom)</option>
                     </select>
                   </div>
@@ -3451,7 +3502,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
                   <div>
                     <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
-                      Section
+                      Section / Team
                     </label>
                     <select
                       value={manualSection}
@@ -3464,13 +3515,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       <option value="Section D">Section D</option>
                       <option value="Section E">Section E</option>
                       <option value="Section F">Section F</option>
+                      <option value="Transport Team">Transport / Driver Team</option>
+                      <option value="Event Team">Event Team</option>
                       <option value="N/A">N/A / General</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-300 mb-1">
-                      Academic Year
+                      Academic Year / Role
                     </label>
                     <select
                       value={manualYear}
@@ -3482,6 +3535,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       <option value="3rd Year">3rd Year</option>
                       <option value="4th Year">4th Year</option>
                       <option value="PG / Alumni">PG / Alumni</option>
+                      <option value="Driver / Transport Staff">🚗 Driver / Transport Staff</option>
+                      <option value="Volunteer / Crew">🛠️ Volunteer / Crew</option>
                       <option value="Faculty / Staff">Faculty / Staff</option>
                       <option value="VIP Guest">VIP Guest</option>
                     </select>
@@ -3493,16 +3548,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     </label>
                     <select
                       value={manualTicketType}
-                      onChange={(e) => setManualTicketType(e.target.value)}
+                      onChange={(e) => handleManualTicketTypeChange(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-gold-royal font-bold text-amber-300"
                     >
-                      <option value="Student Pass">Student Pass</option>
-                      <option value="VIP Pass">VIP Pass</option>
-                      <option value="Faculty Pass">Faculty Pass</option>
-                      <option value="Alumni Pass">Alumni Pass</option>
-                      <option value="Guest Pass">Guest Pass</option>
-                      <option value="Spot Registration">Spot Registration Pass</option>
-                      <option value="General Pass">General Pass</option>
+                      <option value="Student Pass">🎓 Student Pass (College)</option>
+                      <option value="Vehicle Driver Pass">🚗 Vehicle Driver Pass</option>
+                      <option value="Bus Driver Pass">🚌 Bus Driver Pass</option>
+                      <option value="Faculty Pass">👨‍🏫 Faculty / Staff Pass</option>
+                      <option value="VIP Pass">👑 VIP / Chief Guest Pass</option>
+                      <option value="Guest Pass">✨ Special Guest Pass</option>
+                      <option value="Volunteer Pass">🛠️ Volunteer / Crew Pass</option>
+                      <option value="Alumni Pass">🎓 Alumni Pass</option>
+                      <option value="Spot Registration">⚡ Spot Registration Pass</option>
+                      <option value="General Pass">🎟️ General Pass</option>
                     </select>
                   </div>
                 </div>

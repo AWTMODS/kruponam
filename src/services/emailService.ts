@@ -105,8 +105,8 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   ['Email Address', registration.email],
                   ['Phone Number', registration.phone],
                   ['Department & Section', `${registration.department} — ${registration.section || 'Section A'} (${registration.year})`],
-                  ['Pass Type', registration.ticketType === 'VIP Pass' ? 'Student Pass' : (registration.ticketType || 'Student Pass')],
-                  ['Amount Paid', '₹700.00'],
+                  ['Pass Type', registration.ticketType || 'Student Pass'],
+                  ['Amount Paid', registration.paymentAmount !== undefined ? (Number(registration.paymentAmount) === 0 ? 'Complimentary (Free)' : `₹${Number(registration.paymentAmount).toFixed(2)}`) : '₹700.00'],
                   ['Payment UTR / Ref', (!registration.paymentUtr || registration.paymentUtr === 'VIP_COMPLIMENTARY' || registration.paymentUtr === 'VIP') ? 'UPI-VERIFIED-700' : registration.paymentUtr],
                   ['Payment Status', '✅ Verified & Confirmed'],
                   ['Event Date', '14 September 2026, 8:00 AM onwards'],
@@ -160,7 +160,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                       📍 PSR Convention Centre
                     </p>
                     <p style="margin:12px 0 0;display:inline-block;padding:5px 14px;background:#D4AF37;color:#0D472B;border-radius:20px;font-size:11px;font-weight:800;letter-spacing:1px;">
-                      ${(registration.ticketType === 'VIP Pass' ? 'STUDENT PASS' : (registration.ticketType || 'STUDENT PASS')).toUpperCase()}
+                      ${(registration.ticketType || 'STUDENT PASS').toUpperCase()}
                     </p>
                     <p style="margin:14px 0 0;font-size:11px;color:#D4AF37;font-family:monospace;font-weight:700;letter-spacing:1px;">
                       TOKEN: ${registration.id}

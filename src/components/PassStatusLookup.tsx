@@ -429,7 +429,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
       ctx.font = 'bold 20px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
-        (searchResult.ticketType === 'VIP Pass' ? 'STUDENT PASS' : (searchResult.ticketType || 'STUDENT PASS')).toUpperCase(),
+        (searchResult.ticketType || 'STUDENT PASS').toUpperCase(),
         995,
         87
       );
@@ -744,7 +744,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
 
                   <div className="text-right">
                     <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-xs font-black uppercase tracking-wider shadow-sm">
-                      {searchResult.ticketType === 'VIP Pass' ? 'Student Pass' : (searchResult.ticketType || 'Student Pass')}
+                      {searchResult.ticketType || 'Student Pass'}
                     </span>
                     <p className={`text-[11px] font-mono mt-1 ${
                       ticketTheme === 'dark' ? 'text-amber-400' : 'text-slate-500'
