@@ -1,12 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+interface ApiRequest {
+  method?: string;
+  body?: any;
+  headers?: Record<string, any>;
+}
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+interface ApiResponse {
+  status: (statusCode: number) => ApiResponse;
+  json: (data: any) => void;
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
   try {
-    const { registration, qrDataUrl } = req.body;
+    const { registration } = req.body || {};
     if (!registration || !registration.email) {
       return res.status(400).json({ success: false, message: 'Missing registration details or email' });
     }
@@ -34,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }),
         });
 
-        const data = await response.json().catch(() => ({}));
+        const data = (await response.json().catch(() => ({}))) as Record<string, any>;
         if (response.ok) {
           return res.status(200).json({
             success: true,
@@ -58,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               html: req.body.html,
             }),
           });
-          const retryData = await retryRes.json().catch(() => ({}));
+          const retryData = (await retryRes.json().catch(() => ({}))) as Record<string, any>;
           if (retryRes.ok) {
             return res.status(200).json({
               success: true,
@@ -89,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }),
         });
 
-        const data = await response.json().catch(() => ({}));
+        const data = (await response.json().catch(() => ({}))) as Record<string, any>;
         if (response.ok) {
           return res.status(200).json({
             success: true,
