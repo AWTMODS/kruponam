@@ -203,7 +203,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
             const chosen = localTime > cloudTime ? localReg! : cloudReg;
             // Auto-reset ID_Approved / Payment_Pending → Pending_ID_Approval
             if (chosen.approvalStatus === 'ID_Approved' || chosen.approvalStatus === 'Payment_Pending') {
-              const reset = { ...chosen, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow };
+              const reset: Registration = { ...chosen, approvalStatus: 'Pending_ID_Approval', paymentStatus: 'Pending', updatedAt: resetNow };
               saveRegistrationAsync(reset).catch(() => {});
               return reset;
             }
@@ -247,10 +247,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         );
         if (toReset.length > 0) {
           const resetNow = new Date().toISOString();
-          const resetMap = new Map(
-            toReset.map((r) => [
+          const resetMap = new Map<string, Registration>(
+            toReset.map((r): [string, Registration] => [
               r.id,
-              { ...r, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow },
+              { ...r, approvalStatus: 'Pending_ID_Approval', paymentStatus: 'Pending', updatedAt: resetNow },
             ])
           );
           // Update UI state immediately
@@ -1216,9 +1216,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
 
     // Optimistic UI update first
     const resetNow = new Date().toISOString();
-    const resetMap = new Map(targets.map((r) => [
+    const resetMap = new Map<string, Registration>(targets.map((r): [string, Registration] => [
       r.id,
-      { ...r, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow },
+      { ...r, approvalStatus: 'Pending_ID_Approval', paymentStatus: 'Pending', updatedAt: resetNow },
     ]));
 
     setRegistrations((prev) =>

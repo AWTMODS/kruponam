@@ -146,7 +146,13 @@ const loadAllFromIndexedDB = (): Promise<Registration[]> => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
+      req.onsuccess = () => {
+        const raw = (req.result || []) as Registration[];
+        resolve(raw.map((item) => ({
+          ...item,
+          approvalStatus: normalizeApprovalStatus(item.approvalStatus),
+        })));
+      };
       req.onerror = () => resolve([]);
     } catch (e) {
       resolve([]);
@@ -327,6 +333,7 @@ export const getRegistrations = (): Registration[] => {
     return list.map((item: any) => ({
       ...item,
       section: item.section || 'Section A',
+      approvalStatus: normalizeApprovalStatus(item.approvalStatus),
     }));
   } catch (e) {
     return INITIAL_REGISTRATIONS.filter((r) => !deletedIds.has(r.id));

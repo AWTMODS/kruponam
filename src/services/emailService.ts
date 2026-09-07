@@ -254,7 +254,10 @@ export const sendApprovalEmail = async (registration: Registration): Promise<Ema
 
   // Serverless Backend Dispatch (/api/send-approval-email)
   try {
-    const serverlessRes = await fetch('/api/send-approval-email', {
+    const isVercelHost = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+    const endpoint = isVercelHost ? '/api/send-approval-email' : 'https://kruponam.vercel.app/api/send-approval-email';
+
+    const serverlessRes = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
