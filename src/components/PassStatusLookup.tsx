@@ -240,7 +240,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
     return () => clearInterval(pollInterval);
   }, [searchResult, searchQuery]);
 
-  const performSearch = async (queryText: string) => {
+  const performSearch = async (queryText: string, forceFresh: boolean = false) => {
     const q = queryText.trim();
     if (!q) return;
 
@@ -248,29 +248,35 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
     setHasSearched(true);
     setSearchQuery(q);
 
-    // 1. Instant 0ms response from local memory / IndexedDB cache
+    // 1. Instant check from local memory / IndexedDB cache
     const instantMatch = findRegistration(q);
-    if (instantMatch) {
+    const isLocalPending = instantMatch && (instantMatch.approvalStatus === 'Pending_ID_Approval' || instantMatch.approvalStatus === 'Pending');
+
+    // If local record is already Approved/VIP, show immediately. If it is Pending, show loader so live admin approval shows up right away
+    if (instantMatch && !isLocalPending && !forceFresh) {
       setSearchResult(instantMatch);
     } else {
-      setSearchResult(undefined); // Show loader only if no local cache match
+      setSearchResult(undefined);
     }
 
     setIsSearching(true);
 
     try {
-      // 2. Fast parallel cloud lookup for latest real-time approval status
+      // 2. Fast authoritative cloud lookup for real-time approval status
       const latest = await findRegistrationAsync(q);
       if (latest) {
         setSearchResult(latest);
-      } else if (!instantMatch) {
+      } else if (instantMatch) {
+        setSearchResult(instantMatch);
+      } else {
         setSearchResult(null);
       }
     } catch (err) {
       console.warn('Live lookup search notice:', err);
-      if (!instantMatch) {
-        const fallback = findRegistration(q);
-        setSearchResult(fallback || null);
+      if (instantMatch) {
+        setSearchResult(instantMatch);
+      } else {
+        setSearchResult(null);
       }
     } finally {
       setIsSearching(false);
@@ -1164,7 +1170,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+                  onClick={() => performSearch(searchQuery, true)}
                   disabled={isSearching}
                   className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >
@@ -1199,7 +1205,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => handleSearch({ preventDefault: () => {} } as any)}
+                  onClick={() => performSearch(searchQuery, true)}
                   disabled={isSearching}
                   className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >
