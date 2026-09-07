@@ -1850,23 +1850,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                       </button>
                     );
                   })}
-                </div>
 
-                {/* Bulk Reset Button — only when ID_Approved tab is active */}
-                {statusFilter === 'ID_Approved' && idApprovedApps > 0 && (
-                  <button
-                    onClick={() => {
-                      if (window.confirm(`Reset all ${idApprovedApps} "ID Approved (Pay Pending)" records back to "Pending ID Review"? This cannot be undone.`)) {
-                        handleBulkResetToIdPending();
-                      }
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold flex items-center gap-2 transition-all shrink-0"
-                    title="Move all ID Approved (Pay Pending) records back to Pending ID Review"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Reset All {idApprovedApps} to Pending ID Review
-                  </button>
-                )}
+                  {/* Bulk Reset Button — inside pill row, wraps naturally */}
+                  {statusFilter === 'ID_Approved' && idApprovedApps > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Reset all ${idApprovedApps} "ID Approved (Pay Pending)" records back to "Pending ID Review"? This cannot be undone.`)) {
+                          handleBulkResetToIdPending();
+                        }
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold flex items-center gap-2 transition-all"
+                      title="Move all ID Approved (Pay Pending) records back to Pending ID Review"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Reset All {idApprovedApps} to Pending ID Review
+                    </button>
+                  )}
+                </div>
 
                 {/* Search Bar */}
                 <div className="relative w-full lg:w-80">
