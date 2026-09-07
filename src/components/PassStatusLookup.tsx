@@ -235,9 +235,27 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
           setSearchResult(live);
         }
       } catch (_) {}
-    }, 4000);
+    }, 3500);
 
-    return () => clearInterval(pollInterval);
+    // Auto-update immediately when student returns to tab / unlocks phone (especially iOS Safari)
+    const handleRecheckOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        findRegistrationAsync(lookupQuery).then((live) => {
+          if (live && live.approvalStatus !== searchResult.approvalStatus) {
+            setSearchResult(live);
+          }
+        }).catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleRecheckOnFocus);
+    window.addEventListener('focus', handleRecheckOnFocus);
+
+    return () => {
+      clearInterval(pollInterval);
+      document.removeEventListener('visibilitychange', handleRecheckOnFocus);
+      window.removeEventListener('focus', handleRecheckOnFocus);
+    };
   }, [searchResult, searchQuery]);
 
   const performSearch = async (queryText: string, forceFresh: boolean = false) => {
@@ -1170,7 +1188,10 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => performSearch(searchQuery, true)}
+                  onClick={() => {
+                    const qToUse = searchQuery.trim() || searchResult?.id || searchResult?.phone || searchResult?.email || '';
+                    if (qToUse) performSearch(qToUse, true);
+                  }}
                   disabled={isSearching}
                   className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >
@@ -1205,7 +1226,10 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => performSearch(searchQuery, true)}
+                  onClick={() => {
+                    const qToUse = searchQuery.trim() || searchResult?.id || searchResult?.phone || searchResult?.email || '';
+                    if (qToUse) performSearch(qToUse, true);
+                  }}
                   disabled={isSearching}
                   className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >

@@ -83,7 +83,7 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
     if (!isPending) return;
 
     const regId = submittedRegistration.id;
-    const interval = setInterval(async () => {
+    const checkLiveRegistration = async () => {
       try {
         const latest = await findRegistrationAsync(regId);
         if (latest && latest.approvalStatus !== submittedRegistration.approvalStatus) {
@@ -98,9 +98,23 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
           }
         }
       } catch (_) {}
-    }, 3000);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(checkLiveRegistration, 3000);
+
+    const handleFocusCheck = () => {
+      if (document.visibilityState === 'visible') {
+        checkLiveRegistration();
+      }
+    };
+    document.addEventListener('visibilitychange', handleFocusCheck);
+    window.addEventListener('focus', handleFocusCheck);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleFocusCheck);
+      window.removeEventListener('focus', handleFocusCheck);
+    };
   }, [submittedRegistration]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

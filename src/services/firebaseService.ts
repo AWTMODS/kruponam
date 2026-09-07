@@ -332,6 +332,27 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
         const restIdMatch = await runFirestoreRestQuery('id', idKey);
         if (restIdMatch) return restIdMatch;
       } catch (_) {}
+
+      try {
+        const creds = getFirebaseConfig();
+        if (creds && creds.projectId && creds.apiKey) {
+          const docUrl = `https://firestore.googleapis.com/v1/projects/${creds.projectId}/databases/(default)/documents/registrations/${idKey}?key=${creds.apiKey}`;
+          const rRes = await fetch(docUrl);
+          if (rRes.ok) {
+            const rData = await rRes.json();
+            if (rData?.fields) {
+              const docData: any = {};
+              for (const k of Object.keys(rData.fields)) {
+                const valObj = rData.fields[k];
+                docData[k] = valObj.stringValue !== undefined ? valObj.stringValue :
+                             valObj.integerValue !== undefined ? Number(valObj.integerValue) :
+                             valObj.booleanValue !== undefined ? valObj.booleanValue : valObj;
+              }
+              return mapFirebaseDoc(docData, docData.id || idKey);
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     // ── 3. EMAIL SEARCH (When query has @) ─────────────────────────────────────────
