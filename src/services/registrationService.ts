@@ -487,7 +487,7 @@ export const syncCloudRegistrations = async (): Promise<Registration[]> => {
         rejectionReason: r.rejectionReason || existing.rejectionReason,
         isReported: r.isReported !== undefined ? r.isReported : existing.isReported,
         reportedAt: r.reportedAt || existing.reportedAt,
-        updatedAt: new Date().toISOString()
+        updatedAt: preferCloudStatus ? (r.updatedAt || new Date().toISOString()) : (existing.updatedAt || new Date().toISOString())
       };
 
       localMap.set(r.id, mergedRecord);

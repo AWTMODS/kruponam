@@ -30,6 +30,33 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
+const APPROVAL_RANK: Record<string, number> = {
+  'Pending_ID_Approval': 1,
+  'Pending': 1,
+  'Rejected': 2,
+  'ID_Approved': 3,
+  'Payment_Pending': 4,
+  'Approved': 5,
+  'VIP_Pending': 5,
+  'VIP': 6,
+};
+
+const mergeRegRecords = (local?: Registration, cloud?: Registration): Registration => {
+  if (!local) return cloud!;
+  if (!cloud) return local;
+
+  const localRank = APPROVAL_RANK[local.approvalStatus] || 1;
+  const cloudRank = APPROVAL_RANK[cloud.approvalStatus] || 1;
+
+  // Higher status rank always wins! Never downgrade from ID_Approved to Pending_ID_Approval!
+  if (localRank > cloudRank) return local;
+  if (cloudRank > localRank) return cloud;
+
+  const cloudTime = cloud.updatedAt ? new Date(cloud.updatedAt).getTime() : 0;
+  const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+  return localTime > cloudTime ? local : cloud;
+};
+
 export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
@@ -190,12 +217,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       if (fbRegs && fbRegs.length > 0) {
         setRegistrations((current: Registration[]) => {
           const localMap = new Map<string, Registration>(current.map((r) => [r.id, r]));
-          const merged = fbRegs.map((cloudReg: Registration) => {
-            const localReg = localMap.get(cloudReg.id);
-            const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
-            const localTime = localReg?.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
-            return localTime > cloudTime ? localReg! : cloudReg;
-          });
+          const merged = fbRegs.map((cloudReg: Registration) => mergeRegRecords(localMap.get(cloudReg.id), cloudReg));
           const cloudIds = new Set(fbRegs.map((r) => r.id));
           current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
           return merged;
@@ -210,12 +232,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       syncCloudRegistrations().then((regs) => {
         setRegistrations((current) => {
           const localMap = new Map(current.map((r) => [r.id, r]));
-          const merged = regs.map((cloudReg) => {
-            const localReg = localMap.get(cloudReg.id);
-            const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
-            const localTime = localReg?.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
-            return localTime > cloudTime ? localReg! : cloudReg;
-          });
+          const merged = regs.map((cloudReg) => mergeRegRecords(localMap.get(cloudReg.id), cloudReg));
           const cloudIds = new Set(regs.map((r) => r.id));
           current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
           return merged;
@@ -244,7 +261,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     try {
       const regs = await syncCloudRegistrations();
       if (regs && regs.length > 0) {
-        setRegistrations(regs);
+        setRegistrations((current) => {
+          const localMap = new Map(current.map((r) => [r.id, r]));
+          const merged = regs.map((cloudReg) => mergeRegRecords(localMap.get(cloudReg.id), cloudReg));
+          const cloudIds = new Set(regs.map((r) => r.id));
+          current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
+          return merged;
+        });
       }
     } catch (_) {}
 

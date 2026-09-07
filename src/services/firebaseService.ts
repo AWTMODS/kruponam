@@ -111,54 +111,83 @@ export const testFirebaseConnection = async (): Promise<{ success: boolean; mess
 
 // ── Realtime Operations for Registrations ──────────────────────────────
 export const saveRegistrationToFirebase = async (reg: Registration): Promise<boolean> => {
+  let success = false;
   const db = getFirebaseDb();
-  if (!db) return false;
+  const config = getFirebaseConfig();
 
-  try {
-    // Compress base64 images if they exceed safe Firestore document size (Firestore doc limit = 1MB)
-    let safeIdCard = reg.idCardUrl || '';
-    let safePayment = reg.paymentScreenshotUrl || '';
+  // 1. Try Firebase Web SDK
+  if (db) {
+    try {
+      let safeIdCard = reg.idCardUrl || '';
+      let safePayment = reg.paymentScreenshotUrl || '';
 
-    if (safeIdCard.startsWith('data:image') && safeIdCard.length > 250 * 1024) {
-      safeIdCard = await downscaleBase64(safeIdCard, 180 * 1024);
+      if (safeIdCard.startsWith('data:image') && safeIdCard.length > 250 * 1024) {
+        safeIdCard = await downscaleBase64(safeIdCard, 180 * 1024);
+      }
+      if (safePayment.startsWith('data:image') && safePayment.length > 250 * 1024) {
+        safePayment = await downscaleBase64(safePayment, 180 * 1024);
+      }
+
+      const cleanReg: Record<string, any> = {
+        id: reg.id,
+        fullName: reg.fullName || '',
+        email: reg.email || '',
+        phone: reg.phone || '',
+        department: reg.department || '',
+        section: reg.section || 'Section A',
+        year: reg.year || '1st Year',
+        gender: reg.gender || 'Other',
+        ticketType: reg.ticketType || 'General Pass',
+        idCardUrl: safeIdCard,
+        paymentScreenshotUrl: safePayment,
+        paymentAmount: reg.paymentAmount !== undefined ? Number(reg.paymentAmount) : (reg.ticketType === 'VIP Pass' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 0 : 700),
+        paymentStatus: reg.paymentStatus || (reg.approvalStatus === 'Approved' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 'Verified' : 'Pending'),
+        paymentUtr: reg.paymentUtr || '',
+        approvalStatus: reg.approvalStatus || 'Pending_ID_Approval',
+        approval_status: reg.approvalStatus || 'Pending_ID_Approval',
+        status: reg.approvalStatus || 'Pending_ID_Approval',
+        rejectionReason: reg.rejectionReason || '',
+        submittedAt: reg.submittedAt || new Date().toLocaleDateString('en-US'),
+        approvedAt: reg.approvedAt || '',
+        updatedAt: reg.updatedAt || new Date().toISOString(),
+        isReported: Boolean(reg.isReported),
+        reportedAt: reg.reportedAt || '',
+      };
+
+      const docRef = doc(db, 'registrations', reg.id);
+      await setDoc(docRef, cleanReg, { merge: true });
+      success = true;
+    } catch (err) {
+      console.warn('Firebase Web SDK save exception, attempting REST patch:', err);
     }
-    if (safePayment.startsWith('data:image') && safePayment.length > 250 * 1024) {
-      safePayment = await downscaleBase64(safePayment, 180 * 1024);
-    }
-
-    const cleanReg: Record<string, any> = {
-      id: reg.id,
-      fullName: reg.fullName || '',
-      email: reg.email || '',
-      phone: reg.phone || '',
-      department: reg.department || '',
-      section: reg.section || 'Section A',
-      year: reg.year || '1st Year',
-      gender: reg.gender || 'Other',
-      ticketType: reg.ticketType || 'General Pass',
-      idCardUrl: safeIdCard,
-      paymentScreenshotUrl: safePayment,
-      paymentAmount: reg.paymentAmount !== undefined ? Number(reg.paymentAmount) : (reg.ticketType === 'VIP Pass' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 0 : 700),
-      paymentStatus: reg.paymentStatus || (reg.approvalStatus === 'Approved' || reg.approvalStatus === 'VIP' || reg.approvalStatus === 'VIP_Pending' ? 'Verified' : 'Pending'),
-      paymentUtr: reg.paymentUtr || '',
-      approvalStatus: reg.approvalStatus || 'Pending_ID_Approval',
-      approval_status: reg.approvalStatus || 'Pending_ID_Approval',
-      status: reg.approvalStatus || 'Pending_ID_Approval',
-      rejectionReason: reg.rejectionReason || '',
-      submittedAt: reg.submittedAt || new Date().toLocaleDateString('en-US'),
-      approvedAt: reg.approvedAt || '',
-      updatedAt: reg.updatedAt || new Date().toISOString(),
-      isReported: Boolean(reg.isReported),
-      reportedAt: reg.reportedAt || '',
-    };
-
-    const docRef = doc(db, 'registrations', reg.id);
-    await setDoc(docRef, cleanReg, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('Firebase save exception:', err);
-    return false;
   }
+
+  // 2. Direct Firestore REST API update (ensures immediate cloud persistence even if Web SDK has gRPC issues)
+  if (config && config.apiKey && config.projectId) {
+    try {
+      const patchUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/registrations/${reg.id}?updateMask.fieldPaths=approvalStatus&updateMask.fieldPaths=approval_status&updateMask.fieldPaths=status&updateMask.fieldPaths=paymentStatus&updateMask.fieldPaths=updatedAt&key=${config.apiKey}`;
+      const restRes = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            approvalStatus: { stringValue: reg.approvalStatus || 'Pending_ID_Approval' },
+            approval_status: { stringValue: reg.approvalStatus || 'Pending_ID_Approval' },
+            status: { stringValue: reg.approvalStatus || 'Pending_ID_Approval' },
+            paymentStatus: { stringValue: reg.paymentStatus || 'Pending' },
+            updatedAt: { stringValue: reg.updatedAt || new Date().toISOString() },
+          },
+        }),
+      });
+      if (restRes.ok) {
+        success = true;
+      }
+    } catch (restErr) {
+      console.warn('Firestore REST patch notice:', restErr);
+    }
+  }
+
+  return success;
 };
 
 const mapFirebaseDoc = (data: any, docId: string): Registration => {
