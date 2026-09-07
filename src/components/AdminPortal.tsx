@@ -186,11 +186,29 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     const timer = setInterval(updateClock, 1000);
 
     // Auto-polling interval for multi-device cloud database sync (10 seconds)
+    // Uses smart merge: keeps whichever record (local or cloud) has the more recent updatedAt,
+    // preventing optimistic UI updates from being overwritten by stale cloud data.
     const syncInterval = setInterval(() => {
       syncCloudRegistrations().then((regs) => {
-        setRegistrations(regs);
+        setRegistrations((current) => {
+          // Build a map of current (local) records by id
+          const localMap = new Map(current.map((r) => [r.id, r]));
+          // For each cloud record, take the one with the more recent updatedAt
+          const merged = regs.map((cloudReg) => {
+            const localReg = localMap.get(cloudReg.id);
+            if (!localReg) return cloudReg;
+            const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
+            const localTime = localReg.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
+            return localTime > cloudTime ? localReg : cloudReg;
+          });
+          // Add any local records not in cloud (newly added locally but not yet synced)
+          const cloudIds = new Set(regs.map((r) => r.id));
+          current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
+          return merged;
+        });
       });
     }, 10000);
+
 
     return () => {
       clearInterval(timer);
@@ -670,18 +688,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       updatedAt: new Date().toISOString(),
     };
 
+    // ── Optimistic UI update — reflect approval immediately in the UI
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? approvedRecord : r))
+    );
+    if (inspectItem?.id === id) {
+      setInspectItem(approvedRecord);
+    }
+    addToast(`✅ ${approvedRecord.fullName}'s pass approved!`, 'success');
+
     try {
       // 1. Authoritative Database persistence with cloud synchronization
       const saved = await approveRegistration(id, approvedRecord);
       
-      // 2. Update local state
-      setRegistrations((prev) =>
-        prev.map((r) => (r.id === id ? (saved || approvedRecord) : r))
-      );
-      if (inspectItem?.id === id) {
-        setInspectItem(saved || approvedRecord);
+      // 2. Merge cloud-returned record (may differ slightly from optimistic)
+      if (saved) {
+        setRegistrations((prev) =>
+          prev.map((r) => (r.id === id ? saved : r))
+        );
+        if (inspectItem?.id === id) {
+          setInspectItem(saved);
+        }
       }
-      addToast(`✅ ${approvedRecord.fullName}'s pass approved & saved!`, 'success');
 
       // 3. Asynchronous background email ticket dispatch with real delivery status
       if (approvedRecord.email) {
@@ -700,7 +728,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         });
       }
     } catch (err: any) {
-      addToast(`❌ Cloud database update failed: ${err?.message || 'Check database connection'}`, 'error');
+      // Keep optimistic state — approval is saved locally, warn about cloud sync failure
+      addToast(`⚠️ Approved locally but cloud sync failed: ${err?.message || 'Check database connection'}. Will retry on next sync.`, 'error');
     }
   };
 
@@ -727,18 +756,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       updatedAt: new Date().toISOString(),
     };
 
+    // ── Optimistic UI update — update local state immediately so the UI
+    //    reflects ID_Approved right away, even before cloud finishes writing.
+    setRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? updated : r))
+    );
+    if (inspectItem?.id === id) {
+      setInspectItem(updated);
+    }
+
     try {
       const res = await approveIdCard(id, updated);
-      
-      setRegistrations((prev) =>
-        prev.map((r) => (r.id === id ? (res || updated) : r))
-      );
-      if (inspectItem?.id === id) {
-        setInspectItem(res || updated);
+      // Merge cloud-returned record (may differ slightly from optimistic), keep whichever is truthy
+      if (res) {
+        setRegistrations((prev) =>
+          prev.map((r) => (r.id === id ? res : r))
+        );
+        if (inspectItem?.id === id) {
+          setInspectItem(res);
+        }
       }
       addToast('✅ Student ID Card Approved & Synced to Cloud! Payment QR code unlocked for student.', 'success');
     } catch (err: any) {
-      addToast(`❌ Cloud update failed: ${err?.message || 'Failed to save to database'}`, 'error');
+      // Keep the optimistic state — don't revert. Show warning but leave UI updated
+      addToast(`⚠️ ID approved locally but cloud sync failed: ${err?.message || 'Failed to save to database'}. Data will sync on next refresh.`, 'error');
     }
   };
 
@@ -1130,6 +1171,50 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     setBulkResendRunning(false);
     addToast(`📢 Broadcast Finished! ${successCount} sent successfully, ${failCount} failed.`, successCount > 0 ? 'success' : 'error');
   };
+
+  // ── Bulk Reset: Move all ID_Approved / Payment_Pending → Pending_ID_Approval ──
+  const handleBulkResetToIdPending = async () => {
+    const targets = registrations.filter(
+      (r) => r.approvalStatus === 'ID_Approved' || r.approvalStatus === 'Payment_Pending'
+    );
+    if (targets.length === 0) {
+      addToast('No ID Approved or Pay Pending records found to reset.', 'info');
+      return;
+    }
+
+    // Optimistic UI update first
+    const resetNow = new Date().toISOString();
+    const resetMap = new Map(targets.map((r) => [
+      r.id,
+      { ...r, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow },
+    ]));
+
+    setRegistrations((prev) =>
+      prev.map((r) => resetMap.has(r.id) ? resetMap.get(r.id)! : r)
+    );
+    addToast(`🔄 Resetting ${targets.length} records to Pending ID Review...`, 'info');
+
+    // Cloud saves in parallel
+    let success = 0;
+    let fail = 0;
+    const batch = Array.from(resetMap.values());
+    await Promise.allSettled(
+      batch.map(async (updated) => {
+        try {
+          await saveRegistrationAsync(updated);
+          success++;
+        } catch {
+          fail++;
+        }
+      })
+    );
+
+    addToast(
+      `✅ Reset complete: ${success} records moved to Pending ID Review${ fail > 0 ? `, ${fail} cloud saves failed (saved locally)` : '' }.`,
+      success > 0 ? 'success' : 'error'
+    );
+  };
+
 
   const STATUS_PRIORITY: Record<string, number> = {
     'VIP': 0,
@@ -1766,6 +1851,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                     );
                   })}
                 </div>
+
+                {/* Bulk Reset Button — only when ID_Approved tab is active */}
+                {statusFilter === 'ID_Approved' && idApprovedApps > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Reset all ${idApprovedApps} "ID Approved (Pay Pending)" records back to "Pending ID Review"? This cannot be undone.`)) {
+                        handleBulkResetToIdPending();
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold flex items-center gap-2 transition-all shrink-0"
+                    title="Move all ID Approved (Pay Pending) records back to Pending ID Review"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Reset All {idApprovedApps} to Pending ID Review
+                  </button>
+                )}
 
                 {/* Search Bar */}
                 <div className="relative w-full lg:w-80">

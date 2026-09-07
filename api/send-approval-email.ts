@@ -20,9 +20,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return res.status(400).json({ success: false, message: 'Missing registration details or email' });
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY || '';
-    const resendFrom = process.env.RESEND_FROM_EMAIL || 'Kruponam 2026 <onboarding@resend.dev>';
-    const brevoApiKey = process.env.BREVO_API_KEY || '';
+    const resendApiKey = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || '';
+    const resendFrom = process.env.RESEND_FROM_EMAIL || process.env.VITE_RESEND_FROM_EMAIL || 'Kruponam 2026 <onboarding@resend.dev>';
+    const brevoApiKey = process.env.BREVO_API_KEY || process.env.VITE_BREVO_API_KEY || '';
 
     const cleanEmail = registration.email.trim().toLowerCase();
 
@@ -82,7 +82,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     // 2. Try Brevo API if valid v3 API key (starts with xkeysib-)
-    if (brevoApiKey && brevoApiKey.startsWith('xkeysib-')) {
+    if (brevoApiKey && (brevoApiKey.startsWith('xkeysib-') || brevoApiKey.startsWith('xsmtpsib-'))) {
       try {
         const response = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
