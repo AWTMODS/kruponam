@@ -1700,62 +1700,64 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
   const localList = getRegistrations();
   const localMatch = localList.find((r) => matchRecord(r, lowerQ));
 
-  // Perform superfast targeted lookup from Firebase & Supabase in parallel
-  try {
-    const cloudPromises: Promise<Registration | null>[] = [];
-    if (isFirebaseConfigured()) {
-      cloudPromises.push(findRegistrationInFirebase(q));
-      if (localMatch?.id && localMatch.id.toLowerCase() !== lowerQ) {
-        cloudPromises.push(findRegistrationInFirebase(localMatch.id));
+  // 1. Direct authoritative lookup from Firebase Firestore (authoritative source)
+  if (isFirebaseConfigured()) {
+    try {
+      let cloudReg = await findRegistrationInFirebase(q);
+      
+      // If not found by query text, but local match has a known Registration ID, lookup directly by that ID
+      if (!cloudReg && localMatch?.id && localMatch.id.toLowerCase() !== lowerQ) {
+        cloudReg = await findRegistrationInFirebase(localMatch.id);
       }
-      if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
-        cloudPromises.push(findRegistrationInFirebase(`KRP-${digitsOnly}`));
+      
+      if (!cloudReg && digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
+        cloudReg = await findRegistrationInFirebase(`KRP-${digitsOnly}`);
       }
-    }
-    if (isSupabaseConfigured()) {
-      cloudPromises.push(findRegistrationInSupabase(q));
-      if (localMatch?.id && localMatch.id.toLowerCase() !== lowerQ) {
-        cloudPromises.push(findRegistrationInSupabase(localMatch.id));
-      }
-      if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
-        cloudPromises.push(findRegistrationInSupabase(`KRP-${digitsOnly}`));
-      }
-    }
 
-    if (cloudPromises.length > 0) {
-      const results = await Promise.race([
-        Promise.allSettled(cloudPromises),
-        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000)),
-      ]);
+      if (cloudReg) {
+        const normCloudStatus = normalizeApprovalStatus(cloudReg.approvalStatus);
+        const mergedReg: Registration = {
+          ...(localMatch || {}),
+          ...cloudReg,
+          approvalStatus: normCloudStatus,
+          paymentStatus: cloudReg.paymentStatus || (normCloudStatus === 'Approved' || normCloudStatus === 'VIP' || normCloudStatus === 'VIP_Pending' ? 'Verified' : (localMatch?.paymentStatus || 'Pending')),
+          idCardUrl: (cloudReg.idCardUrl && cloudReg.idCardUrl.length > 50) ? cloudReg.idCardUrl : (localMatch?.idCardUrl || cloudReg.idCardUrl),
+          paymentScreenshotUrl: (cloudReg.paymentScreenshotUrl && cloudReg.paymentScreenshotUrl.length > 50) ? cloudReg.paymentScreenshotUrl : (localMatch?.paymentScreenshotUrl || cloudReg.paymentScreenshotUrl),
+          paymentUtr: cloudReg.paymentUtr || localMatch?.paymentUtr || '',
+          rejectionReason: cloudReg.rejectionReason !== undefined ? cloudReg.rejectionReason : localMatch?.rejectionReason,
+          updatedAt: cloudReg.updatedAt || localMatch?.updatedAt || new Date().toISOString(),
+        };
 
-      if (Array.isArray(results)) {
-        for (const res of results) {
-          if (res.status === 'fulfilled' && res.value) {
-            const cloudReg = res.value as Registration;
-            const normCloudStatus = normalizeApprovalStatus(cloudReg.approvalStatus);
-            
-            // Cloud record is authoritative across all devices!
-            const mergedReg: Registration = {
-              ...(localMatch || {}),
-              ...cloudReg,
-              approvalStatus: normCloudStatus,
-              paymentStatus: cloudReg.paymentStatus || (normCloudStatus === 'Approved' || normCloudStatus === 'VIP' || normCloudStatus === 'VIP_Pending' ? 'Verified' : (localMatch?.paymentStatus || 'Pending')),
-              idCardUrl: (cloudReg.idCardUrl && cloudReg.idCardUrl.length > 50) ? cloudReg.idCardUrl : (localMatch?.idCardUrl || cloudReg.idCardUrl),
-              paymentScreenshotUrl: (cloudReg.paymentScreenshotUrl && cloudReg.paymentScreenshotUrl.length > 50) ? cloudReg.paymentScreenshotUrl : (localMatch?.paymentScreenshotUrl || cloudReg.paymentScreenshotUrl),
-              paymentUtr: cloudReg.paymentUtr || localMatch?.paymentUtr || '',
-              rejectionReason: cloudReg.rejectionReason !== undefined ? cloudReg.rejectionReason : localMatch?.rejectionReason,
-              updatedAt: cloudReg.updatedAt || localMatch?.updatedAt || new Date().toISOString(),
-            };
-
-            // Update local memory / storage so future lookups are instant
-            saveRegistration(mergedReg);
-            return mergedReg;
-          }
-        }
+        // Cache into local memory & storage so UI is always in sync
+        saveRegistration(mergedReg);
+        return mergedReg;
       }
+    } catch (e) {
+      console.warn('Authoritative Firebase lookup notice:', e);
     }
-  } catch (e) {
-    console.warn('Fast cloud search notice:', e);
+  }
+
+  // 2. Optional Supabase lookup if configured with custom working keys
+  if (isSupabaseConfigured()) {
+    try {
+      let supaReg = await findRegistrationInSupabase(q);
+      if (!supaReg && localMatch?.id) {
+        supaReg = await findRegistrationInSupabase(localMatch.id);
+      }
+      if (supaReg) {
+        const normStatus = normalizeApprovalStatus(supaReg.approvalStatus);
+        const mergedReg: Registration = {
+          ...(localMatch || {}),
+          ...supaReg,
+          approvalStatus: normStatus,
+          updatedAt: supaReg.updatedAt || new Date().toISOString(),
+        };
+        saveRegistration(mergedReg);
+        return mergedReg;
+      }
+    } catch (e) {
+      console.warn('Secondary Supabase lookup notice:', e);
+    }
   }
 
   if (localMatch) return localMatch;

@@ -52,6 +52,12 @@ export const getSupabaseClient = (): SupabaseClient | null => {
 
 export const isSupabaseConfigured = (): boolean => {
   if (isSupabaseDisabled) return false;
+  const { url, key } = getSupabaseCredentials();
+  if (!url || !key) return false;
+  // If key is the expired default placeholder and not explicitly set by admin, do not invoke Supabase
+  if (key === DEFAULT_SUPABASE_ANON_KEY && !localStorage.getItem(SUPABASE_ANON_KEY) && !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return false;
+  }
   return getSupabaseClient() !== null;
 };
 
