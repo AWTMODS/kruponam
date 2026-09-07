@@ -193,13 +193,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         setRegistrations((current) => {
           // Build a map of current (local) records by id
           const localMap = new Map(current.map((r) => [r.id, r]));
+          const resetNow = new Date().toISOString();
           // For each cloud record, take the one with the more recent updatedAt
+          // and auto-reset any ID_Approved / Payment_Pending to Pending_ID_Approval
           const merged = regs.map((cloudReg) => {
             const localReg = localMap.get(cloudReg.id);
-            if (!localReg) return cloudReg;
             const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
-            const localTime = localReg.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
-            return localTime > cloudTime ? localReg : cloudReg;
+            const localTime = localReg?.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
+            const chosen = localTime > cloudTime ? localReg! : cloudReg;
+            // Auto-reset ID_Approved / Payment_Pending → Pending_ID_Approval
+            if (chosen.approvalStatus === 'ID_Approved' || chosen.approvalStatus === 'Payment_Pending') {
+              const reset = { ...chosen, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow };
+              saveRegistrationAsync(reset).catch(() => {});
+              return reset;
+            }
+            return chosen;
           });
           // Add any local records not in cloud (newly added locally but not yet synced)
           const cloudIds = new Set(regs.map((r) => r.id));
@@ -208,6 +216,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         });
       });
     }, 10000);
+
 
 
     return () => {
@@ -231,6 +240,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       const regs = await syncCloudRegistrations();
       if (regs && regs.length > 0) {
         setRegistrations(regs);
+
+        // 3. Auto-reset: move all ID_Approved / Payment_Pending → Pending_ID_Approval
+        const toReset = regs.filter(
+          (r) => r.approvalStatus === 'ID_Approved' || r.approvalStatus === 'Payment_Pending'
+        );
+        if (toReset.length > 0) {
+          const resetNow = new Date().toISOString();
+          const resetMap = new Map(
+            toReset.map((r) => [
+              r.id,
+              { ...r, approvalStatus: 'Pending_ID_Approval' as const, paymentStatus: 'Pending', updatedAt: resetNow },
+            ])
+          );
+          // Update UI state immediately
+          setRegistrations((prev) =>
+            prev.map((r) => (resetMap.has(r.id) ? resetMap.get(r.id)! : r))
+          );
+          // Persist to cloud in background (fire & forget)
+          Promise.allSettled(
+            Array.from(resetMap.values()).map((updated) => saveRegistrationAsync(updated))
+          );
+        }
       }
     } catch (_) {}
 
@@ -245,6 +276,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     }
     setIsRefreshing(false);
   };
+
 
   const handleCleanDuplicates = async () => {
     setIsRefreshing(true);
