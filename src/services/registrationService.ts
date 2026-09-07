@@ -15,7 +15,10 @@ import {
   deleteRegistrationFromFirebase,
   findRegistrationInFirebase,
   checkIfUtrExistsInFirebase,
+  listenToFirebaseRegistrations,
 } from './firebaseService';
+
+export { listenToFirebaseRegistrations };
 
 export type ApprovalStatus = 'Pending_ID_Approval' | 'ID_Approved' | 'Payment_Pending' | 'Approved' | 'Rejected' | 'Pending' | 'VIP_Pending' | 'VIP';
 
@@ -29,13 +32,11 @@ export const normalizeApprovalStatus = (rawStatus?: any): ApprovalStatus => {
   if (clean === 'approved' || clean === 'verified' || clean === 'pass_approved' || clean === 'completed') {
     return 'Approved';
   }
-  // ID_Approved and Payment_Pending are both treated as Pending_ID_Approval
-  // (single-step workflow: Pending → Approved, skipping intermediate states)
   if (clean === 'id_approved' || clean === 'idapproved' || clean === 'id_verified' || clean === 'pay_unlocked' || clean === 'unlocked') {
-    return 'Pending_ID_Approval';
+    return 'ID_Approved';
   }
   if (clean === 'payment_pending' || clean === 'pay_pending' || clean === 'payment_submitted' || clean === 'utr_submitted') {
-    return 'Pending_ID_Approval';
+    return 'Payment_Pending';
   }
   if (clean === 'rejected' || clean === 'declined') {
     return 'Rejected';
@@ -889,7 +890,7 @@ export const approveIdCard = async (id: string, fallbackRecord?: Registration): 
   if (target) {
     const updatedRecord: Registration = {
       ...target,
-      approvalStatus: 'Pending_ID_Approval',
+      approvalStatus: 'ID_Approved',
       updatedAt: new Date().toISOString(),
     };
 

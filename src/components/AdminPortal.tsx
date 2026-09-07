@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { 
   getRegistrations, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
-  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, issueManualTicket, generateUniqueRegistrationId, type Registration, type ApprovalStatus 
+  exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, issueManualTicket, generateUniqueRegistrationId, listenToFirebaseRegistrations, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
@@ -185,31 +185,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     updateClock();
     const timer = setInterval(updateClock, 1000);
 
-    // Auto-polling interval for multi-device cloud database sync (10 seconds)
+    // Realtime Cloud Sync via Firebase snapshot listener (0-latency updates across all devices)
+    const unsubscribeFb = listenToFirebaseRegistrations((fbRegs: Registration[]) => {
+      if (fbRegs && fbRegs.length > 0) {
+        setRegistrations((current: Registration[]) => {
+          const localMap = new Map<string, Registration>(current.map((r) => [r.id, r]));
+          const merged = fbRegs.map((cloudReg: Registration) => {
+            const localReg = localMap.get(cloudReg.id);
+            const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
+            const localTime = localReg?.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
+            return localTime > cloudTime ? localReg! : cloudReg;
+          });
+          const cloudIds = new Set(fbRegs.map((r) => r.id));
+          current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
+          return merged;
+        });
+      }
+    });
+
+    // Auto-polling fallback interval for multi-device cloud database sync (10 seconds)
     // Uses smart merge: keeps whichever record (local or cloud) has the more recent updatedAt,
     // preventing optimistic UI updates from being overwritten by stale cloud data.
     const syncInterval = setInterval(() => {
       syncCloudRegistrations().then((regs) => {
         setRegistrations((current) => {
-          // Build a map of current (local) records by id
           const localMap = new Map(current.map((r) => [r.id, r]));
-          const resetNow = new Date().toISOString();
-          // For each cloud record, take the one with the more recent updatedAt
-          // and auto-reset any ID_Approved / Payment_Pending to Pending_ID_Approval
           const merged = regs.map((cloudReg) => {
             const localReg = localMap.get(cloudReg.id);
             const cloudTime = cloudReg.updatedAt ? new Date(cloudReg.updatedAt).getTime() : 0;
             const localTime = localReg?.updatedAt ? new Date(localReg.updatedAt).getTime() : 0;
-            const chosen = localTime > cloudTime ? localReg! : cloudReg;
-            // Auto-reset ID_Approved / Payment_Pending → Pending_ID_Approval
-            if (chosen.approvalStatus === 'ID_Approved' || chosen.approvalStatus === 'Payment_Pending') {
-              const reset: Registration = { ...chosen, approvalStatus: 'Pending_ID_Approval', paymentStatus: 'Pending', updatedAt: resetNow };
-              saveRegistrationAsync(reset).catch(() => {});
-              return reset;
-            }
-            return chosen;
+            return localTime > cloudTime ? localReg! : cloudReg;
           });
-          // Add any local records not in cloud (newly added locally but not yet synced)
           const cloudIds = new Set(regs.map((r) => r.id));
           current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
           return merged;
@@ -217,12 +223,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       });
     }, 10000);
 
-
-
     return () => {
       clearInterval(timer);
       clearInterval(syncInterval);
       clearInterval(presenceTimer);
+      if (unsubscribeFb) unsubscribeFb();
       window.removeEventListener('kruponam-presence-updated', handlePresenceUpdate);
     };
   }, []);
@@ -240,28 +245,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       const regs = await syncCloudRegistrations();
       if (regs && regs.length > 0) {
         setRegistrations(regs);
-
-        // 3. Auto-reset: move all ID_Approved / Payment_Pending → Pending_ID_Approval
-        const toReset = regs.filter(
-          (r) => r.approvalStatus === 'ID_Approved' || r.approvalStatus === 'Payment_Pending'
-        );
-        if (toReset.length > 0) {
-          const resetNow = new Date().toISOString();
-          const resetMap = new Map<string, Registration>(
-            toReset.map((r): [string, Registration] => [
-              r.id,
-              { ...r, approvalStatus: 'Pending_ID_Approval', paymentStatus: 'Pending', updatedAt: resetNow },
-            ])
-          );
-          // Update UI state immediately
-          setRegistrations((prev) =>
-            prev.map((r) => (resetMap.has(r.id) ? resetMap.get(r.id)! : r))
-          );
-          // Persist to cloud in background (fire & forget)
-          Promise.allSettled(
-            Array.from(resetMap.values()).map((updated) => saveRegistrationAsync(updated))
-          );
-        }
       }
     } catch (_) {}
 
