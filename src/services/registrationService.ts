@@ -29,11 +29,13 @@ export const normalizeApprovalStatus = (rawStatus?: any): ApprovalStatus => {
   if (clean === 'approved' || clean === 'verified' || clean === 'pass_approved' || clean === 'completed') {
     return 'Approved';
   }
+  // ID_Approved and Payment_Pending are both treated as Pending_ID_Approval
+  // (single-step workflow: Pending → Approved, skipping intermediate states)
   if (clean === 'id_approved' || clean === 'idapproved' || clean === 'id_verified' || clean === 'pay_unlocked' || clean === 'unlocked') {
-    return 'ID_Approved';
+    return 'Pending_ID_Approval';
   }
   if (clean === 'payment_pending' || clean === 'pay_pending' || clean === 'payment_submitted' || clean === 'utr_submitted') {
-    return 'Payment_Pending';
+    return 'Pending_ID_Approval';
   }
   if (clean === 'rejected' || clean === 'declined') {
     return 'Rejected';
@@ -880,7 +882,7 @@ export const approveIdCard = async (id: string, fallbackRecord?: Registration): 
   if (target) {
     const updatedRecord: Registration = {
       ...target,
-      approvalStatus: 'ID_Approved',
+      approvalStatus: 'Pending_ID_Approval',
       updatedAt: new Date().toISOString(),
     };
 
