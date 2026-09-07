@@ -27,8 +27,14 @@ export const saveSupabaseCredentials = (url: string, key: string): void => {
 };
 
 let supabaseInstance: SupabaseClient | null = null;
+let isSupabaseDisabled = false;
+
+export const setSupabaseDisabled = (disabled: boolean) => {
+  isSupabaseDisabled = disabled;
+};
 
 export const getSupabaseClient = (): SupabaseClient | null => {
+  if (isSupabaseDisabled) return null;
   if (supabaseInstance) return supabaseInstance;
 
   const { url, key } = getSupabaseCredentials();
@@ -45,6 +51,7 @@ export const getSupabaseClient = (): SupabaseClient | null => {
 };
 
 export const isSupabaseConfigured = (): boolean => {
+  if (isSupabaseDisabled) return false;
   return getSupabaseClient() !== null;
 };
 
@@ -58,6 +65,7 @@ export const testSupabaseConnection = async (): Promise<{ success: boolean; mess
     const { error } = await client.from('registrations').select('id').limit(1);
     if (error) {
       if (error.message.includes('Invalid API key') || error.code === 'PGRST301' || error.message.includes('JWT')) {
+        isSupabaseDisabled = true;
         return { success: false, message: 'Invalid Supabase API Key. Please update VITE_SUPABASE_ANON_KEY in project settings or Admin Dashboard.' };
       }
       if (error.message.includes('relation "public.registrations" does not exist') || error.code === '42P01') {

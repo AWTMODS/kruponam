@@ -220,6 +220,53 @@ const mapFirebaseDoc = (data: any, docId: string): Registration => {
 };
 
 /**
+ * Superfast REST query runner as parallel accelerator and fallback
+ */
+const runFirestoreRestQuery = async (field: string, value: string): Promise<Registration | null> => {
+  try {
+    const creds = getFirebaseConfig();
+    if (!creds || !creds.projectId || !creds.apiKey) return null;
+    const url = `https://firestore.googleapis.com/v1/projects/${creds.projectId}/databases/(default)/documents:runQuery?key=${creds.apiKey}`;
+    const payload = {
+      structuredQuery: {
+        from: [{ collectionId: 'registrations' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: field },
+            op: 'EQUAL',
+            value: { stringValue: value },
+          },
+        },
+        limit: 1,
+      },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (Array.isArray(data) && data[0]?.document?.fields) {
+      const f = data[0].document.fields;
+      const docName = data[0].document.name || '';
+      const docId = docName.split('/').pop() || '';
+      const docData: any = {};
+      for (const k of Object.keys(f)) {
+        const valObj = f[k];
+        docData[k] = valObj.stringValue !== undefined ? valObj.stringValue :
+                     valObj.integerValue !== undefined ? Number(valObj.integerValue) :
+                     valObj.booleanValue !== undefined ? valObj.booleanValue : valObj;
+      }
+      return mapFirebaseDoc(docData, docData.id || docId);
+    }
+  } catch (err) {
+    console.warn('REST runQuery notice:', err);
+  }
+  return null;
+};
+
+/**
  * Superfast targeted single-record search directly in Firebase (takes ~50-200ms)
  */
 export const findRegistrationInFirebase = async (queryStr: string): Promise<Registration | null> => {
@@ -232,34 +279,62 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
   const digitsOnly = lowerQ.replace(/\D/g, '');
 
   try {
-    // 1. Direct document key lookups by ID variations
-    const directDocKeys = Array.from(new Set([
-      upperQ,
-      q,
-      lowerQ,
-      digitsOnly ? `KRP-${digitsOnly}` : '',
-      digitsOnly ? `krp-${digitsOnly}` : '',
-      digitsOnly ? `KRP${digitsOnly}` : '',
-      digitsOnly ? digitsOnly : '',
-    ])).filter(Boolean);
+    // ── 1. PHONE NUMBER SEARCH (When query is 10 digits or 7-11 digits) ─────────────
+    if (digitsOnly.length >= 7 && !lowerQ.includes('@') && !upperQ.startsWith('KRP-')) {
+      const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
+      const phoneVariations = Array.from(new Set([
+        last10,
+        `+91${last10}`,
+        `+91 ${last10}`,
+        `0${last10}`,
+        digitsOnly,
+        q,
+      ])).filter(Boolean);
 
-    for (const key of directDocKeys) {
-      const docSnap = await getDoc(doc(db, 'registrations', key));
+      // A. Fast single-query SDK check using native 'in' operator across all variations
+      try {
+        const phoneQuery = query(collection(db, 'registrations'), where('phone', 'in', phoneVariations.slice(0, 10)), limit(1));
+        const phoneSnap = await getDocs(phoneQuery);
+        if (!phoneSnap.empty) {
+          return mapFirebaseDoc(phoneSnap.docs[0].data(), phoneSnap.docs[0].id);
+        }
+      } catch (e) {
+        console.warn('Phone SDK "in" query notice:', e);
+      }
+
+      // B. Fast parallel REST query fallback
+      try {
+        const restMatch = await runFirestoreRestQuery('phone', last10);
+        if (restMatch) return restMatch;
+        if (last10 !== q) {
+          const restRawMatch = await runFirestoreRestQuery('phone', q);
+          if (restRawMatch) return restRawMatch;
+        }
+      } catch (_) {}
+    }
+
+    // ── 2. PASS ID SEARCH (When query starts with KRP- or is exactly 6 digits) ───────
+    if (upperQ.startsWith('KRP-') || upperQ.startsWith('KRP') || digitsOnly.length === 6) {
+      const idKey = upperQ.startsWith('KRP-') ? upperQ : (digitsOnly.length === 6 ? `KRP-${digitsOnly}` : upperQ);
+      
+      const docSnap = await getDoc(doc(db, 'registrations', idKey));
       if (docSnap.exists()) {
         return mapFirebaseDoc(docSnap.data(), docSnap.id);
       }
-    }
 
-    // 2. Collection Query by 'id' field for all ID variations (in case docId != reg.id)
-    for (const idVal of directDocKeys) {
-      const idQuery = query(collection(db, 'registrations'), where('id', '==', idVal), limit(1));
+      const idQuery = query(collection(db, 'registrations'), where('id', '==', idKey), limit(1));
       const idSnap = await getDocs(idQuery);
       if (!idSnap.empty) {
         return mapFirebaseDoc(idSnap.docs[0].data(), idSnap.docs[0].id);
       }
+
+      try {
+        const restIdMatch = await runFirestoreRestQuery('id', idKey);
+        if (restIdMatch) return restIdMatch;
+      } catch (_) {}
     }
 
-    // 3. Query by email (check lower, as-is, and trimmed)
+    // ── 3. EMAIL SEARCH (When query has @) ─────────────────────────────────────────
     if (lowerQ.includes('@')) {
       const emailQuery = query(collection(db, 'registrations'), where('email', '==', lowerQ), limit(1));
       const emailSnap = await getDocs(emailQuery);
@@ -274,34 +349,15 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
           return mapFirebaseDoc(rawEmailSnap.docs[0].data(), rawEmailSnap.docs[0].id);
         }
       }
+
+      try {
+        const restEmail = await runFirestoreRestQuery('email', lowerQ);
+        if (restEmail) return restEmail;
+      } catch (_) {}
     }
 
-    // 4. Query by phone number (check last10, +91, with spaces, digitsOnly, raw q)
-    if (digitsOnly.length >= 7) {
-      const last10 = digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
-      const phoneVariations = Array.from(new Set([
-        last10,
-        `+91${last10}`,
-        `+91 ${last10}`,
-        `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`,
-        `${last10.slice(0, 5)} ${last10.slice(5)}`,
-        `${last10.slice(0, 5)}-${last10.slice(5)}`,
-        `0${last10}`,
-        digitsOnly,
-        q,
-      ]));
-
-      for (const pVal of phoneVariations) {
-        const phoneQuery = query(collection(db, 'registrations'), where('phone', '==', pVal), limit(1));
-        const phoneSnap = await getDocs(phoneQuery);
-        if (!phoneSnap.empty) {
-          return mapFirebaseDoc(phoneSnap.docs[0].data(), phoneSnap.docs[0].id);
-        }
-      }
-    }
-
-    // 5. Query by paymentUtr if numeric/alphanumeric with >= 6 chars
-    if (q.length >= 6) {
+    // ── 4. PAYMENT UTR SEARCH (When query is 12-digit numeric transaction ID) ───────
+    if (digitsOnly.length === 12) {
       const utrQuery = query(collection(db, 'registrations'), where('paymentUtr', '==', q), limit(1));
       const utrSnap = await getDocs(utrQuery);
       if (!utrSnap.empty) {
@@ -309,8 +365,8 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       }
     }
 
-    // 6. Query by fullName
-    if (q.length >= 3 && !q.includes('@')) {
+    // ── 5. FULL NAME SEARCH ────────────────────────────────────────────────────────
+    if (q.length >= 3 && !q.includes('@') && digitsOnly.length < 5) {
       const nameQuery = query(collection(db, 'registrations'), where('fullName', '==', q), limit(1));
       const nameSnap = await getDocs(nameQuery);
       if (!nameSnap.empty) {
@@ -318,16 +374,30 @@ export const findRegistrationInFirebase = async (queryStr: string): Promise<Regi
       }
     }
 
-    // 7. Fallback scan for partial ID / Phone / Name match
+    // ── 6. DIRECT DOC KEY GENERAL CHECK ────────────────────────────────────────────
+    const directDocKeys = Array.from(new Set([
+      upperQ,
+      q,
+      lowerQ,
+    ])).filter(Boolean);
+
+    for (const key of directDocKeys) {
+      const docSnap = await getDoc(doc(db, 'registrations', key));
+      if (docSnap.exists()) {
+        return mapFirebaseDoc(docSnap.data(), docSnap.id);
+      }
+    }
+
+    // ── 7. FALLBACK SCAN ───────────────────────────────────────────────────────────
     try {
-      const fallbackSnap = await getDocs(query(collection(db, 'registrations'), limit(250)));
+      const fallbackSnap = await getDocs(query(collection(db, 'registrations'), limit(150)));
       for (const docSnap of fallbackSnap.docs) {
         const d = docSnap.data();
         const docId = String(d.id || docSnap.id || '').toUpperCase();
         const docPhone = String(d.phone || d.phoneNumber || '').replace(/\D/g, '');
         const docName = String(d.fullName || d.name || '').toLowerCase();
         
-        if (digitsOnly && docId.includes(digitsOnly)) {
+        if (digitsOnly && digitsOnly.length === 6 && docId.includes(digitsOnly)) {
           return mapFirebaseDoc(d, docSnap.id);
         }
         if (digitsOnly && digitsOnly.length >= 7 && (docPhone === digitsOnly || docPhone.endsWith(digitsOnly.slice(-10)))) {

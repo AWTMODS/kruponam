@@ -1705,12 +1705,18 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     const cloudPromises: Promise<Registration | null>[] = [];
     if (isFirebaseConfigured()) {
       cloudPromises.push(findRegistrationInFirebase(q));
+      if (localMatch?.id && localMatch.id.toLowerCase() !== lowerQ) {
+        cloudPromises.push(findRegistrationInFirebase(localMatch.id));
+      }
       if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
         cloudPromises.push(findRegistrationInFirebase(`KRP-${digitsOnly}`));
       }
     }
     if (isSupabaseConfigured()) {
       cloudPromises.push(findRegistrationInSupabase(q));
+      if (localMatch?.id && localMatch.id.toLowerCase() !== lowerQ) {
+        cloudPromises.push(findRegistrationInSupabase(localMatch.id));
+      }
       if (digitsOnly.length === 6 && !q.toUpperCase().startsWith('KRP-')) {
         cloudPromises.push(findRegistrationInSupabase(`KRP-${digitsOnly}`));
       }
@@ -1719,7 +1725,7 @@ export const findRegistrationAsync = async (query: string): Promise<Registration
     if (cloudPromises.length > 0) {
       const results = await Promise.race([
         Promise.allSettled(cloudPromises),
-        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 6000)),
+        new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000)),
       ]);
 
       if (Array.isArray(results)) {
