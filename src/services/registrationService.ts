@@ -1684,6 +1684,18 @@ const matchRecord = (r: Registration, q: string): boolean => {
     }
   }
 
+  // 7. Vehicle Number Plate Match (e.g. KL 07 AB 1234, KL07AB1234)
+  const rVeh = (r.vehicleNumber || r.section || '').replace(/[^a-z0-9]/g, '').toLowerCase();
+  if (rVeh && qAlphaNum.length >= 4 && (rVeh === qAlphaNum || rVeh.includes(qAlphaNum))) {
+    return true;
+  }
+
+  // 8. Driving Licence Number Match
+  const rLic = (r.licenseNumber || '').replace(/[^a-z0-9]/g, '').toLowerCase();
+  if (rLic && qAlphaNum.length >= 5 && (rLic === qAlphaNum || rLic.includes(qAlphaNum))) {
+    return true;
+  }
+
   return false;
 };
 

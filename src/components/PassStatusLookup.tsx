@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, CheckCircle2, Download, QrCode, ArrowLeft, UserCheck, Mail, RefreshCw, CreditCard, Upload, Sparkles, AlertCircle, Loader2, GraduationCap, Truck } from 'lucide-react';
 import { findRegistration, findRegistrationAsync, submitPaymentForRegistration, saveRegistrationAsync, isUtrAlreadyUsedAsync, type Registration } from '../services/registrationService';
 import { sendApprovalEmail, generateQrCode } from '../services/emailService';
 import { getUpiSettings, recordPaymentToActiveSlot } from '../services/upiSettingsService';
@@ -10,9 +10,10 @@ import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageComp
 interface LookupProps {
   onClose?: () => void;
   initialQuery?: string;
+  initialMode?: 'student' | 'driver';
 }
 
-export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery }) => {
+export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery, initialMode }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
 
   useEffect(() => {
@@ -34,6 +35,25 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  // Tracking Mode: 'student' vs 'driver'
+  const [trackingMode, setTrackingMode] = useState<'student' | 'driver'>(() => {
+    if (initialMode) return initialMode;
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash.includes('driver') || search.includes('driver')) return 'driver';
+    }
+    return 'student';
+  });
+  const [typeNotice, setTypeNotice] = useState<string | null>(null);
+
+  const isDriverPass = Boolean(
+    searchResult &&
+      (searchResult.ticketType === 'Driver Pass' ||
+        searchResult.ticketType === 'Vehicle Driver Pass' ||
+        searchResult.department?.startsWith('Driver'))
+  );
 
   // Stage 2 Payment fields inside lookup
   const [paymentUtr, setPaymentUtr] = useState('');
@@ -282,10 +302,23 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
     try {
       // 2. Fast authoritative cloud lookup for real-time approval status
       const latest = await findRegistrationAsync(q);
-      if (latest) {
-        setSearchResult(latest);
-      } else if (instantMatch) {
-        setSearchResult(instantMatch);
+      const matched = latest || instantMatch;
+      if (matched) {
+        const isMatchedDriver =
+          matched.ticketType === 'Driver Pass' ||
+          matched.ticketType === 'Vehicle Driver Pass' ||
+          matched.department?.startsWith('Driver');
+
+        if (trackingMode === 'student' && isMatchedDriver) {
+          setTypeNotice(`Pass "${matched.id}" is a Vehicle Driver Pass. Switched to Driver Pass Tracking.`);
+          setTrackingMode('driver');
+        } else if (trackingMode === 'driver' && !isMatchedDriver) {
+          setTypeNotice(`Pass "${matched.id}" is a Student Pass. Switched to Student Pass Tracking.`);
+          setTrackingMode('student');
+        } else {
+          setTypeNotice(null);
+        }
+        setSearchResult(matched);
       } else {
         setSearchResult(null);
       }
@@ -453,7 +486,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
       ctx.font = 'bold 20px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
-        (searchResult.ticketType || 'STUDENT PASS').toUpperCase(),
+        (isDriverPass ? 'VEHICLE DRIVER PASS' : (searchResult.ticketType || 'STUDENT PASS')).toUpperCase(),
         995,
         87
       );
@@ -467,31 +500,43 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
       ctx.lineTo(1140, 145);
       ctx.stroke();
 
-      // Attendee Section
+      // Attendee / Driver Section
       ctx.fillStyle = '#A8D5B5';
       ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText('ATTENDEE NAME', 60, 190);
+      ctx.fillText(isDriverPass ? 'DRIVER NAME' : 'ATTENDEE NAME', 60, 190);
 
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 38px "Segoe UI", Georgia, serif';
       ctx.fillText(searchResult.fullName, 60, 235);
 
       // Details Columns
-      // Col 1: Dept & Section
+      // Col 1: Dept & Section or Vehicle
       ctx.fillStyle = '#A8D5B5';
       ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText('DEPARTMENT & SECTION', 60, 295);
+      ctx.fillText(isDriverPass ? 'VEHICLE CATEGORY & PLATE #' : 'DEPARTMENT & SECTION', 60, 295);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 22px "Segoe UI", sans-serif';
-      ctx.fillText(`${searchResult.department} — ${searchResult.section || 'Section A'}`, 60, 325);
+      ctx.fillText(
+        isDriverPass
+          ? `${searchResult.vehicleNumber || searchResult.section || 'Vehicle Registered'} (${searchResult.department?.replace('Driver - ', '') || 'Vehicle'})`
+          : `${searchResult.department} — ${searchResult.section || 'Section A'}`,
+        60,
+        325
+      );
 
-      // Col 2: Academic Year
+      // Col 2: Academic Year or Licence
       ctx.fillStyle = '#A8D5B5';
       ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText('ACADEMIC YEAR', 420, 295);
+      ctx.fillText(isDriverPass ? 'DRIVING LICENCE NUMBER' : 'ACADEMIC YEAR', 420, 295);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 22px "Segoe UI", sans-serif';
-      ctx.fillText(searchResult.year, 420, 325);
+      ctx.fillText(
+        isDriverPass
+          ? (searchResult.licenseNumber || 'Verified on Licence')
+          : searchResult.year,
+        420,
+        325
+      );
 
       // Col 1 Row 2: Event Date
       ctx.fillStyle = '#A8D5B5';
@@ -519,10 +564,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
 
       ctx.fillStyle = '#A8D5B5';
       ctx.font = 'bold 14px "Segoe UI", sans-serif';
-      ctx.fillText('PAYMENT STATUS', 420, 475);
+      ctx.fillText(isDriverPass ? 'PARKING & CLEARANCE' : 'PAYMENT STATUS', 420, 475);
       ctx.fillStyle = '#4ADE80';
       ctx.font = 'bold 20px "Segoe UI", sans-serif';
-      ctx.fillText(`✓ ₹700 Paid (${searchResult.paymentUtr || 'Verified'})`, 420, 505);
+      ctx.fillText(
+        isDriverPass
+          ? `✓ Vehicle Parking Clearance Approved`
+          : `✓ ₹${searchResult.paymentAmount || ticketAmount} Paid (${searchResult.paymentUtr || 'Verified'})`,
+        420,
+        505
+      );
 
       // Bottom Footer Bar
       ctx.fillStyle = 'rgba(13, 71, 43, 0.8)';
@@ -530,7 +581,13 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
 
       ctx.fillStyle = '#A8D5B5';
       ctx.font = '13px "Segoe UI", sans-serif';
-      ctx.fillText('✓ Student ID Approved  |  ✓ Entry Badge Validated  |  🌸 Onasadya Feast Token: VALID', 60, 592);
+      ctx.fillText(
+        isDriverPass
+          ? '✓ Driver Licence Approved  |  ✓ Vehicle Parking Clearance  |  🌸 Food Token: VALID'
+          : '✓ Student ID Approved  |  ✓ Entry Badge Validated  |  🌸 Onasadya Feast Token: VALID',
+        60,
+        592
+      );
 
       // Draw QR Code onto Canvas
       const qrImg = new Image();
@@ -611,14 +668,16 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
       <div className="flex items-center justify-between pb-6 border-b border-gold-royal/20 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gold-light/40 text-gold-dark flex items-center justify-center text-xl shadow-inner">
-            🔍
+            {trackingMode === 'driver' ? '🚗' : '🎓'}
           </div>
           <div>
             <h3 className="font-serif text-2xl font-bold text-kerala-deep">
-              Check Pass Status & Complete Payment
+              {trackingMode === 'driver' ? 'Vehicle Driver Pass Status Tracker' : 'Student Pass Status & Verification Tracker'}
             </h3>
             <p className="text-xs text-slate-500">
-              Enter your Email, Phone Number, or Registration ID (e.g. KRP-849201)
+              {trackingMode === 'driver'
+                ? 'Enter Driver Pass ID (e.g. KRP-...), Driver Phone, or Vehicle Registration Plate'
+                : 'Enter your College Email, Phone Number, or Registration ID (e.g. KRP-849201)'}
             </p>
           </div>
         </div>
@@ -633,6 +692,54 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
         )}
       </div>
 
+      {/* Segmented Control: Student Pass Tracking vs Driver Pass Tracking */}
+      <div className="flex rounded-2xl p-1.5 bg-cream-soft border border-gold-royal/30 mb-6 shadow-sm">
+        <button
+          type="button"
+          onClick={() => {
+            setTrackingMode('student');
+            setTypeNotice(null);
+            setSearchResult(undefined);
+            setHasSearched(false);
+            setSearchQuery('');
+          }}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            trackingMode === 'student'
+              ? 'bg-gradient-to-r from-kerala-deep to-kerala-emerald text-white shadow-md'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 text-gold-royal" />
+          <span>Student Pass Tracking</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setTrackingMode('driver');
+            setTypeNotice(null);
+            setSearchResult(undefined);
+            setHasSearched(false);
+            setSearchQuery('');
+          }}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            trackingMode === 'driver'
+              ? 'bg-gradient-to-r from-gold-dark via-gold-royal to-amber-500 text-slate-950 font-black shadow-md'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Truck className="w-4 h-4 text-slate-900" />
+          <span>Vehicle Driver Pass Tracking 🚗</span>
+        </button>
+      </div>
+
+      {typeNotice && (
+        <div className="mb-6 p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>{typeNotice}</span>
+        </div>
+      )}
+
       {/* Search Input Form */}
       <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="relative flex-1">
@@ -641,24 +748,28 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
             ref={searchInputRef}
             type="text"
             required
-            placeholder="e.g. 9072428800, anand.nair@example.com, or KRP-849201"
+            placeholder={
+              trackingMode === 'driver'
+                ? "Enter Driver Pass ID (e.g. KRP-...), Driver Phone, or Vehicle Number..."
+                : "e.g. 9072428800, student@krupanidhi.edu.in, or KRP-849201"
+            }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3.5 rounded-full border border-gold-royal/40 bg-cream-soft text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 transition-all"
+            className="w-full pl-11 pr-4 py-3.5 rounded-full border border-gold-royal/40 bg-cream-soft text-sm outline-none focus:border-gold-royal focus:ring-2 focus:ring-gold-royal/30 transition-all font-medium"
           />
         </div>
 
         <button
           type="submit"
           disabled={isSearching}
-          className="px-8 py-3.5 rounded-full bg-kerala-deep text-white font-bold text-xs uppercase tracking-wider hover:bg-kerala-emerald shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="px-8 py-3.5 rounded-full bg-kerala-deep text-white font-bold text-xs uppercase tracking-wider hover:bg-kerala-emerald shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           {isSearching ? (
             <RefreshCw className="w-4 h-4 text-gold-royal animate-spin" />
           ) : (
             <Search className="w-4 h-4 text-gold-royal" />
           )}
-          <span>{isSearching ? 'Searching...' : 'Track Pass Status'}</span>
+          <span>{isSearching ? 'Searching...' : trackingMode === 'driver' ? 'Track Driver Pass' : 'Track Student Pass'}</span>
         </button>
       </form>
 
@@ -691,7 +802,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                 <span>
-                  Pass Approved by Admin! ₹700 Payment & Student ID Verified.
+                  {isDriverPass 
+                    ? `Vehicle Driver Pass Approved by Admin! Vehicle Parking & Venue Entry Authorized.`
+                    : `Pass Approved by Admin! ₹${searchResult.paymentAmount || ticketAmount} Payment & Student ID Verified.`}
                 </span>
               </div>
 
@@ -699,13 +812,19 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               {searchResult.isReported && (
                 <div className="p-3.5 bg-emerald-700 text-white rounded-2xl text-center font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md">
                   <UserCheck className="w-4 h-4 text-gold-royal" />
-                  <span>REPORTED AT CAMPUS GATE ({searchResult.reportedAt}) • Onasadya Token Validated</span>
+                  <span>
+                    {isDriverPass 
+                      ? `VEHICLE REPORTED AT VENUE GATE (${searchResult.reportedAt}) • Parking Clearance Verified`
+                      : `REPORTED AT CAMPUS GATE (${searchResult.reportedAt}) • Onasadya Token Validated`}
+                  </span>
                 </div>
               )}
 
               {/* Pass Theme Toggle Bar */}
               <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Official Event Entry Badge</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  {isDriverPass ? 'Official Driver Entry & Parking Badge' : 'Official Event Entry Badge'}
+                </span>
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-full border border-gold-royal/30">
                   <button
                     type="button"
@@ -752,7 +871,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                 }`}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-kerala-deep text-gold-royal flex items-center justify-center text-xl font-bold shadow-md">
-                      🌼
+                      {isDriverPass ? '🚗' : '🌼'}
                     </div>
                     <div>
                       <h3 className={`font-serif font-bold text-xl ${
@@ -761,14 +880,14 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                       <p className={`text-[10px] font-sans uppercase tracking-widest font-bold ${
                         ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                       }`}>
-                        Krupanidhi Degree College
+                        {isDriverPass ? 'Official Driver Transport Pass' : 'Krupanidhi Degree College'}
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <span className="px-3 py-1 rounded-full bg-gold-royal text-kerala-dark text-xs font-black uppercase tracking-wider shadow-sm">
-                      {searchResult.ticketType || 'Student Pass'}
+                      {isDriverPass ? 'VEHICLE DRIVER PASS' : (searchResult.ticketType || 'Student Pass')}
                     </span>
                     <p className={`text-[11px] font-mono mt-1 ${
                       ticketTheme === 'dark' ? 'text-amber-400' : 'text-slate-500'
@@ -783,7 +902,9 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                     <div>
                       <p className={`text-[10px] uppercase font-bold tracking-wider ${
                         ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
-                      }`}>Attendee Name</p>
+                      }`}>
+                        {isDriverPass ? 'Driver Full Name' : 'Attendee Name'}
+                      </p>
                       <p className={`font-serif text-2xl font-bold ${
                         ticketTheme === 'dark' ? 'text-amber-300' : 'text-kerala-deep'
                       }`}>{searchResult.fullName}</p>
@@ -793,33 +914,49 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
-                        }`}>Department & Section</p>
+                        }`}>
+                          {isDriverPass ? 'Vehicle Category & Plate #' : 'Department & Section'}
+                        </p>
                         <p className={`font-semibold ${ticketTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-                          {searchResult.department} — {searchResult.section || 'Section A'}
+                          {isDriverPass
+                            ? `${searchResult.vehicleNumber || searchResult.section} (${searchResult.department?.replace('Driver - ', '') || 'Vehicle'})`
+                            : `${searchResult.department} — ${searchResult.section || 'Section A'}`}
                         </p>
                       </div>
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
-                        }`}>Academic Year</p>
+                        }`}>
+                          {isDriverPass ? 'Driving Licence Number' : 'Academic Year'}
+                        </p>
                         <p className={`font-semibold ${ticketTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-                          {searchResult.year}
+                          {isDriverPass
+                            ? (searchResult.licenseNumber || 'Verified on Licence')
+                            : searchResult.year}
                         </p>
                       </div>
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
-                        }`}>Payment Status</p>
+                        }`}>
+                          {isDriverPass ? 'Pass Fee & Clearance' : 'Payment Status'}
+                        </p>
                         <p className="font-semibold text-emerald-400 font-mono">
-                          ✓ ₹700 Paid ({(!searchResult.paymentUtr || searchResult.paymentUtr === 'VIP_COMPLIMENTARY' || searchResult.paymentUtr === 'VIP') ? 'Verified' : searchResult.paymentUtr})
+                          {isDriverPass 
+                            ? `✓ ₹${searchResult.paymentAmount || ticketAmount} Paid • Designated Parking Clearance`
+                            : `✓ ₹${searchResult.paymentAmount || ticketAmount} Paid (${(!searchResult.paymentUtr || searchResult.paymentUtr === 'VIP_COMPLIMENTARY' || searchResult.paymentUtr === 'VIP') ? 'Verified' : searchResult.paymentUtr})`}
                         </p>
                       </div>
                       <div>
                         <p className={`text-[10px] uppercase font-bold tracking-wider ${
                           ticketTheme === 'dark' ? 'text-slate-400' : 'text-slate-400'
-                        }`}>Campus Gate Status</p>
+                        }`}>
+                          {isDriverPass ? 'Vehicle Venue Gate' : 'Campus Gate Status'}
+                        </p>
                         <p className="font-semibold text-emerald-400">
-                          {searchResult.isReported ? '✓ Reported & Checked In' : 'Ready for Entry'}
+                          {searchResult.isReported 
+                            ? '✓ Reported & Vehicle Cleared' 
+                            : 'Ready for Entry & Parking'}
                         </p>
                       </div>
                     </div>
@@ -1208,19 +1345,25 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
               </div>
 
               <span className="px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-extrabold uppercase tracking-wider">
-                Stage 1 Pending • Student ID Review
+                {isDriverPass ? 'Stage 1 Pending • Driver Licence & Vehicle Review' : 'Stage 1 Pending • Student ID Review'}
               </span>
 
               <h4 className="font-serif text-2xl font-bold text-amber-950">
-                Student ID Card Under Verification
+                {isDriverPass ? 'Driving Licence & Vehicle Details Under Verification' : 'Student ID Card Under Verification'}
               </h4>
 
               <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
-                Hello <span className="font-bold text-amber-900">{searchResult?.fullName}</span>, your student details and Student ID Card photo have been received. The admin committee is verifying your Student ID Card.
+                {isDriverPass ? (
+                  <>Hello <span className="font-bold text-amber-900">{searchResult?.fullName}</span>, your Driver Registration details for vehicle (<span className="font-mono font-bold text-amber-950">{searchResult?.vehicleNumber || searchResult?.section}</span>) and Driving Licence photo have been received. The event committee is verifying your driving licence and assigning designated parking clearance.</>
+                ) : (
+                  <>Hello <span className="font-bold text-amber-900">{searchResult?.fullName}</span>, your student details and Student ID Card photo have been received. The admin committee is verifying your Student ID Card.</>
+                )}
               </p>
 
               <div className="p-3 bg-amber-100/70 border border-amber-300 rounded-2xl text-xs text-amber-950 font-medium">
-                ℹ️ Once Admin approves your Student ID Card, this screen will automatically refresh with the payment QR code (₹700) to upload your payment screenshot.
+                {isDriverPass 
+                  ? 'ℹ️ Once Admin verifies your Driving Licence, this screen will automatically refresh with your official Vehicle Parking & Entry Pass.'
+                  : `ℹ️ Once Admin approves your Student ID Card, this screen will automatically refresh with the payment QR code (₹${ticketAmount}) to upload your payment screenshot.`}
               </div>
 
               <div className="pt-2">
@@ -1247,20 +1390,22 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                 </div>
 
                 <span className="px-3 py-1 rounded-full bg-rose-200 text-rose-900 text-xs font-extrabold uppercase tracking-wider">
-                  Application Rejected • Re-Upload Required
+                  {isDriverPass ? 'Driver Application Incomplete • Re-Upload Required' : 'Application Rejected • Re-Upload Required'}
                 </span>
 
                 <h4 className="font-serif text-2xl font-bold text-rose-950">
-                  Verification Issue Detected
+                  {isDriverPass ? 'Driving Licence Verification Incomplete' : 'Verification Issue Detected'}
                 </h4>
 
                 <div className="bg-white p-4 rounded-2xl border border-rose-200 text-xs text-rose-900 font-medium max-w-md mx-auto text-left space-y-1">
                   <span className="font-bold block text-rose-950">Reason provided by Admin:</span>
-                  <p className="text-slate-800 italic">"{searchResult?.rejectionReason || 'Uploaded ID Card or Payment UTR could not be verified.'}"</p>
+                  <p className="text-slate-800 italic">"{searchResult?.rejectionReason || (isDriverPass ? 'Uploaded Driving Licence or payment details could not be verified.' : 'Uploaded ID Card or Payment UTR could not be verified.')}"</p>
                 </div>
 
                 <p className="text-slate-600 text-xs font-medium">
-                  Don't worry! You can upload a new clear Student ID Card photo below to resubmit your application for re-review.
+                  {isDriverPass 
+                    ? 'Please upload a clear photo of your Driving Licence or Driver ID below to resubmit for verification.'
+                    : "Don't worry! You can upload a new clear Student ID Card photo below to resubmit your application for re-review."}
                 </p>
               </div>
 
@@ -1268,13 +1413,15 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery 
                 <div className="p-6 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center space-y-2 animate-fadeIn shadow-md">
                   <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
                   <p className="font-bold text-emerald-950 text-sm">{resubmitSuccessNotice}</p>
-                  <p className="text-xs text-emerald-800">Admin will review your newly uploaded Student ID Card shortly.</p>
+                  <p className="text-xs text-emerald-800">
+                    {isDriverPass ? 'Admin will review your newly uploaded Driving Licence shortly.' : 'Admin will review your newly uploaded Student ID Card shortly.'}
+                  </p>
                 </div>
               ) : (
                 <form onSubmit={handleResubmitApplication} className="bg-amber-50/60 rounded-3xl p-6 sm:p-8 border-2 border-amber-300 shadow-md space-y-6">
                   <h4 className="font-serif text-xl font-bold text-kerala-deep flex items-center gap-2">
                     <Upload className="w-5 h-5 text-gold-royal" />
-                    <span>Re-Upload Student ID Card Photo</span>
+                    <span>{isDriverPass ? 'Re-Upload Driving Licence / Driver ID Photo' : 'Re-Upload Student ID Card Photo'}</span>
                   </h4>
 
                   {paymentError && (

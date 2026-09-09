@@ -32,7 +32,7 @@ import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageComp
 
 interface DriverRegistrationProps {
   onBackToHome?: () => void;
-  onOpenLookup?: (query?: string) => void;
+  onOpenLookup?: (query?: string, mode?: 'student' | 'driver') => void;
   onOpenAdmin?: () => void;
 }
 
@@ -61,8 +61,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
   const [phone, setPhone] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [vehicleType, setVehicleType] = useState('College Bus');
-  const [customVehicleType, setCustomVehicleType] = useState('');
+  const [vehicleType, setVehicleType] = useState('Bike');
   const [paymentUtr, setPaymentUtr] = useState('');
 
   // Upload previews
@@ -241,7 +240,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
         recordPaymentToActiveSlot();
       } catch (_) {}
 
-      const cleanVehicleType = vehicleType === 'Other' && customVehicleType.trim() ? customVehicleType.trim() : vehicleType;
+      const cleanVehicleType = vehicleType;
       const passId = generateUniqueRegistrationId();
       const today = new Date().toLocaleDateString('en-US', {
         month: 'short',
@@ -344,7 +343,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
             </h1>
 
             <p className="text-slate-200 text-xs sm:text-sm max-w-xl leading-relaxed">
-              Register college buses, staff vans, tourist tempo travelers, auto rickshaws, and private transport vehicles for Kruponam 2026. Entry passes include designated vehicle parking clearance and food tokens.
+              Register bikes, cars, jeeps, and auto rickshaws for Kruponam 2026. Entry passes include designated vehicle parking clearance and food tokens.
             </p>
 
             <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px] font-bold text-amber-200">
@@ -419,7 +418,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
               {onOpenLookup && (
                 <button
                   type="button"
-                  onClick={() => onOpenLookup(submittedPass.id)}
+                  onClick={() => onOpenLookup(submittedPass.id, 'driver')}
                   className="flex-1 py-3.5 rounded-xl bg-kerala-deep text-white font-bold text-xs uppercase tracking-wider hover:bg-kerala-emerald transition-all shadow-md flex items-center justify-center gap-2"
                 >
                   <Search className="w-4 h-4" />
@@ -539,30 +538,12 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                     onChange={(e) => setVehicleType(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-kerala-deep focus:border-transparent font-medium bg-white"
                   >
-                    <option value="College Bus">College Bus / Heavy Passenger</option>
-                    <option value="Staff Van / Traveler">Staff Van / Tempo Traveler</option>
-                    <option value="Tourist Bus">Private Tourist Bus</option>
-                    <option value="Auto Rickshaw">Auto Rickshaw</option>
-                    <option value="Car / Taxi">Car / Taxi</option>
-                    <option value="Equipment / Supply Truck">Equipment / Sound Truck</option>
-                    <option value="Other">Other Vehicle Type</option>
+                    <option value="Bike">Bike (🏍️)</option>
+                    <option value="Car">Car (🚗)</option>
+                    <option value="Jeep">Jeep (🚙)</option>
+                    <option value="Auto Rickshaw">Auto Rickshaw (🛺)</option>
                   </select>
                 </div>
-
-                {vehicleType === 'Other' && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Specify Vehicle Type
-                    </label>
-                    <input
-                      type="text"
-                      value={customVehicleType}
-                      onChange={(e) => setCustomVehicleType(e.target.value)}
-                      placeholder="e.g. Mini Bus"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-kerala-deep focus:border-transparent font-medium"
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Driving Licence / Driver ID Upload */}

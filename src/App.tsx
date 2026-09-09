@@ -53,6 +53,7 @@ export function App() {
     return 'main';
   });
   const [lookupQuery, setLookupQuery] = useState<string>('');
+  const [lookupMode, setLookupMode] = useState<'student' | 'driver'>('student');
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
   const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
 
@@ -176,8 +177,9 @@ export function App() {
     setSelectedPass(passName);
   };
 
-  const handleOpenLookup = (query?: string) => {
+  const handleOpenLookup = (query?: string, mode?: 'student' | 'driver') => {
     setLookupQuery(typeof query === 'string' ? query : '');
+    setLookupMode(mode || 'student');
     setActiveView('lookup');
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -211,7 +213,7 @@ export function App() {
         <div className="pt-24 min-h-screen">
           <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} onOpenDriver={handleOpenDriver} />
           <div className="max-w-7xl mx-auto px-4">
-            <PassStatusLookup onClose={() => setActiveView('main')} initialQuery={lookupQuery} />
+            <PassStatusLookup onClose={() => setActiveView('main')} initialQuery={lookupQuery} initialMode={lookupMode} />
           </div>
           <Footer onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
         </div>
