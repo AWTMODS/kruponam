@@ -63,7 +63,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
   const [phone, setPhone] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [vehicleType, setVehicleType] = useState('Bike');
+  const [vehicleType, setVehicleType] = useState('Car');
   const [paymentUtr, setPaymentUtr] = useState('');
 
   // Upload previews
@@ -449,6 +449,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                   setLicenseNumber('');
                   setVehicleNumber('');
                   setPaymentUtr('');
+                  setVehicleType('Car');
                   setLicensePhotoPreview(null);
                   setPaymentScreenshotPreview(null);
                   try { sessionStorage.removeItem('kruponam_active_driver_id'); } catch (_) {}
@@ -568,8 +569,8 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                     onChange={(e) => setVehicleType(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-kerala-deep focus:border-transparent font-medium bg-white"
                   >
-                    <option value="Bike">Bike (🏍️)</option>
                     <option value="Car">Car (🚗)</option>
+                    <option value="Bike">Bike (🏍️)</option>
                     <option value="Jeep">Jeep (🚙)</option>
                     <option value="Auto Rickshaw">Auto Rickshaw (🛺)</option>
                   </select>
