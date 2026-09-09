@@ -110,6 +110,14 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
+  const handleOpenDriver = () => {
+    setActiveView('driver');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (!window.location.pathname.includes('driver')) {
+      window.history.pushState(null, '', '/driver.html');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-cream-warm text-slate-800 relative selection:bg-gold-royal selection:text-white">
       {/* Floating Canvas Flower Petals (Public Site Only - Hidden in Admin or Coming Soon) */}
@@ -122,16 +130,14 @@ export function App() {
         <DriverRegistrationForm
           onBackToHome={() => {
             setActiveView('main');
-            if (window.location.hash === '#driver' || window.location.search.includes('driver')) {
-              window.history.replaceState(null, '', window.location.pathname);
-            }
+            window.history.replaceState(null, '', '/');
           }}
           onOpenLookup={handleOpenLookup}
           onOpenAdmin={() => setActiveView('admin')}
         />
       ) : activeView === 'lookup' ? (
         <div className="pt-24 min-h-screen">
-          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
+          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} onOpenDriver={handleOpenDriver} />
           <div className="max-w-7xl mx-auto px-4">
             <PassStatusLookup onClose={() => setActiveView('main')} initialQuery={lookupQuery} />
           </div>
@@ -144,18 +150,19 @@ export function App() {
         />
       ) : (
         <>
-          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />
+          <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} onOpenDriver={handleOpenDriver} />
           
           <main>
-            <Hero onOpenLookup={handleOpenLookup} />
+            <Hero onOpenLookup={handleOpenLookup} onOpenDriver={handleOpenDriver} />
             <About />
             <Countdown />
             {showProgramsSchedule && <ProgramsTimeline />}
-            <TicketPasses onSelectTicket={handleSelectTicketFromPasses} />
+            <TicketPasses onSelectTicket={handleSelectTicketFromPasses} onOpenDriver={handleOpenDriver} />
             <BookingGuidelines onOpenLookup={handleOpenLookup} />
             <RegistrationForm
               selectedPassFromParent={selectedPass}
               onOpenLookup={handleOpenLookup}
+              onOpenDriver={handleOpenDriver}
             />
             <Contact />
           </main>

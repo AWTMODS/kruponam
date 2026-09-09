@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Ticket, ShieldCheck } from 'lucide-react';
+import { Menu, X, Ticket, ShieldCheck, Truck } from 'lucide-react';
 import { getSiteSettings } from '../services/siteSettingsService';
 
 interface NavbarProps {
   onOpenLookup?: () => void;
   onOpenAdmin?: () => void;
+  onOpenDriver?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin, onOpenDriver }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
@@ -125,6 +126,28 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
               <Ticket className="w-3.5 h-3.5 text-gold-royal group-hover:rotate-12 transition-transform" />
               <span>Register Pass</span>
             </a>
+
+            {/* Driver Ticket Registration Button */}
+            {onOpenDriver ? (
+              <button
+                type="button"
+                onClick={onOpenDriver}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-800 hover:text-kerala-deep bg-gold-royal/20 hover:bg-gold-royal/35 rounded-full border border-gold-royal/40 transition-all duration-300 hover:scale-105 shadow-sm"
+                title="Register Vehicle Driver Pass"
+              >
+                <Truck className="w-3.5 h-3.5 text-gold-dark" />
+                <span>Driver Pass</span>
+              </button>
+            ) : (
+              <a
+                href="/driver.html"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-800 hover:text-kerala-deep bg-gold-royal/20 hover:bg-gold-royal/35 rounded-full border border-gold-royal/40 transition-all duration-300 hover:scale-105 shadow-sm"
+                title="Register Vehicle Driver Pass"
+              >
+                <Truck className="w-3.5 h-3.5 text-gold-dark" />
+                <span>Driver Pass</span>
+              </a>
+            )}
           </div>
 
           {/* Mobile Hamburger Toggle */}
@@ -176,6 +199,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenLookup, onOpenAdmin }) => 
               >
                 <Ticket className="w-4 h-4 text-gold-royal" />
                 Register Pass (₹700)
+              </a>
+
+              <a
+                href="/driver.html"
+                onClick={(e) => {
+                  setMobileMenuOpen(false);
+                  if (onOpenDriver) {
+                    e.preventDefault();
+                    onOpenDriver();
+                  }
+                }}
+                className="w-full py-2.5 text-center text-xs font-bold text-slate-800 bg-gold-royal/20 hover:bg-gold-royal/30 border border-gold-royal/40 rounded-xl shadow-sm flex items-center justify-center gap-2"
+              >
+                <Truck className="w-4 h-4 text-gold-dark" />
+                Vehicle Driver Pass Registration
               </a>
             </div>
           </div>

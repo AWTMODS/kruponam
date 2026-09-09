@@ -1,12 +1,13 @@
 import React from 'react';
-import { Ticket, Calendar, MapPin, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Ticket, Calendar, MapPin, Sparkles, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 import { getAssetUrl } from '../utils/assetPath';
 
 interface HeroProps {
   onOpenLookup?: () => void;
+  onOpenDriver?: () => void;
 }
 
-export const Hero: React.FC<HeroProps> = ({ onOpenLookup }) => {
+export const Hero: React.FC<HeroProps> = ({ onOpenLookup, onOpenDriver }) => {
 
   return (
     <section id="home" className="relative pt-28 pb-16 lg:pt-36 lg:pb-28 overflow-hidden bg-cream-gradient">
@@ -81,6 +82,26 @@ export const Hero: React.FC<HeroProps> = ({ onOpenLookup }) => {
                 <span>Get Your Tickets</span>
                 <Ticket className="w-4 h-4 text-gold-royal group-hover:rotate-12 transition-transform" />
               </a>
+
+              {/* Driver Registration Button */}
+              {onOpenDriver ? (
+                <button
+                  type="button"
+                  onClick={onOpenDriver}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-bold text-slate-900 bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/50 rounded-full shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                >
+                  <Truck className="w-4 h-4 text-gold-dark" />
+                  <span>Driver Registration</span>
+                </button>
+              ) : (
+                <a
+                  href="/driver.html"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-bold text-slate-900 bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/50 rounded-full shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+                >
+                  <Truck className="w-4 h-4 text-gold-dark" />
+                  <span>Driver Registration</span>
+                </a>
+              )}
 
               {onOpenLookup && (
                 <button

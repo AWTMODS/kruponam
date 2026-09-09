@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles, RefreshCw, ShieldCheck, Layers, AlertCircle, Trash2, Camera, Loader2, CreditCard, QrCode } from 'lucide-react';
+import { Ticket, User, Mail, Phone, Building2, Calendar, CheckCircle2, Sparkles, RefreshCw, ShieldCheck, Layers, AlertCircle, Trash2, Camera, Loader2, CreditCard, QrCode, Truck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
   saveRegistrationAsync, 
@@ -16,9 +16,10 @@ import { compressImageToDataUrl, readRawFileAsDataUrl } from '../utils/imageComp
 interface RegistrationProps {
   selectedPassFromParent?: string;
   onOpenLookup?: (query?: string) => void;
+  onOpenDriver?: () => void;
 }
 
-export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFromParent, onOpenLookup }) => {
+export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFromParent, onOpenLookup, onOpenDriver }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
 
   useEffect(() => {
@@ -319,6 +320,28 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
           <p className="text-slate-600 text-base sm:text-lg">
             Enter your details and upload your Student ID Card photo. Once Admin approves your ID card, you will be able to pay ₹{ticketAmount} and download your official event pass.
           </p>
+          <div className="pt-2">
+            {onOpenDriver ? (
+              <button
+                type="button"
+                onClick={onOpenDriver}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/40 text-xs font-bold text-slate-800 hover:text-kerala-deep transition-all duration-300 hover:scale-105 shadow-sm cursor-pointer"
+                title="Register for Vehicle Driver Pass"
+              >
+                <Truck className="w-3.5 h-3.5 text-gold-dark" />
+                <span>Are you a Vehicle Driver? Register for Driver Pass here →</span>
+              </button>
+            ) : (
+              <a
+                href="/driver.html"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/40 text-xs font-bold text-slate-800 hover:text-kerala-deep transition-all duration-300 hover:scale-105 shadow-sm"
+                title="Register for Vehicle Driver Pass"
+              >
+                <Truck className="w-3.5 h-3.5 text-gold-dark" />
+                <span>Are you a Vehicle Driver? Register for Driver Pass here →</span>
+              </a>
+            )}
+          </div>
         </div>
 
         {submittedRegistration ? (
@@ -803,6 +826,29 @@ export const RegistrationForm: React.FC<RegistrationProps> = ({ selectedPassFrom
                     </>
                   )}
                 </button>
+
+                {/* Driver Registration link right under submit button */}
+                <div className="pt-2 pb-1 text-center">
+                  <span className="text-xs text-slate-500 font-medium mr-2">Are you an institution/auto/bus driver?</span>
+                  {onOpenDriver ? (
+                    <button
+                      type="button"
+                      onClick={onOpenDriver}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-kerala-deep hover:text-gold-dark underline decoration-gold-royal underline-offset-2 transition-colors cursor-pointer"
+                    >
+                      <Truck className="w-3.5 h-3.5 text-gold-dark inline" />
+                      <span>Register for Driver Pass</span>
+                    </button>
+                  ) : (
+                    <a
+                      href="/driver.html"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-kerala-deep hover:text-gold-dark underline decoration-gold-royal underline-offset-2 transition-colors"
+                    >
+                      <Truck className="w-3.5 h-3.5 text-gold-dark inline" />
+                      <span>Register for Driver Pass</span>
+                    </a>
+                  )}
+                </div>
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-[11px] text-amber-950 font-medium text-center space-y-1">

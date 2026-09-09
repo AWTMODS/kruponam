@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Ticket, CheckCircle2, ArrowDown } from 'lucide-react';
+import { Ticket, CheckCircle2, ArrowDown, Truck } from 'lucide-react';
 import { getSiteSettings } from '../services/siteSettingsService';
 
 interface PassProps {
   onSelectTicket?: (ticketType: string) => void;
+  onOpenDriver?: () => void;
 }
 
-export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket }) => {
+export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket, onOpenDriver }) => {
   const [ticketAmount, setTicketAmount] = useState<number>(() => getSiteSettings().ticketAmount);
 
   useEffect(() => {
@@ -133,6 +134,30 @@ export const TicketPasses: React.FC<PassProps> = ({ onSelectTicket }) => {
                   <span>{pass.ctaText}</span>
                   <ArrowDown className="w-3.5 h-3.5" />
                 </button>
+
+                {/* Driver Pass Registration Button right near the registration button */}
+                <div className="mt-3 pt-3 border-t border-slate-100 text-center">
+                  {onOpenDriver ? (
+                    <button
+                      type="button"
+                      onClick={onOpenDriver}
+                      className="w-full py-2.5 px-4 rounded-full text-xs font-bold text-slate-800 hover:text-kerala-deep bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/40 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer hover:scale-102"
+                      title="Register for Vehicle Driver Pass"
+                    >
+                      <Truck className="w-4 h-4 text-gold-dark" />
+                      <span>Register as Vehicle Driver</span>
+                    </button>
+                  ) : (
+                    <a
+                      href="/driver.html"
+                      className="w-full py-2.5 px-4 rounded-full text-xs font-bold text-slate-800 hover:text-kerala-deep bg-gold-royal/20 hover:bg-gold-royal/35 border border-gold-royal/40 transition-all flex items-center justify-center gap-2 shadow-sm hover:scale-102"
+                      title="Register for Vehicle Driver Pass"
+                    >
+                      <Truck className="w-4 h-4 text-gold-dark" />
+                      <span>Register as Vehicle Driver</span>
+                    </a>
+                  )}
+                </div>
 
               </div>
             );
