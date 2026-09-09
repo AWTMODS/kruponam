@@ -40,21 +40,37 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const cleanEmail = registration.email.trim().toLowerCase();
 
+    // Extract Base64 QR code for file attachment
+    const qrBase64 = typeof req.body.qrDataUrl === 'string' && req.body.qrDataUrl.includes('base64,')
+      ? req.body.qrDataUrl.split('base64,')[1]
+      : null;
+
     // 1. Try Resend API
     if (resendApiKey) {
       try {
+        const resendPayload: Record<string, any> = {
+          from: resendFrom,
+          to: [cleanEmail],
+          subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
+          html: req.body.html,
+        };
+
+        if (qrBase64) {
+          resendPayload.attachments = [
+            {
+              filename: `Kruponam-Pass-${registration.id}-QR.png`,
+              content: qrBase64,
+            },
+          ];
+        }
+
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            from: resendFrom,
-            to: [cleanEmail],
-            subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
-            html: req.body.html,
-          }),
+          body: JSON.stringify(resendPayload),
         });
 
         const data = (await response.json().catch(() => ({}))) as Record<string, any>;
@@ -68,18 +84,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
         // If from address failed (e.g. unverified domain), retry with default onboarding@resend.dev
         if (!response.ok && resendFrom !== 'onboarding@resend.dev' && (data.message?.includes('domain') || data.message?.includes('verify') || response.status === 403)) {
+          const retryPayload: Record<string, any> = {
+            from: 'Kruponam 2026 <onboarding@resend.dev>',
+            to: [cleanEmail],
+            subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
+            html: req.body.html,
+          };
+          if (qrBase64) {
+            retryPayload.attachments = [
+              {
+                filename: `Kruponam-Pass-${registration.id}-QR.png`,
+                content: qrBase64,
+              },
+            ];
+          }
+
           const retryRes = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${resendApiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              from: 'Kruponam 2026 <onboarding@resend.dev>',
-              to: [cleanEmail],
-              subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
-              html: req.body.html,
-            }),
+            body: JSON.stringify(retryPayload),
           });
           const retryData = (await retryRes.json().catch(() => ({}))) as Record<string, any>;
           if (retryRes.ok) {
@@ -98,18 +124,29 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     // 2. Try Brevo API if valid v3 API key (starts with xkeysib-)
     if (brevoApiKey && (brevoApiKey.startsWith('xkeysib-') || brevoApiKey.startsWith('xsmtpsib-'))) {
       try {
+        const brevoPayload: Record<string, any> = {
+          sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
+          to: [{ email: cleanEmail, name: registration.fullName }],
+          subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
+          htmlContent: req.body.html,
+        };
+
+        if (qrBase64) {
+          brevoPayload.attachment = [
+            {
+              name: `Kruponam-Pass-${registration.id}-QR.png`,
+              content: qrBase64,
+            },
+          ];
+        }
+
         const response = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: {
             'api-key': brevoApiKey,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            sender: { name: 'Kruponam 2026', email: 'awtwhatsapp.crashlog@gmail.com' },
-            to: [{ email: cleanEmail, name: registration.fullName }],
-            subject: `🎟️ Kruponam 2026 Official Pass & Invoice (${registration.id})`,
-            htmlContent: req.body.html,
-          }),
+          body: JSON.stringify(brevoPayload),
         });
 
         const data = (await response.json().catch(() => ({}))) as Record<string, any>;

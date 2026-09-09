@@ -1,6 +1,11 @@
 import QRCode from 'qrcode';
 import type { Registration } from './registrationService';
 
+// ── Public Hosted QR Code Generator (Required because Gmail, Apple Mail, Outlook strip data:image/base64 URIs) ───
+export const getEmailQrImageUrl = (text: string): string => {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}&color=0D472B&bgcolor=FFFBF0`;
+};
+
 // ── QR Code Generator (Local offline generation with high contrast) ─────────────
 export const generateQrCode = async (text: string): Promise<string> => {
   try {
@@ -14,12 +19,14 @@ export const generateQrCode = async (text: string): Promise<string> => {
     });
   } catch (err) {
     console.warn('Local QR code generation fallback:', err);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}&color=0D472B&bgcolor=FFFBF0`;
+    return getEmailQrImageUrl(text);
   }
 };
 
 // ── Kerala-themed HTML Email Template ─────────────────────────────
-const buildEmailHtml = (registration: Registration, qrDataUrl: string): string => `
+const buildEmailHtml = (registration: Registration, qrImageUrl: string): string => {
+  const passLookupUrl = `https://kruponam.vercel.app/home.html#lookup?id=${encodeURIComponent(registration.id)}`;
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -168,13 +175,23 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
                   </td>
                   <!-- QR Code -->
                   <td style="padding:20px 24px;text-align:center;vertical-align:middle;min-width:140px;">
-                    <div style="background:#FFFBF0;border-radius:12px;padding:8px;display:inline-block;border:2px solid #D4AF37;">
-                      ${qrDataUrl
-                        ? `<img src="${qrDataUrl}" width="130" height="130" alt="QR Code" style="display:block;border-radius:6px;" />`
-                        : `<div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;color:#0D472B;font-size:11px;font-weight:700;">QR Code<br/>${registration.id}</div>`
-                      }
-                    </div>
-                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;">SCAN AT VENUE GATE</p>
+                    <a href="${passLookupUrl}" target="_blank" style="text-decoration:none;display:inline-block;" title="Tap to view official digital pass badge">
+                      <div style="background:#FFFBF0;border-radius:12px;padding:8px;display:inline-block;border:2px solid #D4AF37;">
+                        <img 
+                          src="${qrImageUrl}" 
+                          width="130" 
+                          height="130" 
+                          alt="Pass QR: ${registration.id}" 
+                          style="display:block;border-radius:6px;width:130px;height:130px;object-fit:contain;" 
+                        />
+                      </div>
+                    </a>
+                    <p style="margin:8px 0 0;font-size:9px;color:#a8d5b5;letter-spacing:1px;font-weight:700;">SCAN AT VENUE GATE</p>
+                    <p style="margin:6px 0 0;">
+                      <a href="${passLookupUrl}" target="_blank" style="display:inline-block;padding:4px 10px;background:#D4AF37;color:#0D472B;border-radius:12px;font-size:10px;font-weight:800;text-decoration:none;">
+                        📱 View Digital Badge
+                      </a>
+                    </p>
                   </td>
                 </tr>
                 <!-- Ticket Footer -->
@@ -225,6 +242,7 @@ const buildEmailHtml = (registration: Registration, qrDataUrl: string): string =
 </body>
 </html>
 `;
+};
 
 // ── Email Result ────────────────────────────────────────────────────
 export interface EmailResult {
@@ -237,11 +255,15 @@ export interface EmailResult {
 // ── Main Send Function ──────────────────────────────────────────────
 export const sendApprovalEmail = async (registration: Registration): Promise<EmailResult> => {
   const cleanEmail = registration.email ? registration.email.trim().toLowerCase() : '';
-  const qrDataUrl = await generateQrCode(
-    `KRUPONAM2026|TOKEN:${registration.id}|NAME:${registration.fullName}|DEPT:${registration.department}|UTR:${registration.paymentUtr || 'VERIFIED'}`
-  );
+  const qrPayload = `KRUPONAM2026|TOKEN:${registration.id}|NAME:${registration.fullName}|DEPT:${registration.department}|UTR:${registration.paymentUtr || 'VERIFIED'}`;
+  
+  // Public HTTPS URL for email clients (crucial: Gmail/Apple Mail/Outlook block inline base64 data URIs)
+  const qrImageUrl = getEmailQrImageUrl(qrPayload);
 
-  const html = buildEmailHtml(registration, qrDataUrl);
+  // Also generate local base64 for fallback and attachments
+  const qrDataUrl = await generateQrCode(qrPayload);
+
+  const html = buildEmailHtml(registration, qrImageUrl);
 
   if (!cleanEmail || !cleanEmail.includes('@')) {
     return {
