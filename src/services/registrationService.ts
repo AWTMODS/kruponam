@@ -140,7 +140,7 @@ const deleteFromIndexedDB = async (id: string) => {
   }
 };
 
-const loadAllFromIndexedDB = (): Promise<Registration[]> => {
+export const loadAllFromIndexedDB = (): Promise<Registration[]> => {
   return new Promise(async (resolve) => {
     try {
       const db = await openIDB();

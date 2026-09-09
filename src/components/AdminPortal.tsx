@@ -7,12 +7,12 @@ import {
   Ticket, Printer, Building2
 } from 'lucide-react';
 import { 
-  getRegistrations, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
+  getRegistrations, loadAllFromIndexedDB, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
   exportBackupDataJson, importBackupDataJson, saveRegistrationAsync, isPhoneMatch, issueVipPass, convertToOfficialVip, issueManualTicket, generateUniqueRegistrationId, listenToFirebaseRegistrations, type Registration, type ApprovalStatus 
 } from '../services/registrationService';
 import { sendApprovalEmail, type EmailResult } from '../services/emailService';
 import { getEmailConfig, saveEmailCredentials, saveResendApiKey, saveBrevoApiKey, isEmailEnabled } from '../config/emailConfig';
-import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, testSupabaseConnection, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
+import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, testSupabaseConnection, disableSupabaseRealtime, SUPABASE_SQL_SETUP_SCRIPT } from '../services/supabaseService';
 import { getFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConfigured, testFirebaseConnection } from '../services/firebaseService';
 import { getMultiUpiSettings, saveMultiUpiSettings, addUpiSlot, updateUpiSlot, removeUpiSlot, resetSlotCount, setActiveSlotManually, type UpiSlot, type MultiUpiSettings } from '../services/upiSettingsService';
 import { getSiteSettings, saveSiteSettings } from '../services/siteSettingsService';
@@ -249,38 +249,64 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     };
   }, []);
 
-  const loadData = async () => {
+  const loadData = () => {
     setIsRefreshing(true);
-    // 1. Immediately display local records without waiting for network
+    // 1. Immediately display local records (IndexedDB / localStorage) — no network wait
     const local = getRegistrations();
     if (local && local.length > 0) {
       setRegistrations(local);
     }
+    // Clear the spinner immediately; cloud sync runs silently in background
+    setIsRefreshing(false);
 
-    // 2. Fast non-blocking parallel sync with Firebase & Supabase
-    try {
-      const regs = await syncCloudRegistrations();
-      if (regs && regs.length > 0) {
-        setRegistrations((current) => {
-          const localMap = new Map(current.map((r) => [r.id, r]));
-          const merged = regs.map((cloudReg) => mergeRegRecords(localMap.get(cloudReg.id), cloudReg));
-          const cloudIds = new Set(regs.map((r) => r.id));
-          current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
-          return merged;
-        });
-      }
-    } catch (_) {}
+    // 1b. Merge IndexedDB records immediately — catches any registrations that were
+    // saved exclusively to IDB (because localStorage quota was exceeded) and would
+    // otherwise be invisible until the background cloud sync completes.
+    loadAllFromIndexedDB()
+      .then((idbRegs) => {
+        if (idbRegs && idbRegs.length > 0) {
+          setRegistrations((current) => {
+            const localMap = new Map(current.map((r) => [r.id, r]));
+            idbRegs.forEach((idbReg) => {
+              if (!idbReg || !idbReg.id) return;
+              const existing = localMap.get(idbReg.id);
+              localMap.set(idbReg.id, existing ? mergeRegRecords(existing, idbReg) : idbReg);
+            });
+            return Array.from(localMap.values());
+          });
+        }
+      })
+      .catch(() => {});
 
+    // 2. Non-blocking background sync with Firebase & Supabase
+    syncCloudRegistrations()
+      .then((regs) => {
+        if (regs && regs.length > 0) {
+          setRegistrations((current) => {
+            const localMap = new Map(current.map((r) => [r.id, r]));
+            const merged = regs.map((cloudReg) => mergeRegRecords(localMap.get(cloudReg.id), cloudReg));
+            const cloudIds = new Set(regs.map((r) => r.id));
+            current.forEach((r) => { if (!cloudIds.has(r.id)) merged.push(r); });
+            return merged;
+          });
+        }
+      })
+      .catch(() => {});
+
+    // Supabase connection health check — also non-blocking.
+    // On invalid key: disable Realtime immediately to stop WS reconnect spam.
     if (isSupabaseConfigured()) {
       testSupabaseConnection().then((res) => {
         if (!res.success) {
           setSupabaseConnNotice(res.message);
+          // Stop the Supabase Realtime WebSocket reconnect loop if the key is bad.
+          // disableSupabaseRealtime() is idempotent — safe to call multiple times.
+          disableSupabaseRealtime();
         } else {
           setSupabaseConnNotice(null);
         }
       });
     }
-    setIsRefreshing(false);
   };
 
 

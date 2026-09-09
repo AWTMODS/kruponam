@@ -5,7 +5,7 @@ const SUPABASE_URL_KEY = 'kruponam_supabase_url';
 const SUPABASE_ANON_KEY = 'kruponam_supabase_anon_key';
 
 const DEFAULT_SUPABASE_URL = 'https://ummggndyxmwenknhhbsr.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbWdnbnR5eG13ZW5rbmhoYnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQwMjksImV4cCI6MjEwMTU5MDAyOX0.e0fkp2uUK6na-sjtIjUY56cIZMB26ipsKL-qtOSaq9U';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtbWdnbmR5eG13ZW5rbmhoYnNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMTQwMjksImV4cCI6MjEwMTU5MDAyOX0.e0fkp2uUK6na-sjtIjUY56cIZMB26ipsKL-qtOSaq9U';
 
 export const getSupabaseCredentials = (): { url: string; key: string } => {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -28,9 +28,27 @@ export const saveSupabaseCredentials = (url: string, key: string): void => {
 
 let supabaseInstance: SupabaseClient | null = null;
 let isSupabaseDisabled = false;
+let isRealtimeDisabled = false;
 
 export const setSupabaseDisabled = (disabled: boolean) => {
   isSupabaseDisabled = disabled;
+};
+
+/**
+ * Disconnects the Supabase Realtime WebSocket and prevents automatic reconnection.
+ * Call this when the API key is invalid to stop the infinite reconnect spam in the console.
+ * Safe to call multiple times — idempotent.
+ */
+export const disableSupabaseRealtime = (): void => {
+  if (isRealtimeDisabled) return;
+  isRealtimeDisabled = true;
+  if (supabaseInstance) {
+    try {
+      supabaseInstance.realtime.disconnect();
+    } catch (_) {
+      // Ignore disconnect errors — client may already be torn down
+    }
+  }
 };
 
 export const getSupabaseClient = (): SupabaseClient | null => {
@@ -72,6 +90,9 @@ export const testSupabaseConnection = async (): Promise<{ success: boolean; mess
     if (error) {
       if (error.message.includes('Invalid API key') || error.code === 'PGRST301' || error.message.includes('JWT')) {
         isSupabaseDisabled = true;
+        // Stop the Realtime WebSocket reconnect loop immediately — invalid key means
+        // the server will always reject the WS handshake, so retrying forever is pointless.
+        disableSupabaseRealtime();
         return { success: false, message: 'Invalid Supabase API Key. Please update VITE_SUPABASE_ANON_KEY in project settings or Admin Dashboard.' };
       }
       if (error.message.includes('relation "public.registrations" does not exist') || error.code === '42P01') {
