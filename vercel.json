@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
+    { "source": "/home.html", "destination": "/" },
     { "source": "/admin.html", "destination": "/?admin=true" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
