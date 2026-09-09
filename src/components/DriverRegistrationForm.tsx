@@ -167,7 +167,17 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      setValidationError('Please upload an image file (JPG, PNG, WebP) for the payment screenshot.');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setValidationError('Payment screenshot file size is too large. Please select an image under 15MB.');
+      return;
+    }
+
     setIsProcessingScreenshot(true);
+    setValidationError(null);
     try {
       const compressed = await compressImageToDataUrl(file, { initialMaxWidth: 900, initialQuality: 0.75 });
       setPaymentScreenshotPreview(compressed);
@@ -176,7 +186,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
         const raw = await readRawFileAsDataUrl(file);
         setPaymentScreenshotPreview(raw);
       } catch {
-        // Ignore fallback
+        setValidationError('Could not process this screenshot image. Please try another photo.');
       }
     } finally {
       setIsProcessingScreenshot(false);
@@ -239,6 +249,11 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
     const cleanUtr = paymentUtr.trim().replace(/\D/g, '');
     if (cleanUtr.length !== 12) {
       setValidationError('Please enter the valid 12-digit numeric UPI Transaction UTR Number.');
+      return;
+    }
+
+    if (!paymentScreenshotPreview) {
+      setValidationError('Please upload/attach your payment screenshot showing the 12-digit UTR Number.');
       return;
     }
 
@@ -742,10 +757,10 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                 </p>
               </div>
 
-              {/* Optional Payment Screenshot */}
+              {/* Required Payment Screenshot */}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Upload Payment Screenshot <span className="text-slate-400 font-normal">(Optional but recommended)</span>
+                  Upload Payment Screenshot <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <div className="flex items-center gap-3">
                   {paymentScreenshotPreview ? (
@@ -754,7 +769,10 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                       <span className="text-xs font-bold text-emerald-800">Screenshot attached</span>
                       <button
                         type="button"
-                        onClick={() => setPaymentScreenshotPreview(null)}
+                        onClick={() => {
+                          setPaymentScreenshotPreview(null);
+                          if (screenshotInputRef.current) screenshotInputRef.current.value = '';
+                        }}
                         className="p-1 text-rose-600 hover:bg-rose-100 rounded-lg"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -768,11 +786,11 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                       className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 border border-slate-300"
                     >
                       {isProcessingScreenshot ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
                       ) : (
-                        <Camera className="w-3.5 h-3.5" />
+                        <Camera className="w-3.5 h-3.5 text-slate-600" />
                       )}
-                      <span>Attach Payment Screenshot</span>
+                      <span>Attach Payment Screenshot *</span>
                     </button>
                   )}
                   <input
@@ -783,6 +801,9 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                     className="hidden"
                   />
                 </div>
+                <p className="text-[11px] text-slate-500">
+                  Please upload a screenshot of your successful UPI transaction showing the 12-digit UTR / Reference number.
+                </p>
               </div>
             </div>
 
