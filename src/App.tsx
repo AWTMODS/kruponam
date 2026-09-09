@@ -24,12 +24,32 @@ export function App() {
     const hash = window.location.hash.toLowerCase();
     const search = window.location.search.toLowerCase();
     const pathname = window.location.pathname.toLowerCase();
+
+    // Priority 1: If user explicitly navigated to a main anchor like #home, #registration, etc., always show main
+    const mainSectionHashes = ['#home', '#about', '#programs', '#tickets', '#registration', '#guidelines', '#contact'];
+    if (mainSectionHashes.includes(hash)) {
+      return 'main';
+    }
+
+    // Priority 2: Direct Registration page routes (/registration.html, /registration, /register.html, /register, ?view=registration)
+    if (
+      pathname.includes('registration') ||
+      pathname.includes('register') ||
+      search.includes('view=registration')
+    ) {
+      return 'main';
+    }
+
+    // Priority 3: Admin portal routes (/admin.html, /admin, #admin, ?admin=true)
     if (hash === '#admin' || search.includes('admin') || pathname.includes('admin')) {
       return 'admin';
     }
+
+    // Priority 4: Driver registration routes (/driver.html, /driver, #driver, ?view=driver)
     if (hash === '#driver' || search.includes('driver') || pathname.includes('driver')) {
       return 'driver';
     }
+
     return 'main';
   });
   const [lookupQuery, setLookupQuery] = useState<string>('');
@@ -40,20 +60,57 @@ export function App() {
     // Start tracking live active visitor presence
     startLivePresenceHeartbeat();
 
-    // 1. Check URL Hash and query params (e.g. #admin, /admin.html, /driver.html, #driver, ?view=driver)
+    // 1. Check URL Hash and query params (e.g. #admin, /admin.html, /driver.html, /registration.html, #home)
     const checkUrlRouting = () => {
       const hash = window.location.hash.toLowerCase();
       const search = window.location.search.toLowerCase();
       const pathname = window.location.pathname.toLowerCase();
 
+      const mainSectionHashes = ['#home', '#about', '#programs', '#tickets', '#registration', '#guidelines', '#contact'];
+      
+      // If user clicks a main anchor like #home (e.g. /admin.html#home), switch to main and clean URL
+      if (mainSectionHashes.includes(hash)) {
+        setActiveView('main');
+        if (pathname.includes('admin') || pathname.includes('driver')) {
+          window.history.replaceState(null, '', hash === '#home' ? '/' : `/${hash}`);
+        }
+        setTimeout(() => {
+          if (hash === '#home') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            const el = document.getElementById(hash.substring(1));
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        }, 100);
+        return;
+      }
+
+      // Direct registration routes (/registration.html, /registration, /register.html, /register)
+      if (
+        pathname.includes('registration') ||
+        pathname.includes('register') ||
+        search.includes('view=registration')
+      ) {
+        setActiveView('main');
+        setTimeout(() => {
+          const el = document.getElementById('registration');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+        return;
+      }
+
       if (hash === '#admin' || search.includes('admin') || pathname.includes('admin')) {
         setActiveView('admin');
-      } else if (
-        hash === '#driver' ||
-        search.includes('driver') ||
-        pathname.includes('driver')
-      ) {
+        return;
+      }
+      
+      if (hash === '#driver' || search.includes('driver') || pathname.includes('driver')) {
         setActiveView('driver');
+        return;
       }
     };
 
@@ -93,11 +150,26 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.pathname.includes('registration') ||
+        window.location.pathname.includes('register') ||
+        window.location.search.includes('view=registration'))
+    ) {
+      setTimeout(() => {
+        const el = document.getElementById('registration');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 350);
+    }
+  }, []);
+
   const handleCloseAdmin = () => {
     setActiveView('main');
-    if (window.location.hash === '#admin' || window.location.pathname.includes('admin') || window.location.search.includes('admin')) {
-      window.history.replaceState(null, '', '/');
-    }
+    window.history.replaceState(null, '', '/');
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleSelectTicketFromPasses = (passName: string) => {

@@ -8,6 +8,10 @@
     { "source": "/admin.html", "destination": "/?admin=true" },
     { "source": "/driver.html", "destination": "/?view=driver" },
     { "source": "/driver", "destination": "/?view=driver" },
+    { "source": "/registration.html", "destination": "/?view=registration" },
+    { "source": "/registration", "destination": "/?view=registration" },
+    { "source": "/register.html", "destination": "/?view=registration" },
+    { "source": "/register", "destination": "/?view=registration" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
