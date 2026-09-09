@@ -66,6 +66,8 @@ export interface Registration {
   updatedAt?: string;
   isReported?: boolean;
   reportedAt?: string;
+  licenseNumber?: string;
+  vehicleNumber?: string;
 }
 
 const STORAGE_KEY = 'kruponam_registrations_v3';

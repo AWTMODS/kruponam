@@ -13,12 +13,25 @@ import { AdminPortal } from './components/AdminPortal';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
 import { ComingSoon } from './components/ComingSoon';
+import { DriverRegistrationForm } from './components/DriverRegistrationForm';
 import { getSiteSettings } from './services/siteSettingsService';
 import { startLivePresenceHeartbeat } from './services/livePresenceService';
 
 export function App() {
   const [selectedPass, setSelectedPass] = useState<string>('Student Pass');
-  const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin'>('main');
+  const [activeView, setActiveView] = useState<'main' | 'lookup' | 'admin' | 'driver'>(() => {
+    if (typeof window === 'undefined') return 'main';
+    const hash = window.location.hash.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+    if (hash === '#admin' || search.includes('admin') || pathname.includes('admin')) {
+      return 'admin';
+    }
+    if (hash === '#driver' || search.includes('driver') || pathname.includes('driver')) {
+      return 'driver';
+    }
+    return 'main';
+  });
   const [lookupQuery, setLookupQuery] = useState<string>('');
   const [showProgramsSchedule, setShowProgramsSchedule] = useState<boolean>(() => getSiteSettings().showProgramsSchedule);
   const [comingSoonMode, setComingSoonMode] = useState<boolean>(() => getSiteSettings().comingSoonMode);
@@ -27,17 +40,26 @@ export function App() {
     // Start tracking live active visitor presence
     startLivePresenceHeartbeat();
 
-    // 1. Check URL Hash (e.g., #admin or ?admin=true)
-    const checkAdminTrigger = () => {
+    // 1. Check URL Hash and query params (e.g. #admin, /admin.html, /driver.html, #driver, ?view=driver)
+    const checkUrlRouting = () => {
       const hash = window.location.hash.toLowerCase();
       const search = window.location.search.toLowerCase();
-      if (hash === '#admin' || search.includes('admin=true')) {
+      const pathname = window.location.pathname.toLowerCase();
+
+      if (hash === '#admin' || search.includes('admin') || pathname.includes('admin')) {
         setActiveView('admin');
+      } else if (
+        hash === '#driver' ||
+        search.includes('driver') ||
+        pathname.includes('driver')
+      ) {
+        setActiveView('driver');
       }
     };
 
-    checkAdminTrigger();
-    window.addEventListener('hashchange', checkAdminTrigger);
+    checkUrlRouting();
+    window.addEventListener('hashchange', checkUrlRouting);
+    window.addEventListener('popstate', checkUrlRouting);
 
     // Listen to site settings changes
     const handleSettingsChanged = (e: Event) => {
@@ -64,7 +86,8 @@ export function App() {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('hashchange', checkAdminTrigger);
+      window.removeEventListener('hashchange', checkUrlRouting);
+      window.removeEventListener('popstate', checkUrlRouting);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('kruponam-site-settings-changed', handleSettingsChanged);
     };
@@ -72,8 +95,8 @@ export function App() {
 
   const handleCloseAdmin = () => {
     setActiveView('main');
-    if (window.location.hash === '#admin') {
-      window.history.replaceState(null, '', window.location.pathname);
+    if (window.location.hash === '#admin' || window.location.pathname.includes('admin') || window.location.search.includes('admin')) {
+      window.history.replaceState(null, '', '/');
     }
   };
 
@@ -95,6 +118,17 @@ export function App() {
       {/* Main App View Navigation */}
       {activeView === 'admin' ? (
         <AdminPortal onClose={handleCloseAdmin} />
+      ) : activeView === 'driver' ? (
+        <DriverRegistrationForm
+          onBackToHome={() => {
+            setActiveView('main');
+            if (window.location.hash === '#driver' || window.location.search.includes('driver')) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }}
+          onOpenLookup={handleOpenLookup}
+          onOpenAdmin={() => setActiveView('admin')}
+        />
       ) : activeView === 'lookup' ? (
         <div className="pt-24 min-h-screen">
           <Navbar onOpenLookup={handleOpenLookup} onOpenAdmin={() => setActiveView('admin')} />

@@ -4,7 +4,7 @@ import {
   ArrowLeft, X, QrCode, UserCheck, Mail, Settings, Upload, Save, RefreshCw, 
   Plus, Trash2, RotateCcw, AlertCircle, Download, Sparkles, ShieldCheck, 
   Check, Filter, TrendingUp, Activity, HardDrive, FileJson, Layers, Database, Copy, Pencil, Flame, Crown, Loader2,
-  Ticket, Printer, Building2
+  Ticket, Printer, Building2, Truck
 } from 'lucide-react';
 import { 
   getRegistrations, loadAllFromIndexedDB, syncCloudRegistrations, deduplicateRegistrations, approveRegistration, approveIdCard, deleteRegistration, rejectRegistration, markAsReported, 
@@ -107,7 +107,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [emailPreview, setEmailPreview] = useState<EmailResult | null>(null);
   const [sendingEmail, setSendingEmail] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'registrations' | 'upi-settings' | 'database' | 'site-settings'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'drivers' | 'upi-settings' | 'database' | 'site-settings'>('registrations');
+  const [driverSearchQuery, setDriverSearchQuery] = useState('');
+  const [driverStatusFilter, setDriverStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState('');
 
@@ -1155,8 +1157,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
     );
   };
 
+  // ── Helper to identify any Vehicle Driver record ─────────────────────────
+  const isDriverRecord = (r: Registration): boolean => {
+    return (
+      r.ticketType === 'Driver Pass' ||
+      r.ticketType === 'Vehicle Driver Pass' ||
+      r.ticketType === 'Bus Driver Pass' ||
+      (typeof r.department === 'string' && r.department.toLowerCase().startsWith('driver'))
+    );
+  };
+
+  // ── Vehicle Driver Metrics ──────────────────────────────────────────────
+  const driverRegistrations = registrations.filter((r) => isDriverRecord(r));
+  const totalDrivers = driverRegistrations.length;
+  const pendingDrivers = driverRegistrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
+  const approvedDrivers = driverRegistrations.filter((r) => r.approvalStatus === 'Approved').length;
+  const rejectedDrivers = driverRegistrations.filter((r) => r.approvalStatus === 'Rejected').length;
+  const totalDriverRevenue = driverRegistrations
+    .filter((r) => r.approvalStatus === 'Approved' && (r.paymentAmount === undefined || r.paymentAmount > 0))
+    .reduce((sum, r) => sum + (r.paymentAmount !== undefined ? r.paymentAmount : 700), 0);
+
   // ── VIP and Normal Metrics Segregation ──────────────────────────────────
-  const normalRegistrations = registrations.filter((r) => !isVipRecord(r));
+  const normalRegistrations = registrations.filter((r) => !isVipRecord(r) && !isDriverRecord(r));
   const totalApps = normalRegistrations.length;
   const pendingIdApps = normalRegistrations.filter((r) => r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending').length;
   const idApprovedApps = normalRegistrations.filter((r) => r.approvalStatus === 'ID_Approved').length;
@@ -1304,8 +1326,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
         return item.approvalStatus === 'VIP';
       }
 
-      // 2. Hide ALL VIP passes from normal listings and normal status filters
-      if (isVipRecord(item)) {
+      // 2. Hide ALL VIP passes and Driver passes from normal listings and normal status filters
+      if (isVipRecord(item) || isDriverRecord(item)) {
         return false;
       }
 
@@ -1341,6 +1363,70 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
       const timeB = b.updatedAt || b.submittedAt || '';
       return timeB.localeCompare(timeA);
     });
+
+  const filteredDrivers = registrations
+    .filter((r) => isDriverRecord(r))
+    .filter((r) => {
+      if (driverStatusFilter === 'pending') {
+        return r.approvalStatus === 'Pending_ID_Approval' || r.approvalStatus === 'Pending';
+      }
+      if (driverStatusFilter === 'approved') {
+        return r.approvalStatus === 'Approved';
+      }
+      if (driverStatusFilter === 'rejected') {
+        return r.approvalStatus === 'Rejected';
+      }
+      return true;
+    })
+    .filter((r) => {
+      if (!driverSearchQuery.trim()) return true;
+      const q = driverSearchQuery.toLowerCase().trim();
+      return (
+        (r.fullName && r.fullName.toLowerCase().includes(q)) ||
+        (r.phone && r.phone.toLowerCase().includes(q)) ||
+        (r.id && r.id.toLowerCase().includes(q)) ||
+        (r.licenseNumber && r.licenseNumber.toLowerCase().includes(q)) ||
+        (r.vehicleNumber && r.vehicleNumber.toLowerCase().includes(q)) ||
+        (r.section && r.section.toLowerCase().includes(q)) ||
+        (r.department && r.department.toLowerCase().includes(q)) ||
+        (r.paymentUtr && r.paymentUtr.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      const timeA = a.updatedAt || a.submittedAt || '';
+      const timeB = b.updatedAt || b.submittedAt || '';
+      return timeB.localeCompare(timeA);
+    });
+
+  const handleExportDriversCsv = () => {
+    const drivers = registrations.filter((r) => isDriverRecord(r));
+    if (drivers.length === 0) {
+      addToast('No vehicle driver records to export.', 'info');
+      return;
+    }
+    const headers = ['Pass ID', 'Driver Name', 'Mobile', 'Licence Number', 'Vehicle Number', 'Vehicle Details', 'Payment Amount', 'Payment UTR', 'Status', 'Submitted At'];
+    const rows = drivers.map((d) => [
+      `"${d.id}"`,
+      `"${(d.fullName || '').replace(/"/g, '""')}"`,
+      `"${d.phone || ''}"`,
+      `"${(d.licenseNumber || '').replace(/"/g, '""')}"`,
+      `"${(d.vehicleNumber || d.section || '').replace(/"/g, '""')}"`,
+      `"${(d.department || '').replace(/"/g, '""')}"`,
+      d.paymentAmount || 700,
+      `"${d.paymentUtr || ''}"`,
+      `"${d.approvalStatus || ''}"`,
+      `"${d.submittedAt || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `kruponam_vehicle_drivers_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast(`📥 Exported ${drivers.length} Driver Passes to CSV!`, 'success');
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-3 sm:p-6 lg:p-8 font-sans relative overflow-x-hidden">
@@ -1669,6 +1755,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
                 <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-slate-950/60 text-slate-200">
                   {totalApps}
                 </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('drivers')}
+                className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                  activeTab === 'drivers'
+                    ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 shadow-gold-glow font-black'
+                    : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Truck className="w-4 h-4 text-gold-royal" />
+                <span>Vehicle Driver Passes 🚗</span>
+                <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-slate-950/60 text-slate-200">
+                  {totalDrivers}
+                </span>
+                {pendingDrivers > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-amber-400 text-slate-950 font-black animate-pulse">
+                    {pendingDrivers} Pending
+                  </span>
+                )}
               </button>
 
               <button
@@ -2254,6 +2360,384 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ onClose }) => {
             </div>
 
           </>)}
+
+          {/* ── Vehicle Driver Passes Tab ────────────────────────── */}
+          {activeTab === 'drivers' && (
+            <div className="space-y-8 animate-fadeIn">
+
+              {/* Driver Section Header Banner */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-royal to-amber-500 text-slate-950 flex items-center justify-center shadow-gold-glow shrink-0">
+                    <Truck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="font-serif text-2xl font-bold text-white flex items-center gap-2">
+                      <span>Vehicle Driver & Transport Passes</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold-royal/20 text-gold-royal border border-gold-royal/40 font-mono">
+                        {totalDrivers} Total
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Entry tickets, parking clearance, and food tokens for college bus drivers, staff vans, tourist tempo travelers, and vehicle crew.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={handleExportDriversCsv}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5 text-gold-royal" />
+                    <span>Export CSV</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleOpenManualTicketModal();
+                      handleManualTicketTypeChange('Vehicle Driver Pass');
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-gold-royal to-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider hover:shadow-gold-glow transition-all flex items-center gap-1.5 shadow-md"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Issue Driver Pass</span>
+                  </button>
+
+                  <a
+                    href="/driver.html"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3.5 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <span>Public Form</span>
+                    <span className="text-[10px]">↗</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Metrics Overview Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 shadow-md">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Total Drivers</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black font-mono text-white">{totalDrivers}</span>
+                    <span className="text-xs text-slate-500">vehicles</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 p-5 rounded-2xl border border-amber-500/30 shadow-md">
+                  <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block">Pending Verification</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black font-mono text-amber-400">{pendingDrivers}</span>
+                    <span className="text-xs text-amber-300/60">require review</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 p-5 rounded-2xl border border-emerald-500/30 shadow-md">
+                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Approved Passes</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black font-mono text-emerald-400">{approvedDrivers}</span>
+                    <span className="text-xs text-emerald-300/60">entry ready</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 p-5 rounded-2xl border border-gold-royal/30 shadow-md">
+                  <span className="text-xs text-gold-royal font-bold uppercase tracking-wider block">Driver Ticket Revenue</span>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-black font-mono text-gold-light">₹{totalDriverRevenue.toLocaleString()}</span>
+                    <span className="text-xs text-gold-royal/70">collected</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Pills and Search Bar */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'all', label: 'All Drivers', count: totalDrivers },
+                    { id: 'pending', label: 'Pending Approval', count: pendingDrivers },
+                    { id: 'approved', label: 'Approved Passes', count: approvedDrivers },
+                    { id: 'rejected', label: 'Rejected', count: rejectedDrivers },
+                  ].map((filterTab) => {
+                    const active = driverStatusFilter === filterTab.id;
+                    return (
+                      <button
+                        key={filterTab.id}
+                        onClick={() => setDriverStatusFilter(filterTab.id as any)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          active
+                            ? 'bg-gradient-to-r from-gold-royal to-amber-500 text-slate-950 font-black shadow-gold-glow'
+                            : 'bg-slate-950 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                        }`}
+                      >
+                        <span>{filterTab.label}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                          active ? 'bg-slate-950/40 text-slate-950 font-bold' : 'bg-slate-900 text-slate-400'
+                        }`}>
+                          {filterTab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative w-full lg:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search driver, vehicle plate, licence, UTR..."
+                    value={driverSearchQuery}
+                    onChange={(e) => setDriverSearchQuery(e.target.value)}
+                    className="w-full pl-11 pr-9 py-2.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white outline-none focus:border-gold-royal focus:ring-1 focus:ring-gold-royal transition-all placeholder-slate-500"
+                  />
+                  {driverSearchQuery && (
+                    <button
+                      onClick={() => setDriverSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Drivers Table / List */}
+              <div className="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800 font-bold">
+                      <tr>
+                        <th className="p-4">Driver Pass ID</th>
+                        <th className="p-4">Driver Details</th>
+                        <th className="p-4">Vehicle & Licence Info</th>
+                        <th className="p-4">Licence Photo</th>
+                        <th className="p-4">Fee & Payment UTR</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-medium">
+                      {filteredDrivers.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-12 text-center">
+                            <div className="w-16 h-16 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center mx-auto mb-3">
+                              <Truck className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-base font-bold text-white mb-1">
+                              No Vehicle Driver Passes Found
+                            </h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
+                              {driverSearchQuery ? 'No drivers match your search query.' : 'Drivers can register at kruponam.vercel.app/driver.html to submit vehicle details.'}
+                            </p>
+                            <div className="flex justify-center gap-3">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/driver.html`);
+                                  addToast('📋 Driver Registration URL copied to clipboard!', 'success');
+                                }}
+                                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold text-xs hover:bg-slate-700 transition-all flex items-center gap-1.5"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>Copy Driver URL</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  handleOpenManualTicketModal();
+                                  handleManualTicketTypeChange('Vehicle Driver Pass');
+                                }}
+                                className="px-4 py-2 rounded-xl bg-gold-royal text-slate-950 font-bold text-xs hover:bg-gold-light transition-all flex items-center gap-1.5"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Issue Spot Ticket</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDrivers.map((driver) => (
+                          <tr key={driver.id} className="hover:bg-slate-800/40 transition-colors">
+                            {/* ID & Date */}
+                            <td className="p-4 font-mono">
+                              <div className="space-y-1">
+                                <span className="font-bold text-gold-light bg-gold-royal/10 px-2.5 py-1 rounded-lg border border-gold-royal/30 inline-block">
+                                  {driver.id}
+                                </span>
+                                <span className="text-[10px] text-slate-500 block font-sans">
+                                  {driver.submittedAt}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Driver Name & Mobile */}
+                            <td className="p-4">
+                              <div className="space-y-1">
+                                <span className="text-sm font-bold text-white block">
+                                  {driver.fullName}
+                                </span>
+                                <a
+                                  href={`tel:${driver.phone}`}
+                                  className="text-slate-400 hover:text-gold-light transition-colors font-mono text-xs inline-flex items-center gap-1"
+                                >
+                                  📞 {driver.phone}
+                                </a>
+                              </div>
+                            </td>
+
+                            {/* Vehicle & Licence Info */}
+                            <td className="p-4">
+                              <div className="space-y-1.5">
+                                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono font-bold text-xs">
+                                  🚗 {driver.vehicleNumber || driver.section || 'N/A'}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {driver.department || 'Vehicle Driver'}
+                                </div>
+                                {driver.licenseNumber && (
+                                  <div className="text-[10px] text-slate-500 font-mono">
+                                    Licence: <span className="text-slate-300 font-bold">{driver.licenseNumber}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Licence Photo Thumbnail */}
+                            <td className="p-4">
+                              {driver.idCardUrl ? (
+                                <button
+                                  onClick={() => setInspectItem(driver)}
+                                  className="relative group w-14 h-14 rounded-xl overflow-hidden border border-slate-700 hover:border-gold-royal transition-all"
+                                  title="Click to view Driving Licence / ID"
+                                >
+                                  <img
+                                    src={driver.idCardUrl}
+                                    alt="Licence"
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <Eye className="w-4 h-4 text-white" />
+                                  </div>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 italic">No photo</span>
+                              )}
+                            </td>
+
+                            {/* Payment UTR & Amount */}
+                            <td className="p-4 font-mono">
+                              <div className="space-y-1">
+                                <span className="text-xs font-bold text-emerald-400 block font-sans">
+                                  ₹{driver.paymentAmount || ticketAmountInput || 700}
+                                </span>
+                                {driver.paymentUtr ? (
+                                  <span className="text-[11px] text-slate-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 inline-block font-bold">
+                                    UTR: {driver.paymentUtr}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-amber-400 italic">No UTR</span>
+                                )}
+                                {driver.paymentScreenshotUrl && (
+                                  <button
+                                    onClick={() => setInspectItem(driver)}
+                                    className="text-[10px] text-gold-light hover:underline block"
+                                  >
+                                    View Receipt ↗
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="p-4">
+                              {driver.approvalStatus === 'Approved' ? (
+                                <span className="px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold inline-flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Approved</span>
+                                </span>
+                              ) : driver.approvalStatus === 'Rejected' ? (
+                                <span className="px-3 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-500/40 text-[11px] font-bold">
+                                  Rejected
+                                </span>
+                              ) : (
+                                <span className="px-3 py-1 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-[11px] font-bold inline-flex items-center gap-1 animate-pulse">
+                                  <Clock className="w-3 h-3" />
+                                  <span>Pending Review</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Quick Approve */}
+                                {driver.approvalStatus !== 'Approved' && (
+                                  <button
+                                    onClick={() => handleApprove(driver.id)}
+                                    className="p-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 transition-all"
+                                    title="Approve Driver Pass"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                )}
+
+                                {/* Quick Reject */}
+                                {driver.approvalStatus !== 'Rejected' && (
+                                  <button
+                                    onClick={() => setShowRejectModal(driver.id)}
+                                    className="p-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 transition-all"
+                                    title="Reject Driver Pass"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+
+                                {/* Print Driver Pass */}
+                                <button
+                                  onClick={() => handlePrintTicket(driver)}
+                                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all"
+                                  title="Print Driver Entry Pass"
+                                >
+                                  <Printer className="w-4 h-4 text-gold-royal" />
+                                </button>
+
+                                {/* Inspect */}
+                                <button
+                                  onClick={() => setInspectItem(driver)}
+                                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all"
+                                  title="Inspect Driver Pass Details"
+                                >
+                                  <Eye className="w-4 h-4 text-blue-400" />
+                                </button>
+
+                                {/* Edit */}
+                                <button
+                                  onClick={() => handleOpenEditModal(driver)}
+                                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all"
+                                  title="Edit Driver Details"
+                                >
+                                  <Pencil className="w-4 h-4 text-amber-400" />
+                                </button>
+
+                                {/* Delete */}
+                                <button
+                                  onClick={() => setShowDeleteModal(driver)}
+                                  className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 transition-all"
+                                  title="Delete Record"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* ── UPI / Payment Settings Tab ────────────────────────── */}
           {activeTab === 'upi-settings' && (

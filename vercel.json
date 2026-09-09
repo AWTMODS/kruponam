@@ -6,6 +6,8 @@
   "rewrites": [
     { "source": "/home.html", "destination": "/" },
     { "source": "/admin.html", "destination": "/?admin=true" },
+    { "source": "/driver.html", "destination": "/?view=driver" },
+    { "source": "/driver", "destination": "/?view=driver" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
