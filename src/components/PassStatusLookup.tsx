@@ -750,7 +750,7 @@ export const PassStatusLookup: React.FC<LookupProps> = ({ onClose, initialQuery,
             required
             placeholder={
               trackingMode === 'driver'
-                ? "Enter Driver Pass ID (e.g. KRP-...), Driver Phone, or Vehicle Number..."
+                ? "Enter Driver Pass ID (e.g. KRP-...), Driver Phone, Email, or Vehicle Number..."
                 : "e.g. 9072428800, student@krupanidhi.edu.in, or KRP-849201"
             }
             value={searchQuery}

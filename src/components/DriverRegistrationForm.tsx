@@ -14,7 +14,8 @@ import {
   ArrowLeft, 
   Search, 
   ShieldCheck, 
-  RefreshCw
+  RefreshCw,
+  Mail
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -58,6 +59,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
 
   // Form Fields
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -206,6 +208,13 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
       return;
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setValidationError('Please enter a valid driver email address (e.g. driver@gmail.com).');
+      return;
+    }
+
     const cleanPhone = phone.trim().replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       setValidationError('Please enter a valid 10-digit mobile number.');
@@ -251,7 +260,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
       const driverRecord: Registration = {
         id: passId,
         fullName: fullName.trim(),
-        email: `${cleanPhone}@driver.kruponam.in`,
+        email: cleanEmail,
         phone: cleanPhone,
         department: `Driver - ${cleanVehicleType} (${licenseNumber.trim().toUpperCase()})`,
         section: vehicleNumber.trim().toUpperCase(),
@@ -394,6 +403,10 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                   <span className="font-bold text-slate-900">{submittedPass.phone}</span>
                 </div>
                 <div>
+                  <span className="text-slate-500 block">Email Address</span>
+                  <span className="font-bold text-slate-900 break-all">{submittedPass.email}</span>
+                </div>
+                <div>
                   <span className="text-slate-500 block">Licence Number</span>
                   <span className="font-mono font-bold text-slate-900">{submittedPass.licenseNumber || 'Verified on Licence'}</span>
                 </div>
@@ -431,6 +444,7 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                 onClick={() => {
                   setSubmittedPass(null);
                   setFullName('');
+                  setEmail('');
                   setPhone('');
                   setLicenseNumber('');
                   setVehicleNumber('');
@@ -478,6 +492,22 @@ export const DriverRegistrationForm: React.FC<DriverRegistrationProps> = ({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Suresh Kumar"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-kerala-deep focus:border-transparent font-medium"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-gold-royal" />
+                    <span>Email Address <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. suresh.kumar@gmail.com"
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-kerala-deep focus:border-transparent font-medium"
                   />
                 </div>
