@@ -5,14 +5,8 @@ import {
   Ticket, 
   CheckCircle2, 
   Calendar, 
-  ShieldCheck, 
   PartyPopper, 
-  Utensils, 
-  Music, 
   ArrowRight, 
-  Phone, 
-  Mail,
-  GraduationCap,
   Truck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -22,7 +16,7 @@ interface ComingSoonProps {
   onOpenLookup?: (query?: string, mode?: 'student' | 'driver') => void;
 }
 
-export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLookup }) => {
+export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenLookup }) => {
   const [quickQuery, setQuickQuery] = useState('');
 
   // Fire celebratory festive confetti once on mount
@@ -83,11 +77,11 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
                 2026
               </span>
             </span>
-            <p className="text-[11px] text-slate-600 font-sans hidden sm:block">Krupanidhi Degree College Cultural Committee</p>
+            <p className="text-[11px] text-slate-600 font-sans hidden sm:block">Official Onam Cultural Extravaganza</p>
           </div>
         </div>
 
-        {/* Top Header Actions */}
+        {/* Top Header Actions - Admin login hidden as requested */}
         <div className="flex items-center gap-2.5">
           {onOpenLookup && (
             <button
@@ -96,16 +90,6 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
             >
               <Ticket className="w-4 h-4 text-gold-dark" />
               <span>Check My Pass</span>
-            </button>
-          )}
-
-          {onOpenAdmin && (
-            <button
-              onClick={onOpenAdmin}
-              title="Admin Portal"
-              className="p-2 rounded-xl text-slate-500 hover:text-kerala-deep hover:bg-gold-light/30 transition-all border border-transparent hover:border-gold-royal/20"
-            >
-              <ShieldCheck className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -129,7 +113,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
             Thank You for <span className="text-gold-gradient italic">Booking!</span>
           </h1>
           <p className="font-sans text-base sm:text-lg text-slate-700 leading-relaxed max-w-2xl mx-auto">
-            We are deeply grateful for the overwhelming response and enthusiastic support from our students, alumni, faculty, and guests. Ticket reservations for <strong className="text-kerala-deep">Kruponam 2026</strong> are officially closed.
+            We are deeply grateful for the overwhelming response and enthusiastic support. Ticket reservations for <strong className="text-kerala-deep">Kruponam 2026</strong> are officially closed.
           </p>
           <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-900 bg-gold-light/30 px-4 py-1.5 rounded-full border border-gold-royal/20">
             <Calendar className="w-4 h-4 text-gold-dark" />
@@ -196,7 +180,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-cream-soft to-amber-50">
             <img
               src={getAssetUrl('images/hero_poster.jpg?v=3')}
-              alt="Kruponam 2026 Official Poster King Mahabali Krupanidhi Institutions"
+              alt="Kruponam 2026 Official Poster King Mahabali"
               className="w-full h-auto object-cover max-h-[580px] rounded-2xl shadow-inner group-hover:scale-105 transition-transform duration-700"
             />
             
@@ -213,7 +197,7 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
                   🌴
                 </div>
                 <div className="text-left">
-                  <p className="text-xs font-bold text-kerala-deep">Krupanidhi Degree College</p>
+                  <p className="text-xs font-bold text-kerala-deep">Kruponam 2026</p>
                   <p className="text-[11px] text-slate-500">Official Onam Celebration</p>
                 </div>
               </div>
@@ -224,89 +208,37 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ onOpenAdmin, onOpenLooku
           </div>
         </div>
 
-        {/* Event Feature Highlights */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 w-full max-w-3xl pt-2">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gold-royal/30 text-center shadow-sm">
-            <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <Ticket className="w-5 h-5" />
-            </div>
-            <p className="font-bold text-slate-800 text-sm">Housefull</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">All Passes Allocated</p>
+        {/* Notice: Only mention that the ticket should be with them */}
+        <div className="w-full max-w-xl bg-amber-50/90 rounded-2xl p-4 sm:p-5 border border-amber-300/70 text-left text-xs sm:text-sm text-slate-700 shadow-sm flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 shadow-inner">
+            <Ticket className="w-5 h-5 text-amber-800" />
           </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gold-royal/30 text-center shadow-sm">
-            <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <Utensils className="w-5 h-5" />
-            </div>
-            <p className="font-bold text-slate-800 text-sm">Royal Onasadya</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Authentic Kerala Feast</p>
+          <div>
+            <p className="font-bold text-amber-950 text-sm">Important Entry Requirement:</p>
+            <p className="text-slate-700 text-xs sm:text-[13px] leading-relaxed mt-0.5">
+              Please make sure you have your official <strong>Kruponam 2026 entry ticket / pass</strong> (digital QR code or printed pass) with you at the gate for entry verification.
+            </p>
           </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gold-royal/30 text-center shadow-sm">
-            <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <Music className="w-5 h-5" />
-            </div>
-            <p className="font-bold text-slate-800 text-sm">Chenda Melam</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Live Traditional Beats</p>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-gold-royal/30 text-center shadow-sm">
-            <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <p className="font-bold text-slate-800 text-sm">Campus Event</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Krupanidhi Institutions</p>
-          </div>
-        </div>
-
-        {/* Important Guidelines Notice for Attendees */}
-        <div className="w-full max-w-3xl bg-amber-50/70 rounded-2xl p-4 sm:p-5 border border-amber-300/60 text-left text-xs sm:text-sm text-slate-700 space-y-2 shadow-sm">
-          <div className="flex items-center gap-2 font-bold text-amber-900">
-            <ShieldCheck className="w-4 h-4 text-amber-700" />
-            <span>Important Instructions for Confirmed Attendees:</span>
-          </div>
-          <ul className="list-disc pl-5 space-y-1 text-slate-600 text-xs sm:text-[13px] leading-relaxed">
-            <li><strong>Mandatory College ID:</strong> All attendees must carry their original college ID card along with their digital or printed Kruponam Pass for entry gate verification.</li>
-            <li><strong>Traditional Dress Code:</strong> Traditional Kerala attire (Kasavu Mundu, Saree, or festive ethnic wear) is warmly encouraged to celebrate the spirit of Onam.</li>
-            <li><strong>Entry Verification:</strong> Keep your pass QR code readily available on your phone for quick scanning at the welcome desk.</li>
-          </ul>
-        </div>
-
-        {/* Help & Support Assistance */}
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs text-slate-600 pt-1">
-          <span className="font-semibold text-slate-700">Need pass assistance?</span>
-          <a
-            href="mailto:kruponam@krupanidhi.edu.in"
-            className="inline-flex items-center gap-1.5 text-amber-800 hover:text-amber-900 font-medium hover:underline"
-          >
-            <Mail className="w-3.5 h-3.5 text-amber-600" />
-            <span>kruponam@krupanidhi.edu.in</span>
-          </a>
-          <span className="hidden sm:inline text-slate-300">•</span>
-          <span className="inline-flex items-center gap-1.5 text-slate-600">
-            <Phone className="w-3.5 h-3.5 text-amber-600" />
-            <span>Cultural Helpdesk & Pass Support</span>
-          </span>
         </div>
 
       </main>
 
-      {/* Footer Bar */}
+      {/* Footer Bar - Admin login hidden, Krupanidhi removed, Aadith CV with Instagram added */}
       <footer className="py-6 px-4 text-center text-xs text-slate-500 border-t border-gold-royal/20 z-10 space-y-2">
         <p className="font-serif italic font-semibold text-slate-700 text-sm">
           Celebrate Tradition. Celebrate Together. Happy Onam 2026!
         </p>
-        <p>© 2026 Krupanidhi Degree College Cultural Committee • Designed by HyreBit Innovations LLP</p>
-        {onOpenAdmin && (
-          <div className="pt-1">
-            <button
-              onClick={onOpenAdmin}
-              className="text-[11px] text-slate-400 hover:text-amber-800 transition-colors underline"
-            >
-              Organizers & Admin Portal
-            </button>
-          </div>
-        )}
+        <p className="text-slate-600">
+          Designed & Developed by{' '}
+          <a
+            href="https://instagram.com/aadith.cv"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-amber-700 hover:text-amber-900 underline underline-offset-2 transition-colors"
+          >
+            Aadith CV (@aadith.cv)
+          </a>
+        </p>
       </footer>
 
     </div>
