@@ -2,7 +2,8 @@
 // Controls website feature toggles (e.g., comingSoonMode, showing/hiding Programs & Schedule section).
 // Admins can toggle these settings live from the Admin Portal.
 
-const STORAGE_KEY = 'kruponam_site_settings_v2';
+const STORAGE_KEY = 'kruponam_site_settings_v3';
+const PREV_STORAGE_KEY = 'kruponam_site_settings_v2';
 const LEGACY_STORAGE_KEY = 'kruponam_site_settings_v1';
 
 export interface SiteSettings {
@@ -13,7 +14,7 @@ export interface SiteSettings {
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   showProgramsSchedule: false, // Default hidden
-  comingSoonMode: true,         // Default Thanks for Booking / Closed page active
+  comingSoonMode: false,        // Default booking site is open & live
   ticketAmount: 700,            // Default ticket pass price in ₹
 };
 
@@ -29,13 +30,13 @@ export const getSiteSettings = (): SiteSettings => {
       };
     }
 
-    // Check legacy storage migration (preserve ticket amount / schedule if previously customized, but default comingSoonMode to true)
-    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (legacyRaw) {
-      const parsed = JSON.parse(legacyRaw);
+    // Check legacy / previous storage migration (preserve ticket amount / schedule if customized, default comingSoonMode to false so booking site is open)
+    const prevRaw = localStorage.getItem(PREV_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (prevRaw) {
+      const parsed = JSON.parse(prevRaw);
       const migrated: SiteSettings = {
         showProgramsSchedule: typeof parsed.showProgramsSchedule === 'boolean' ? parsed.showProgramsSchedule : DEFAULT_SITE_SETTINGS.showProgramsSchedule,
-        comingSoonMode: true, // Default to true now that bookings are stopped
+        comingSoonMode: false, // Default booking site as open
         ticketAmount: typeof parsed.ticketAmount === 'number' && parsed.ticketAmount >= 0 ? parsed.ticketAmount : DEFAULT_SITE_SETTINGS.ticketAmount,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
